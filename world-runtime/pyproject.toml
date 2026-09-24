@@ -11,7 +11,7 @@ requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [{name = "Xiongwei Lin"}]
 dependencies = [
-  "semantic-language @ git+https://github.com/xiongweilin/semantic-language.git@eb8c6cb1757256ea9961201bd66ea79952de6134",
+  "semantic-language @ git+https://github.com/xiongweilin/aios.git@main#subdirectory=semantic-language",
   "fastapi>=0.115",
   "pydantic>=2.9",
 ]

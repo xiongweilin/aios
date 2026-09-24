@@ -17,7 +17,7 @@ dependencies = [
   "sqlalchemy>=2.0,<3",
   "psycopg[binary]>=3.2,<4",
   "uvicorn>=0.35,<1",
-  "semantic-language @ git+https://github.com/xiongweilin/semantic-language.git@eb8c6cb1757256ea9961201bd66ea79952de6134",
+  "semantic-language @ git+https://github.com/xiongweilin/aios.git@main#subdirectory=semantic-language",
 ]
 
 [project.optional-dependencies]
