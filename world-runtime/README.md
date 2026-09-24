@@ -48,39 +48,10 @@ The semantic rules behind that catalog are in `docs/contracts/runtime-contracts.
 
 The catalog deliberately does not absorb `semantic-language` or Domain Controller semantics.
 
-## Replacement status
+## Release contract
 
-`docs/replacement-gap-matrix.md` is the deletion gate for the three frozen predecessor
-repositories. A matching module name is not considered evidence of replacement.
-
-The matrix classifies every deletion-relevant predecessor invariant as:
-
-- `migrated`;
-- `intentionally deleted` with a new owner/rationale; or
-- `still missing`.
-
-The predecessors are not deletable while any deletion-blocking row remains `still missing`.
-
-## Migration
-
-Legacy state migration must produce typed canonical Runtime state plus a reconciliation report.
-Opaque source-event envelopes are provenance only and do not count as semantic migration.
-
-The migration pipeline reports unresolved source records explicitly; a migration is deletion-ready
-only when required records reconcile without unresolved or rejected entries.
-
-
-## Predecessor retirement
-
-The current stable Runtime baseline is frozen in `docs/releases/world-runtime-1.1-freeze.md`.
-The physical-deletion conditions for `meta-controller`, `agent-kernel`, and
-`world-state` are defined in `docs/migration/deletion-gate.md` and enforced by the
-`historical-predecessor-deletion-proof` workflow plus `scripts/deletion_gate.py`.
-
-Repository CI can prove code/contract replacement. Physical deletion additionally requires
-operator evidence that any real predecessor state has been migrated, or that no live predecessor
-state exists.
-
+Runtime Protocol 4.0 and the current 1.1 evolution rules are documented in
+`docs/releases/world-runtime-1.1-freeze.md`.
 
 ## Supported execution surface
 
@@ -147,9 +118,7 @@ This applies without turning Runtime into a universal ontology:
 - ontology type versions are append-only and require explicit Revision to
   advance the current version.
 
-These continuity semantics remain part of the stable kernel. Runtime Protocol 4.0
-adds new public agency/query commands without changing the historical meaning
-of the 0.6 lineage rules.
+These continuity semantics remain part of the stable kernel. Runtime Protocol 4.0 adds public agency/query commands without changing lineage semantics.
 
 
 ## World Runtime 1.0 agency model
