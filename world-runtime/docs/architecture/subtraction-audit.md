@@ -1,14 +1,8 @@
-# Semantic subtraction audit
+# Semantic ownership audit
 
-This stage removes predecessor-era compatibility and records what intentionally remains.
+The Runtime keeps semantic owners separate even when implementation shapes look similar.
 
-## Deleted
-
-- `BeliefVerdict.REJECTED` alias for `UNSUPPORTED`.
-- `BeliefVerdict.CONFLICTED` alias for `DISPUTED`.
-- any requirement for Domain Controllers to infer a bounded assignment from generic Work.
-
-## Retained with explicit owners
+## Current owners
 
 - `ClaimRevision`, `EvidenceAssessment`, and `BeliefState`: epistemics.
 - cognitive search/closure/revision state: cognition.
@@ -17,7 +11,7 @@ This stage removes predecessor-era compatibility and records what intentionally 
 - `Work`, `Run`, provider attempts/results: execution.
 - `StrategyAssessment`: strategy.
 
-## Explicit non-merges
+## Non-merges
 
 Objects sharing a suffix such as `Assessment` are not merged unless their meaning and authority
 are identical. Epistemic assessment, responsibility assessment, and strategy assessment answer
