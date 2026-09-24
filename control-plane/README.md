@@ -50,7 +50,7 @@ World Runtime remains the canonical owner of cross-domain semantic objects such 
 
 The boundary is protocol-based, not Python-import-based.
 
-Production source must not import `world_runtime`, and `pyproject.toml` / `uv.lock` must not depend on the `world-runtime` Python package. CI enforces both constraints.
+Production source must not import `world_runtime`, and `pyproject.toml` / `uv.lock` must not depend on the `world-runtime` Python package. Component verification should preserve both constraints.
 
 ## Runtime handshake
 
@@ -144,10 +144,10 @@ This distinction is the reason a local controller is allowed while a copied Runt
 
 Concrete providers are local to this Domain Controller. Examples include:
 
-- Codex reasoning/execution;
+- agent/model reasoning or execution adapters;
 - monitoring verification;
 - Git synchronization;
-- Docker/maintenance operations;
+- infrastructure or maintenance providers;
 
 The local provider protocol is an implementation boundary for control-plane. It does not mint universal authority.
 
@@ -218,13 +218,14 @@ uv run mypy src
 uv run pytest -q
 ```
 
-CI additionally proves:
+The component verification surface is expected to cover:
 
 - no production `world_runtime` imports;
 - no `world-runtime` package dependency;
 - predecessor runtime code is absent;
-- exact Runtime protocol mismatch fails closed;
-- SonarCloud Quality Gate passes.
+- exact Runtime protocol mismatch fails closed.
+
+Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow; historical standalone component CI is not current evidence.
 
 
 ## Reality effect boundary
