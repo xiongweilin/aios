@@ -1,6 +1,8 @@
 # Production operations
 
-This runbook describes the current Administrative V1 + World Runtime production topology.
+Status: component deployment reference; not an AIOS-wide deployment contract.
+
+This runbook describes the Administrative V1 + World Runtime deployment topology represented by this component.
 
 ## Topology
 
@@ -34,8 +36,8 @@ WORLD_RUNTIME_FACTORY=scripts.production_world_runtime_stack:build
 WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH=/var/lib/world-runtime/world-runtime.db
 ```
 
-`world-runtime` itself is pinned to an immutable Git SHA in `pyproject.toml`.
-There is no mutable deployment-level Agent Kernel revision source.
+World Runtime source now lives in the same AIOS monorepo. Deployment identity must therefore be pinned and recorded at the built artifact/image and AIOS commit level; `pyproject.toml` is not a locator for a separate Runtime repository.
+There is no deployment-level Agent Kernel revision source.
 
 Use `.env.production.example` as the configuration inventory.
 
@@ -191,9 +193,7 @@ Before rolling back:
 
 ## Acceptance evidence
 
-Current V1 acceptance is produced by CI, the Production Trust workflow, Runtime integration gates,
-and fresh production/read-back evidence. Run-specific evidence belongs in CI artifacts or an
-operator-controlled evidence store, not as staged milestone snapshots in the source tree.
+Current acceptance requires fresh component verification, Runtime integration gates, repository-level AIOS checks, and production/read-back evidence appropriate to the deployment being assessed. Historical standalone workflow names are not current evidence. Run-specific evidence belongs in CI artifacts or an operator-controlled evidence store, not as staged milestone snapshots in the source tree.
 
 Unit tests and local fixtures prove repository semantics; they are not relabeled as real-provider
 evidence.
