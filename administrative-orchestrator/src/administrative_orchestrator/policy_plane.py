@@ -449,8 +449,8 @@ def default_commitment_policy_version() -> PolicyVersionRecord:
                     "authority_class": "normal",
                 }
             ],
-            "confirmation": "internal_feishu_one_to_one_fixed_template",
-            "reminder": "one_bounded_internal_feishu_one_to_one",
+            "confirmation": "internal_direct_message_fixed_template",
+            "reminder": "one_bounded_internal_direct_message",
             "fulfillment": ["authorized_attestation", "evidence_verified"],
         },
         created_at=baseline,

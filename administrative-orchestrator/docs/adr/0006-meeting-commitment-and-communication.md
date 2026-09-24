@@ -7,8 +7,8 @@ Gateway PR #16 merged; closure recorded in
 
 ## Decision
 
-M9 treats a meeting transcript as untrusted source material. The Feishu
-intake profile `meeting.commitment.v1` may create zero or more candidate
+M9 treats a meeting transcript as untrusted source material. The
+provider-neutral intake profile `meeting.commitment.v1` may create zero or more candidate
 commitments, but it cannot create authority, a Kernel responsibility, Work
 admission, a communication command, or a fulfillment fact.
 
@@ -30,11 +30,10 @@ of kind `meeting-commitment` and a durable CommitmentRecord. The commitment
 is a persistent responsibility proposal; it is not an Administrative Work
 item and it does not authorize fulfillment.
 
-M9 confirmation/reminder messages are fixed-template, one-to-one Feishu
-communications. Draft content lives only in the content-addressed
+M9 confirmation/reminder messages are fixed-template direct messages via a provider-neutral transport. Draft content lives only in the content-addressed
 ArtifactStore. Administrative database rows contain storage references,
-digests, recipient identity, event identity, and delivery state. The Gateway
-has a separate HMAC key from ingress/notification keys, accepts one durable
+digests, recipient identity, event identity, and delivery state. A transport
+accepts one durable
 `communication_event_id`, and never treats transport acceptance as human read
 or commitment fulfillment. A lost transport ACK is `outcome_unknown`; the
 same event is reconciled rather than re-sent with a new identity.
@@ -51,7 +50,7 @@ decision, and a Kernel lifecycle transition, in that order.
   the generic capability `administrative.communication.message.send.v1`.
 - The Gateway remains a transport boundary and does not own Administrative
   policy, identity, fulfillment, or completion.
-- M9 cannot claim completion from a model response, a Feishu HTTP success, a
+- M9 cannot claim completion from a model response, a transport HTTP success, a
   provider message identifier, or a confirmation-message reply alone.
 
 ## Out of scope

@@ -111,7 +111,7 @@ def test_failed_outbox_replay_starts_one_fresh_bounded_attempt_window() -> None:
         db.add(
             OutboxEventRow(
                 event_id=event_id,
-                event_type="intake.feishu.received",
+                event_type="intake.source.received",
                 aggregate_id=str(event_id),
                 payload_json={"event_id": str(event_id)},
                 status=OUTBOX_FAILED,

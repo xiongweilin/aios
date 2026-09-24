@@ -56,32 +56,6 @@ def create_control_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/v1/agency-console/contracts", include_in_schema=False)
-    def agency_console_contracts() -> dict[str, object]:
-        return {
-            "manifest": "agency-console-controller-contracts-v2",
-            "system": "autonomous-development",
-            "contract": "autonomous-development-agency-console-v2",
-            "package": "0.1.0",
-            "runtime_protocol": "4.0",
-            "reads": {
-                "health": "/health",
-                "ready": "/ready",
-                "requirement": "/v1/operator/requirements/{request_id}",
-                "events": "/v1/operator/events",
-            },
-            "commands": {
-                "submit_requirement": "/v1/operator/requirements",
-                "start_requirement": "/v1/operator/requirements/{request_id}/start",
-                "cancel_requirement": "/v1/operator/requirements/{request_id}/cancel",
-                "cancel_requirement_if_current": (
-                    "/v1/operator/requirements/{request_id}/cancel-if-current"
-                ),
-                "respond_intervention": "/v1/operator/interventions/{intervention_id}/responses",
-            },
-            "command_version_semantics": "development-request-state-v1",
-        }
-
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
         if operator is not None:

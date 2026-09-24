@@ -54,7 +54,7 @@ def _store(tmp_path: Path) -> SqlStore:
             ],
             "identity_bindings": [
                 {
-                    "provider": "feishu",
+                    "provider": "messaging-provider",
                     "external_subject": "ou_committer",
                     "principal_id": "person:committer",
                 }
@@ -77,8 +77,8 @@ def _interpretation(store: SqlStore, *, classification: str) -> tuple[Interpreta
     interpretation_id = uuid4()
     artifact = SourceArtifact(
         artifact_id=artifact_id,
-        source_kind="feishu-message",
-        source_system="feishu",
+        source_kind="meeting-message",
+        source_system="meeting-source",
         tenant_ref="tenant",
         canonical_source_ref="message-1",
         source_event_ref="event-1",
@@ -95,7 +95,7 @@ def _interpretation(store: SqlStore, *, classification: str) -> tuple[Interpreta
         representation_digest="b" * 64,
         locator_kind="message-text",
         locator={"start": 0, "end": 42},
-        extractor_ref="feishu-canonical:v1",
+        extractor_ref="canonical-message:v1",
     )
     interpretation = InterpretationRecord(
         interpretation_id=interpretation_id,
@@ -472,7 +472,7 @@ def _prepared_communication_service(
         external_effects_enabled=external_effects_enabled,
         communication_gateway_base_url=gateway_url,
         communication_transport_secret=SecretStr("m9-test-secret"),
-        feishu_artifact_root=str(tmp_path / "artifacts"),
+        intake_artifact_root=str(tmp_path / "artifacts"),
     )
     service = MeetingCommitmentService(store, settings=settings)
     candidate = service.create_candidates_from_interpretation(

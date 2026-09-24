@@ -83,7 +83,7 @@ class SpeakerPrincipalResolution(UtcModel):
     candidate_ref: UUID
     source_speaker_identity: str = Field(min_length=1, max_length=512)
     resolved_principal_id: str = Field(min_length=1, max_length=255)
-    provider: str = Field(default="feishu", min_length=1, max_length=128)
+    provider: str = Field(min_length=1, max_length=128)
     external_subject: str = Field(min_length=1, max_length=1000)
     basis: dict[str, Any] = Field(min_length=1)
     resolver_type: str = Field(min_length=1, max_length=128)

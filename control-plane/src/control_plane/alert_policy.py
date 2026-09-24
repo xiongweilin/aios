@@ -169,7 +169,7 @@ def classify_safety(result: dict[str, Any] | None) -> str:
     diagnosis. A missing, malformed, or failed provider result is ``invalid``
     rather than ``unknown``. Explicit UNKNOWN is denied all effect
     capabilities, but still receives the bounded read-only execution and
-    verification pass before the next round or Feishu escalation.
+    verification pass before the next round or human escalation.
     """
     if not _succeeded(result):
         return _INVALID_SAFETY_CLASS

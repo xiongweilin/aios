@@ -33,7 +33,7 @@ employee-lifecycle repository, no identity-revocation repository.
 ### 2. Termination truth comes from an authoritative HR source
 
 ```text
-Feishu: "X leaves today"                        → CLAIM
+Unverified message: "X leaves today"            → CLAIM
 HRIS:   termination_status / effective_at       → AUTHORITATIVE
 ```
 

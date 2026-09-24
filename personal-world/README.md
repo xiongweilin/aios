@@ -1,8 +1,7 @@
 # personal-world
 
-[![CI](https://github.com/xiongweilin/personal-world/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xiongweilin/personal-world/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=metratio_personal-world&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_personal-world)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=metratio_personal-world&metric=coverage)](https://sonarcloud.io/summary/new_code?id=metratio_personal-world)
+> Component of the [AIOS monorepo](../README.md) at `personal-world/`; this directory is not an independent GitHub repository.
+
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Version](https://img.shields.io/badge/version-1.0.0-6f42c1)

@@ -2,9 +2,8 @@
 
 Status: implemented contract, last reviewed 2026-09-19.
 
-This document owns the provider-neutral contract between the local Autonomous Development
-control plane and an operator adapter such as the independent Feishu bridge. A provider message,
-chat ID, or open ID is never stored in the core domain; the adapter maps those identities to the
+This document owns the provider-neutral contract between the Autonomous Development
+control plane and an operator adapter. Provider-specific message and user identifiers are never stored in the core domain; the adapter maps those identities to the
 durable `request_id` and sends only the normalized request body below.
 
 ## Requirement lifecycle
@@ -64,9 +63,9 @@ The JSON contract uses camelCase on the wire. A submit body is:
 
 ```json
 {
-  "requestId": "feishu:message-id",
+  "requestId": "operator:event-id",
   "targetId": "the-single-registered-target",
-  "source": "feishu-autodev",
+  "source": "operator-adapter",
   "externalReferenceDigest": "sha256-of-provider-event-identity",
   "title": "bounded title",
   "normalizedRequirementText": "UTF-8 normalized text",
@@ -81,7 +80,7 @@ untrusted runtime evidence; a human requirement enters this contract directly.
 
 The bridge and control plane use a new, independent operator HMAC secret loaded from secret
 files. It must not equal the old gateway notification HMAC, administrative HMAC, user HMAC,
-control-plane key, or Feishu App Secret.
+control-plane key, or provider credential.
 
 Every request includes:
 

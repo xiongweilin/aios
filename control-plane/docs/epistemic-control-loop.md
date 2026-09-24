@@ -1,6 +1,6 @@
 # Epistemic repair loop
 
-The personal incident-repair profile owns a domain-local epistemic and repair loop. It does not import or project into `world_runtime.cognition`.
+The Control Plane owns a domain-local epistemic and repair loop. It does not import or project into `world_runtime.cognition`.
 
 World Runtime remains the owner of universal durable Responsibility, DomainAssignment, Decision, governance, and audit semantics. The control-plane loop communicates with it only through the public HTTP contracts.
 

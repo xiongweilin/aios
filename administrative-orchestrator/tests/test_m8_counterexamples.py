@@ -127,7 +127,7 @@ def test_document_prompt_injection_stays_a_candidate_claim(tmp_path) -> None:
         MessageAttachment(
             attachment_ref="m8-injection",
             message_ref="m8-message",
-            source_system="feishu",
+            source_system="external-message-provider",
             tenant_ref="tenant:m8",
             source_event_ref="m8-injection-event",
             filename="prompt-injection-invoice.pdf",
@@ -155,7 +155,7 @@ def test_malicious_pdf_instructions_remain_uninterpreted_representation(tmp_path
         MessageAttachment(
             attachment_ref="m8-malicious-pdf",
             message_ref="m8-malicious-message",
-            source_system="feishu",
+            source_system="external-message-provider",
             tenant_ref="tenant:m8",
             source_event_ref="m8-malicious-event",
             filename="malicious-invoice.pdf",

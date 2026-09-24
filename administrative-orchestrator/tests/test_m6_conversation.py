@@ -190,7 +190,7 @@ def test_conversation_sender_participants_and_delivery_order_are_stable() -> Non
     assert len(service.list_messages(ref)) == 1
 
 
-def test_provider_sequence_accepts_feishu_large_integer() -> None:
+def test_provider_sequence_accepts_large_integer() -> None:
     _, service, ref = _setup()
     sequence = 1_789_020_305_342
 

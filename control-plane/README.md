@@ -1,14 +1,13 @@
 # control-plane
 
-[![CI](https://github.com/xiongweilin/control-plane/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xiongweilin/control-plane/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=metratio_control-plane&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_control-plane)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=metratio_control-plane&metric=coverage)](https://sonarcloud.io/summary/new_code?id=metratio_control-plane)
+> Component of the [AIOS monorepo](../README.md) at `control-plane/`; this directory is not an independent GitHub repository.
+
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-An external Domain Controller for [world-runtime](https://github.com/xiongweilin/world-runtime), focused on authenticated personal/platform operations, monitoring, bounded repair, and narrowly scoped effects.
+An AIOS Domain Controller component for [world-runtime](../world-runtime/README.md), focused on authenticated personal/platform operations, monitoring, bounded repair, and narrowly scoped effects.
 
-This repository is intentionally not a second World Runtime.
+This component is intentionally not a second World Runtime.
 
 ```text
 World Runtime
@@ -149,7 +148,6 @@ Concrete providers are local to this Domain Controller. Examples include:
 - monitoring verification;
 - Git synchronization;
 - Docker/maintenance operations;
-- Feishu notification.
 
 The local provider protocol is an implementation boundary for control-plane. It does not mint universal authority.
 

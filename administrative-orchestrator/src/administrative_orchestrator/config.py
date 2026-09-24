@@ -24,43 +24,13 @@ class Settings(BaseSettings):
     external_effects_enabled: bool = False
     auto_create_schema: bool = True
 
-    # Optional M6 Feishu runtime. Secret values are held as SecretStr and are
-    # never returned by readiness endpoints or written to intake records.
-    feishu_base_url: str = "https://open.feishu.cn"
-    # Worker-only Feishu app credentials used to obtain short-lived tenant
-    # access tokens for canonical reads. They are intentionally separate from
-    # the ingress verification token and the gateway's transport credentials.
-    feishu_app_id: str = ""
-    feishu_app_id_file: str = ""
-    feishu_app_secret: SecretStr | None = None
-    feishu_app_secret_file: str = ""
-    feishu_verification_token: SecretStr | None = None
-    feishu_verification_token_file: str = ""
-    # Secret used only by the trusted gateway-to-Administrative metadata
-    # handoff. Feishu's official long connection does not provide the HTTP
-    # callback token on every event, so this transport credential is separate
-    # from the callback verification material.
-    feishu_ingress_shared_secret: SecretStr | None = None
-    feishu_ingress_shared_secret_file: str = ""
-    feishu_encrypt_key: SecretStr | None = None
-    # Explicit test/manual override. Production/staging should use the app
-    # credential pair above and the dynamic tenant-token provider.
-    feishu_access_token: SecretStr | None = None
-    feishu_artifact_root: str = "./data/intake-artifacts"
-    # M9 outbound communication is a separate governed transport.  Its
-    # credential is intentionally distinct from the M6 ingress secret and the
-    # legacy notification key.
+    intake_artifact_root: str = "./data/intake-artifacts"
+    # Outbound communication uses a provider-neutral transport contract.
     communication_gateway_base_url: str = ""
     communication_transport_secret: SecretStr | None = None
     communication_transport_secret_file: str = ""
     communication_transport_secret_env: str = "ADMIN_COMMUNICATION_TRANSPORT_SECRET"
     communication_gateway_timeout_seconds: float = 10.0
-    communication_verifier_app_id: str = ""
-    communication_verifier_app_id_file: str = ""
-    communication_verifier_app_secret: SecretStr | None = None
-    communication_verifier_app_secret_file: str = ""
-    communication_verifier_app_secret_env: str = "ADMIN_COMMUNICATION_VERIFIER_APP_SECRET"
-    communication_verifier_gateway_secret_env: str = "ADMIN_COMMUNICATION_TRANSPORT_SECRET"
     intake_model_url: str = ""
     intake_model_api_key: SecretStr | None = None
     intake_model_protocol: Literal["json", "openai-chat", "openai-responses"] = "json"
@@ -69,7 +39,7 @@ class Settings(BaseSettings):
     intake_model_provider: str = "configured-model-gateway"
     intake_model_identity: str = "configured-model"
     intake_model_version: str = "configured"
-    intake_model_profile_ref: str = "feishu-onboarding-v1"
+    intake_model_profile_ref: str = "candidate-intake-v1"
     intake_model_schema_ref: str = "candidate-interpretation-v1"
     # Optional advisory-only investigation adapter.  A blank URL keeps the
     # Administrative deployment available while investigation remains

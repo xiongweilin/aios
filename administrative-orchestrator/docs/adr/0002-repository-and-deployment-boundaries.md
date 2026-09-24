@@ -113,12 +113,6 @@ vendor transport mechanics
 
 remain colocated so the authority/reality distinctions cannot drift silently.
 
-## Operations Console split policy
-
-Keep `operations-console/` in this repository while it is the human exception surface for the Administrative product and participates in the same CI/acceptance gate.
-
-Reconsider a split only if it becomes a separately versioned multi-product operations product with a stable external API contract and independent release/ownership lifecycle.
-
 ## Consequences
 
 Positive:

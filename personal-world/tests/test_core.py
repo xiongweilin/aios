@@ -109,19 +109,19 @@ def test_revision_preserves_history_and_as_of_world(service: PersonalWorldServic
     assert second.revision == 2
     march = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=datetime(2026, 3, 1, tzinfo=UTC),
     )
     current = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
     )
     assert [item.value for item in march] == ["Tokyo"]
     assert [item.value for item in current] == ["Osaka"]
     assert len(
-        service.history_for_subject(subject, service_identity="agency-console", purpose="audit")
+        service.history_for_subject(subject, service_identity="administrative-orchestrator", purpose="audit")
     ) == 2
 
 

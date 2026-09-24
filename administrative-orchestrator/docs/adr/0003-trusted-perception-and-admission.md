@@ -123,23 +123,7 @@ provider event authenticity
 Provider credentials are perception credentials; they are not Administrative
 authority credentials and are not Kernel reality-write credentials.
 
-For the Feishu reference slice, the official SDK long connection hands a
-metadata-only envelope through the gateway to the Administrative HTTP
-boundary. The long-connection event does not reliably carry the HTTP callback
-verification token, so the gateway uses a dedicated transport credential for
-this internal handoff. The boundary verifies that credential, and verifies a
-provider token too whenever one is present; direct callback mode continues to
-require the provider token and optional signature. It then writes a verified
-`IntakeReceipt` and `intake.feishu.received` outbox event in one transaction.
-The receipt/outbox job payload contains provider delivery metadata only;
-message body/content is fetched canonically by the asynchronous worker after
-durable acceptance. A duplicate delivery reuses the delivery identity, while
-a conflicting reuse fails closed. URL-verification and signed HTTP callback
-headers are not part of this long-connection reference slice unless a
-separate callback transport is enabled. Canonical fetch, artifact persistence,
-identity resolution, interpretation, and candidate projection are not part of
-the metadata handoff response path.
-
+A verified transport receipt and provider-neutral outbox event are persisted atomically with delivery metadata only. Canonical content is fetched only after durable acceptance; duplicate delivery reuses its identity, while conflicting reuse fails closed. Transport-specific handshakes stay outside the domain admission boundary.
 ### 5. Interpretation is historical and non-authoritative
 
 An artifact can have multiple immutable interpretations:
@@ -244,18 +228,7 @@ assessments, and promotion lineage—not raw binary content. Missing objects,
 digest mismatch, corruption, and storage unavailability fail closed without
 fabricating an interpretation or admission.
 
-The current implementation wires the Feishu canonical file/image fetch into
-the provider-neutral attachment processor. `FilesystemArtifactStore` stores
-bytes as SHA-256 content-addressed objects outside PostgreSQL, publishes new
-objects atomically, and verifies the digest on read; the production worker
-mounts a durable named artifact volume. `SourceArtifact` retains MIME/size/
-digest/storage-reference metadata and `EvidenceSpan` retains immutable
-representation locators. No raw document body belongs in `IntakeReceipt` or
-an outbox payload, and no attachment is authoritative merely because it was
-stored or interpreted. A real provider attachment run, OCR/document
-interpretation, or document-to-Work behavior remains unproven until staging
-evidence records it.
-
+A provider adapter may supply canonical attachments to the provider-neutral attachment processor. `FilesystemArtifactStore` stores bytes as SHA-256 content-addressed objects outside PostgreSQL, publishes new objects atomically, and verifies the digest on read. `SourceArtifact` retains MIME/size/digest/storage-reference metadata and `EvidenceSpan` retains immutable representation locators. No raw document body belongs in `IntakeReceipt` or an outbox payload, and no attachment is authoritative merely because it was stored or interpreted.
 ### 9. Workflow authority map
 
 | Transition | Owner | Evidence / guard |
@@ -275,28 +248,7 @@ provider delivery cannot become a unique business request by itself; an
 unknown execution result is not retry permission; and candidate state cannot
 call Kernel or physical providers directly.
 
-### 10. Provider and cross-repository boundary
-
-M6 PR1 did not choose or implement a provider. PR9 selects Feishu as the
-reference provider based on current local evidence. The existing gateway may
-only own transport, event authenticity, delivery identity, and explicitly
-signed forwarding. The Administrative adapter performs canonical fetch,
-source/artifact lineage, identity resolution, interpretation, and candidate
-projection after durable acceptance; neither component may persist business
-authority, create Administrative cases, or own admission or completion. A
-gateway change, if necessary, is a separate compatibility PR;
-`agent-kernel`, `meta-controller`, and unrelated repositories are not modified
-for M6 convenience.
-
-The current repository also contains a configurable Feishu runtime that builds
-the webhook boundary, canonical fetcher, model gateway, and artifact store from
-deployment settings and injects the worker processor. Missing processing
-dependencies fail closed. A production Feishu credential, canonical-fetch
-route, model gateway, artifact root, and identity binding still require fresh
-real-staging evidence; this ADR does not assert that those external
-integrations have run successfully.
-
-### 11. M5 compatibility and replay matrix
+### 10. M5 compatibility and replay matrix### 11. M5 compatibility and replay matrix
 
 M6 is an upstream additive change. The following M5 gates are rerun only when
 their owned boundary changes:

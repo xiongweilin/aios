@@ -40,12 +40,12 @@ def test_erasure_removes_personal_content_from_all_derived_surfaces(
 
     before_search = service.search(
         SearchRequest(subject_id=subject, purpose="audit", query=secret),
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
     )
     assert before_search
     before_projection = service.project(
         ContextProjectionRequest(subject_id=subject, purpose="audit", query=secret),
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
     )
     assert before_projection.included_items
 
@@ -53,18 +53,18 @@ def test_erasure_removes_personal_content_from_all_derived_surfaces(
 
     assert service.search(
         SearchRequest(subject_id=subject, purpose="audit", query=secret),
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
     ) == []
     projection = service.project(
         ContextProjectionRequest(subject_id=subject, purpose="audit", query=secret),
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
     )
     assert projection.included_items == ()
     assert projection.contested_items == ()
     assert projection.stale_items == ()
     assert service.history_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
     ) == []
 

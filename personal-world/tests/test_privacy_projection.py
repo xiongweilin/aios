@@ -128,7 +128,7 @@ def test_disclosure_audit_survives_bundle_restore(
     subject = uuid4()
     service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
     )
     bundle = service.export_bundle()

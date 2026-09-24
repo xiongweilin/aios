@@ -1,7 +1,7 @@
 [project]
 name = "control-plane"
 version = "0.5.0"
-description = "External personal-operations Domain Controller for World Runtime"
+description = "AIOS Control Plane component for governed operations over World Runtime"
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }

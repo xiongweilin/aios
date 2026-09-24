@@ -3,7 +3,6 @@ from __future__ import annotations
 from .communication_effects import (
     AdministrativeCommunicationEffectConnection,
     AdministrativeCommunicationEffectConnector,
-    FeishuCommunicationVerifier,
 )
 from .effect_common import (
     ConnectorConfigurationError,
@@ -43,7 +42,6 @@ from .odoo_effects import _required_odoo_numeric_ref as _required_odoo_numeric_r
 __all__ = [
     "AdministrativeCommunicationEffectConnection",
     "AdministrativeCommunicationEffectConnector",
-    "FeishuCommunicationVerifier",
     "ConnectorConfigurationError",
     "ConnectorResult",
     "ConnectorStatus",

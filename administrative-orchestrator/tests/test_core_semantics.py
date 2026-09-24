@@ -58,7 +58,7 @@ def _complete_facts() -> OnboardingFacts:
         manager_principal_id="person:manager",
         start_date="2026-09-15",
         employment_type="full-time",
-        requested_systems=("github", "feishu"),
+        requested_systems=("github", "messaging"),
     )
 
 

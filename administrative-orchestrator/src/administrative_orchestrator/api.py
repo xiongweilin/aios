@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-import os
-import time
 from importlib.metadata import version as package_version
 from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from .access_policy import (
@@ -50,7 +45,6 @@ from .fact_transitions import replace_facts_for_reevaluation
 from .governance import GovernanceBasis, GovernanceRepository
 from .ingress import DuplicateIngressEvent, get_ingress_receipt
 from .inspection import list_authorizations, list_decisions, list_realizations
-from .intake.repository import IntakeReceiptConflict
 from .messaging import FailedOutboxEvent, list_failed_outbox
 from .obligations import ObligationRepository, OnboardingObligationSet
 from .persistence import ConcurrencyConflict, SqlStore
@@ -65,13 +59,6 @@ from .production_readiness import (
     ProductionReadinessError,
     validate_world_runtime_compatibility,
 )
-from .providers.feishu import (
-    FeishuAcceptance,
-    FeishuChallenge,
-    FeishuVerificationError,
-    FeishuWebhookBoundary,
-)
-from .providers.feishu_runtime import build_feishu_webhook_boundary
 from .service import (
     TransitionError,
     apply_policy_evaluation,
@@ -97,20 +84,10 @@ _policies = PolicyRepository(_store)
 _governance = GovernanceRepository(_store)
 _obligations = ObligationRepository(_store)
 _authenticator = Authenticator(_store, _settings)
-_feishu_intake_boundary: FeishuWebhookBoundary | None = None
 if _settings.auto_create_schema:
     # UoW and repositories above intentionally import/register all domain row
     # models before metadata creation.
     _store.init_schema()
-
-
-def configure_feishu_intake(boundary: FeishuWebhookBoundary | None) -> None:
-    """Inject the provider verifier without making secrets part of app import."""
-    global _feishu_intake_boundary
-    _feishu_intake_boundary = boundary
-
-
-configure_feishu_intake(build_feishu_webhook_boundary(_store, _settings))
 
 
 class CreateOnboardingCase(BaseModel):
@@ -156,18 +133,6 @@ class DecisionResponse(BaseModel):
     approval: ApprovalAssessment | None = None
 
 
-class AgencyConsoleDispositionBody(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    gesture_id: UUID = Field(alias="gestureId")
-    principal_ref: str = Field(alias="principalRef", min_length=1)
-    proposal_ref: str = Field(alias="proposalRef", min_length=1)
-    proposal_version: str = Field(alias="proposalVersion", min_length=1)
-    expected_state_version: str = Field(alias="expectedStateVersion", min_length=1)
-    disposition: Literal["approved", "rejected"]
-    occurred_at: str = Field(alias="occurredAt", min_length=1)
-
-
 def _authenticate(request: Request) -> AuthenticatedPrincipal:
     return _authenticator.authenticate(request)
 
@@ -194,53 +159,6 @@ def _case_scope(case: AdministrativeCase) -> str:
     facts = case.fact_snapshot.facts if case.fact_snapshot else {}
     department = facts.get("department_ref")
     return str(department) if department else "*"
-
-
-def _agency_console_secret() -> str:
-    secret = os.getenv("ADMIN_AGENCY_CONSOLE_SHARED_SECRET", "").strip()
-    if not secret:
-        raise HTTPException(
-            status_code=503,
-            detail="Agency Console integration authentication is not configured",
-        )
-    return secret
-
-
-def _verify_agency_console_request(request: Request, body: bytes = b"") -> None:
-    timestamp = request.headers.get("X-Agency-Console-Timestamp", "").strip()
-    signature = request.headers.get("X-Agency-Console-Signature", "").strip().lower()
-    if not timestamp or not signature:
-        raise HTTPException(status_code=401, detail="Agency Console signature is required")
-    try:
-        asserted_at = int(timestamp)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail="invalid Agency Console timestamp") from exc
-    ttl = max(1, int(os.getenv("ADMIN_AGENCY_CONSOLE_ASSERTION_TTL_SECONDS", "60")))
-    if abs(int(time.time()) - asserted_at) > ttl:
-        raise HTTPException(status_code=401, detail="Agency Console assertion is expired")
-    body_digest = hashlib.sha256(body).hexdigest()
-    canonical = f"{timestamp}\n{request.method.upper()}\n{request.url.path}\n{body_digest}".encode()
-    expected = hmac.new(_agency_console_secret().encode(), canonical, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature.removeprefix("sha256=")):
-        raise HTTPException(status_code=401, detail="invalid Agency Console signature")
-
-
-def _agency_console_binding(case: AdministrativeCase) -> dict[str, object] | None:
-    if case.status.value != "awaiting_decision":
-        return None
-    version = str(case.version)
-    proposal_ref = f"administrative:case:{case.case_id}:decision"
-    return {
-        "bindingId": f"administrative:case:{case.case_id}:decision:{version}",
-        "sourceSystem": "administrative-orchestrator",
-        "commandName": "case.disposition",
-        "targetRef": str(case.case_id),
-        "expectedTargetVersion": version,
-        "proposalRef": proposal_ref,
-        "proposalVersion": version,
-        "allowedDispositions": ["approved", "rejected"],
-        "readBackRef": f"administrative:case:{case.case_id}",
-    }
 
 
 def _current_onboarding_policy():
@@ -279,268 +197,6 @@ def _existing_onboarding_response(
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
-
-@app.get("/v1/agency-console/contracts")
-def agency_console_contracts() -> dict[str, object]:
-    return {
-        "manifest": "agency-console-controller-contracts-v2",
-        "system": "administrative-orchestrator",
-        "contract": "administrative-agency-console-v2",
-        "package": "1.0.0",
-        "runtime_protocol": "4.0",
-        "reads": {
-            "health": "/healthz",
-            "ready": "/readyz",
-            "case": "/v1/cases/{case_id}",
-            "facts": "/v1/cases/{case_id}/facts",
-            "decisions": "/v1/cases/{case_id}/decisions",
-            "authorizations": "/v1/cases/{case_id}/authorizations",
-            "effects": "/v1/cases/{case_id}/effects",
-            "outcomes": "/v1/cases/{case_id}/outcomes",
-            "completion": "/v1/cases/{case_id}/completion",
-            "console_proposal": "/v1/agency-console/cases/{case_id}/proposal",
-            "console_projection": "/v1/agency-console/cases/{case_id}/projection",
-        },
-        "commands": {
-            "disposition": "/v1/agency-console/cases/{case_id}/dispositions",
-            "reopen": "/v1/cases/{case_id}/reopen",
-        },
-        "command_version_semantics": "administrative-case-version",
-    }
-
-
-@app.get("/v1/agency-console/cases/{case_id}/proposal")
-def agency_console_case_proposal(case_id: UUID, request: Request) -> dict[str, object]:
-    _verify_agency_console_request(request)
-    case = _store.get_case(case_id)
-    if case is None:
-        raise HTTPException(status_code=404, detail="case not found")
-    binding = _agency_console_binding(case)
-    proposal = None
-    if binding is not None:
-        proposal = {
-            "proposalRef": binding["proposalRef"],
-            "proposalVersion": str(case.version),
-            "expectedStateVersion": str(case.version),
-            "title": f"Administrative decision for {case.subject_ref}",
-            "rationale": f"Case {case.case_kind} is awaiting an authorized human decision.",
-            "scope": [f"administrative:{case.case_kind}"],
-            "resources": [case.subject_ref],
-            "irreversibleConsequences": [],
-            "evidenceRefs": [],
-            "unknowns": [],
-            "commandBinding": binding,
-        }
-    return {
-        "caseRef": str(case.case_id),
-        "caseVersion": str(case.version),
-        "caseStatus": case.status.value,
-        "proposal": proposal,
-    }
-
-
-@app.get("/v1/agency-console/cases/{case_id}/projection")
-def agency_console_case_projection(case_id: UUID, request: Request) -> dict[str, object]:
-    _verify_agency_console_request(request)
-    case = _store.get_case(case_id)
-    if case is None:
-        raise HTTPException(status_code=404, detail="case not found")
-    effects = _execution.list_effects(case.case_id, case.authority_epoch)
-    outcomes = _execution.list_outcomes(case.case_id, case.authority_epoch)
-    realizations = _execution.list_realizations(case.case_id, case.authority_epoch)
-    obligation_set = _obligations.get_current(case.case_id, case.authority_epoch)
-    if obligation_set is None:
-        completion = assess_onboarding_completion(effects, outcomes, realizations=realizations)
-    else:
-        completion = assess_administrative_completion(
-            obligation_set,
-            effects,
-            outcomes,
-            realizations=realizations,
-            links=_obligations.list_links(case.case_id, case.authority_epoch),
-            fulfillments=_obligations.list_domain_state_fulfillments(
-                case.case_id, case.authority_epoch
-            ),
-        )
-    return {
-        "case": case.model_dump(mode="json"),
-        "decisions": [item.model_dump(mode="json") for item in list_decisions(_store, case.case_id)],
-        "authorizations": [
-            item.model_dump(mode="json") for item in list_authorizations(_store, case.case_id)
-        ],
-        "effects": [item.model_dump(mode="json") for item in effects],
-        "realizations": [item.model_dump(mode="json") for item in realizations],
-        "outcomes": [item.model_dump(mode="json") for item in outcomes],
-        "completion": completion.model_dump(mode="json"),
-        "commandBinding": _agency_console_binding(case),
-    }
-
-
-@app.post("/v1/agency-console/cases/{case_id}/dispositions")
-async def agency_console_case_disposition(case_id: UUID, request: Request) -> dict[str, object]:
-    raw = await request.body()
-    _verify_agency_console_request(request, raw)
-    try:
-        payload = AgencyConsoleDispositionBody.model_validate_json(raw)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="invalid Agency Console disposition") from exc
-
-    case = _store.get_case(case_id)
-    if case is None:
-        raise HTTPException(status_code=404, detail="case not found")
-    expected_proposal_ref = f"administrative:case:{case.case_id}:decision"
-    if payload.proposal_ref != expected_proposal_ref:
-        raise HTTPException(status_code=409, detail="proposal reference is stale")
-
-    existing = _store.get_decision(payload.gesture_id)
-    if existing is not None:
-        expected_disposition = (
-            DecisionDisposition.APPROVE
-            if payload.disposition == "approved"
-            else DecisionDisposition.REJECT
-        )
-        if (
-            existing.case_id != case.case_id
-            or existing.principal_id != payload.principal_ref
-            or existing.disposition != expected_disposition
-            or str(existing.case_version) != payload.proposal_version
-            or str(existing.case_version) != payload.expected_state_version
-        ):
-            raise HTTPException(status_code=409, detail="gesture id is already bound differently")
-        current = _store.get_case(case_id)
-        if current is None:
-            raise HTTPException(status_code=404, detail="case not found")
-        return {
-            "commandId": f"administrative:{payload.gesture_id}",
-            "accepted": True,
-            "authoritativeRef": str(existing.decision_id),
-            "stateVersion": str(current.version),
-            "status": "accepted",
-            "message": "Human disposition was already admitted; returning authoritative replay.",
-            "replayed": True,
-        }
-
-    if payload.proposal_version != str(case.version) or payload.expected_state_version != str(
-        case.version
-    ):
-        raise HTTPException(status_code=409, detail="administrative case version is stale")
-
-    principal = _authority.get_principal(payload.principal_ref)
-    if principal is None:
-        raise HTTPException(status_code=403, detail="represented principal is not active")
-    try:
-        _access.require(
-            payload.principal_ref,
-            AdministrativePermission.DECISION_SUBMIT,
-            case=case,
-        )
-    except AccessDenied as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    if case.policy_ref is None:
-        raise HTTPException(status_code=409, detail="case has no current policy")
-    evaluation = _store.get_latest_policy_evaluation(case.case_id)
-    if evaluation is None or evaluation.policy_ref != case.policy_ref:
-        raise HTTPException(status_code=409, detail="case has no current policy evaluation")
-
-    scope = _case_scope(case)
-    try:
-        role = resolve_decision_role(
-            _authority,
-            principal_id=payload.principal_ref,
-            evaluation=evaluation,
-            organization_scope=scope,
-            requested_role=None,
-        )
-    except AuthorityError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-
-    disposition = (
-        DecisionDisposition.APPROVE
-        if payload.disposition == "approved"
-        else DecisionDisposition.REJECT
-    )
-    decision = Decision(
-        decision_id=payload.gesture_id,
-        case_id=case.case_id,
-        case_version=case.version,
-        authority_epoch=case.authority_epoch,
-        principal_id=payload.principal_ref,
-        decision_role=role,
-        disposition=disposition,
-        rationale=f"Agency Console human disposition {payload.gesture_id}",
-        policy_ref=case.policy_ref,
-    )
-    approval: ApprovalAssessment | None = None
-    approval_complete = False
-    satisfaction = None
-    if disposition == DecisionDisposition.APPROVE:
-        prior_decisions = list_decisions(_store, case.case_id)
-        approval = assess_approval_satisfaction(
-            _authority,
-            case_id=case.case_id,
-            authority_epoch=case.authority_epoch,
-            policy_ref=case.policy_ref,
-            evaluation=evaluation,
-            decisions=[*prior_decisions, decision],
-            organization_scope=scope,
-        )
-        approval_complete = approval.satisfied
-        satisfaction = approval.satisfaction
-
-    try:
-        updated = record_decision(case, decision, approval_complete=approval_complete)
-        _uow.apply_decision_transition(
-            case,
-            updated,
-            decision,
-            organization_scope=scope,
-            approval_satisfaction=satisfaction,
-        )
-    except (TransitionError, ConcurrencyConflict, ValueError, AuthorityError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    return {
-        "commandId": f"administrative:{payload.gesture_id}",
-        "accepted": True,
-        "authoritativeRef": str(decision.decision_id),
-        "stateVersion": str(updated.version),
-        "status": "accepted",
-        "message": "Human disposition admitted by Administrative authority and state transition.",
-        "replayed": False,
-    }
-
-
-@app.post("/v1/intake/feishu/events", status_code=202)
-async def receive_feishu_event(request: Request) -> JSONResponse:
-    """Accept only the authenticated Feishu envelope and enqueue metadata.
-
-    Canonical message fetch, artifact persistence, identity resolution, and
-    interpretation happen in the worker after this transaction commits.
-    """
-    boundary = _feishu_intake_boundary
-    if boundary is None:
-        raise HTTPException(status_code=503, detail="Feishu intake is not configured")
-    body = await request.body()
-    try:
-        accepted = boundary.accept(body, request.headers)
-    except FeishuVerificationError as exc:
-        raise HTTPException(status_code=401, detail="invalid Feishu callback") from exc
-    except IntakeReceiptConflict as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    if isinstance(accepted, FeishuChallenge):
-        return JSONResponse(status_code=200, content={"challenge": accepted.challenge})
-    assert isinstance(accepted, FeishuAcceptance)
-    return JSONResponse(
-        status_code=202,
-        content={
-            "accepted": True,
-            "created": accepted.created,
-            "receipt_id": str(accepted.receipt.receipt_id),
-            "outbox_event_id": str(accepted.outbox_event_id),
-        },
-    )
-
 
 @app.get("/readyz")
 def readyz() -> dict[str, str]:

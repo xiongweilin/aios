@@ -21,11 +21,8 @@ from administrative_orchestrator.integrations.credentials import (
     read_credential_file,
 )
 from administrative_orchestrator.integrations.production_effects import (
-    AdministrativeCommunicationEffectConnection,
-    AdministrativeCommunicationEffectConnector,
     ConnectorResult,
     ConnectorStatus,
-    FeishuCommunicationVerifier,
     KeycloakEffectConnection,
     KeycloakIdentityDisableConnector,
     KeycloakIdentityDisableVerifier,
@@ -42,7 +39,6 @@ from administrative_orchestrator.integrations.production_effects import (
     OdooFinancialVerifier,
 )
 from administrative_orchestrator.integrations.runtime_capabilities import (
-    ADMINISTRATIVE_COMMUNICATION_MESSAGE_SEND,
     ADMINISTRATIVE_ERP_EXPENSE_REPORT_CREATE,
     ADMINISTRATIVE_ERP_PURCHASE_ORDER_CONFIRM,
     ADMINISTRATIVE_ERP_PURCHASE_ORDER_CREATE_DRAFT,
@@ -277,7 +273,6 @@ def build() -> WorldRuntime:
     state_path = os.getenv("WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH", "").strip()
     if not state_path:
         raise RuntimeError("WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH is required")
-    communication_gateway_base_url = settings.communication_gateway_base_url.strip()
 
     runtime = WorldRuntime.sqlite(
         Path(state_path),
@@ -403,105 +398,6 @@ def build() -> WorldRuntime:
             allow_insecure_http=settings.oidc_allow_insecure_http,
         )
     )
-
-    communication_provider = None
-    communication_verifier = None
-    if communication_gateway_base_url:
-        transport_secret_env = getattr(
-            settings,
-            "communication_transport_secret_env",
-            "ADMIN_COMMUNICATION_TRANSPORT_SECRET",
-        )
-        verifier_secret_env = getattr(
-            settings,
-            "communication_verifier_app_secret_env",
-            "ADMIN_COMMUNICATION_VERIFIER_APP_SECRET",
-        )
-        communication_credentials = EnvironmentOrFileCredentialResolver(
-            {
-                transport_secret_env: getattr(
-                    settings,
-                    "communication_transport_secret_file",
-                    "",
-                ).strip(),
-                verifier_secret_env: (
-                    getattr(settings, "communication_verifier_app_secret_file", "").strip()
-                    or getattr(settings, "feishu_app_secret_file", "").strip()
-                ),
-            }
-        )
-        communication_connection = AdministrativeCommunicationEffectConnection(
-            gateway_base_url=communication_gateway_base_url,
-            transport_credential=CredentialRef(
-                "gateway:administrative-communication",
-                transport_secret_env,
-            ),
-            artifact_root=Path(settings.feishu_artifact_root),
-            timeout_seconds=getattr(settings, "communication_gateway_timeout_seconds", 10.0),
-            allow_insecure_http=settings.oidc_allow_insecure_http,
-        )
-        communication_provider = ProductionEffectProvider(
-            provider_id="provider:administrative-production:feishu-communication-writer",
-            name="Administrative Feishu communication writer",
-            capability=ADMINISTRATIVE_COMMUNICATION_MESSAGE_SEND,
-            family="feishu-gateway",
-            execution_domain="feishu:communication",
-            credential_configuration_ref="gateway:administrative-communication",
-            network_domain=_host(communication_gateway_base_url),
-            connector=AdministrativeCommunicationEffectConnector(
-                communication_connection,
-                credentials=communication_credentials,
-            ),
-            reversibility="irreversible",
-        )
-        verifier_app_id = getattr(settings, "communication_verifier_app_id", "").strip()
-        if not verifier_app_id:
-            verifier_app_id_file = (
-                getattr(settings, "communication_verifier_app_id_file", "").strip()
-                or getattr(settings, "feishu_app_id_file", "").strip()
-            )
-            if verifier_app_id_file:
-                verifier_app_id = read_credential_file(
-                    verifier_app_id_file,
-                    configuration_ref="feishu:communication-verifier",
-                )
-        if not verifier_app_id:
-            raise RuntimeError(
-                "M9 communication capability requires a configured verifier app id"
-            )
-        communication_verifier = ProductionReadbackVerifier(
-                provider_id="provider:administrative-production:feishu-communication-verifier",
-                name="Administrative Feishu communication independent verifier",
-                effect_capability=ADMINISTRATIVE_COMMUNICATION_MESSAGE_SEND,
-                family="feishu-readback",
-                credential_configuration_ref="feishu:communication-verifier",
-                network_domain=_host(settings.feishu_base_url),
-                verifier=FeishuCommunicationVerifier(
-                    base_url=settings.feishu_base_url,
-                    app_id=verifier_app_id,
-                    app_secret=CredentialRef(
-                        "feishu:communication-verifier",
-                        getattr(
-                            settings,
-                            "communication_verifier_app_secret_env",
-                            "ADMIN_COMMUNICATION_VERIFIER_APP_SECRET",
-                        ),
-                    ),
-                    gateway_base_url=communication_gateway_base_url,
-                    gateway_secret=CredentialRef(
-                        "gateway:communication-verifier",
-                        getattr(
-                            settings,
-                            "communication_verifier_gateway_secret_env",
-                            "ADMIN_COMMUNICATION_TRANSPORT_SECRET",
-                        ),
-                    ),
-                    timeout_seconds=getattr(
-                        settings, "communication_gateway_timeout_seconds", 10.0
-                    ),
-                    credentials=communication_credentials,
-                ),
-            )
 
     hris_provider = ProductionEffectProvider(
         provider_id="provider:administrative-production:odoo-writer",
@@ -718,8 +614,6 @@ def build() -> WorldRuntime:
         expense_provider,
         expense_verifier,
     ]
-    if communication_provider is not None and communication_verifier is not None:
-        providers.extend([communication_provider, communication_verifier])
     for provider in providers:
         registry.register(provider)
 
@@ -733,7 +627,6 @@ def build() -> WorldRuntime:
         ADMINISTRATIVE_ERP_PURCHASE_ORDER_CONFIRM,
         ADMINISTRATIVE_ERP_VENDOR_BILL_CREATE_DRAFT,
         ADMINISTRATIVE_ERP_EXPENSE_REPORT_CREATE,
-        ADMINISTRATIVE_COMMUNICATION_MESSAGE_SEND,
     ]
     for capability in effect_capabilities:
         runtime.contract_registry.register_effect_rule(

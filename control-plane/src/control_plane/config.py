@@ -92,28 +92,6 @@ class ControlPlaneConfig:
     garbage_quarantine_dir: str = str(PROJECT_ROOT / "data" / "recovery-quarantine")
     automatic_handling_enabled: bool = False
     auto_maintenance_alertnames: tuple[str, ...] = ("ControlPlaneGarbageDetected",)
-    v2rayn_expected_path: str | None = None
-
-    game_mode_enabled: bool = True
-    game_mode_state_path: Path | None = None
-    game_mode_active_max_age_seconds: int = 12 * 60 * 60
-    game_mode_restore_grace_seconds: int = 10 * 60
-    game_mode_alertnames: tuple[str, ...] = (
-        "ContainerRestartStorm",
-        "PrometheusScrapeFailed",
-        "ControlPlaneStaleReady",
-    )
-    game_mode_scrape_jobs: tuple[str, ...] = (
-        "node",
-        "cadvisor",
-        "loki",
-        "prometheus",
-        "alertmanager",
-        "blackbox",
-        "blackbox-protected",
-        "feishu-gateway",
-        "control-plane-ready",
-    )
 
     allowed_auto_projects: tuple[str, ...] = ()
     project_dirs: dict[str, str] = field(default_factory=dict)
@@ -159,7 +137,6 @@ class ControlPlaneConfig:
         monitoring = _section(data, "monitoring")
         policy = _section(data, "policy")
         environment = _section(data, "environment")
-        game_mode = _section(data, "game_mode")
         projects = _section(data, "projects")
 
         api_key = os.getenv("CONTROL_PLANE_API_KEY", "").strip()
@@ -281,32 +258,6 @@ class ControlPlaneConfig:
                 for v in environment.get(
                     "auto_maintenance_alertnames", base.auto_maintenance_alertnames
                 )
-            ),
-            v2rayn_expected_path=(
-                str(environment["v2rayn_expected_path"])
-                if environment.get("v2rayn_expected_path")
-                else base.v2rayn_expected_path
-            ),
-            game_mode_enabled=_env_bool(
-                "CONTROL_PLANE_GAME_MODE",
-                bool(game_mode.get("enabled", base.game_mode_enabled)),
-            ),
-            game_mode_state_path=(
-                Path(str(game_mode["state_path"]))
-                if game_mode.get("state_path")
-                else base.game_mode_state_path
-            ),
-            game_mode_active_max_age_seconds=int(
-                game_mode.get("active_max_age_seconds", base.game_mode_active_max_age_seconds)
-            ),
-            game_mode_restore_grace_seconds=int(
-                game_mode.get("restore_grace_seconds", base.game_mode_restore_grace_seconds)
-            ),
-            game_mode_alertnames=tuple(
-                str(v) for v in game_mode.get("alertnames", base.game_mode_alertnames)
-            ),
-            game_mode_scrape_jobs=tuple(
-                str(v) for v in game_mode.get("scrape_jobs", base.game_mode_scrape_jobs)
             ),
             allowed_auto_projects=tuple(
                 str(v) for v in projects.get("allowed_auto", base.allowed_auto_projects)

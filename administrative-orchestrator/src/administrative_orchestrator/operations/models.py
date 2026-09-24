@@ -137,7 +137,7 @@ class IntakePromotionResponse(BaseModel):
 
 class CommitmentSpeakerResolutionBody(BaseModel):
     external_subject: str = Field(min_length=1, max_length=1000)
-    provider: str = Field(default="feishu", min_length=1, max_length=128)
+    provider: str = Field(min_length=1, max_length=128)
     basis: dict[str, Any] = Field(min_length=1)
 
 

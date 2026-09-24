@@ -94,7 +94,7 @@ class CommitmentCommunicationCoordinator:
             draft_id=draft_id,
             case_id=commitment.case_id,
             authority_epoch=commitment.authority_epoch,
-            channel="feishu-one-to-one",
+            channel="direct-message",
             recipient_principal_id=commitment.committer_principal_id,
             recipient_external_subject=commitment.committer_external_subject,
             content_storage_ref=stored.storage_ref,

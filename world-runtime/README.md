@@ -1,8 +1,7 @@
 # world-runtime
 
-[![CI](https://github.com/xiongweilin/world-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/xiongweilin/world-runtime/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=metratio_world-runtime&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_world-runtime)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=metratio_world-runtime&metric=coverage)](https://sonarcloud.io/summary/new_code?id=metratio_world-runtime)
+> Component of the [AIOS monorepo](../README.md) at `world-runtime/`; this directory is not an independent GitHub repository.
+
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Version](https://img.shields.io/badge/version-1.1.0-6f42c1)

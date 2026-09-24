@@ -28,7 +28,6 @@ def _config(tmp_path: Path) -> ControlPlaneConfig:
         alertmanager_url="",
         notification_enabled=False,
         environment_enabled=False,
-        game_mode_enabled=False,
         allowed_repo_roots=(str(tmp_path),),
         project_dirs={"test": str(tmp_path)},
         allowed_auto_projects=(),

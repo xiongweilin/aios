@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from ..messaging import OutboxEvent
-from ..providers.feishu import FEISHU_INTAKE_EVENT_TYPE
 from .protocol import CASE_CHANGED_TOPIC
 
 
@@ -15,15 +13,6 @@ class WorkflowWakeAction:
     workflow_id: str
     topic: str
     message: dict[str, Any]
-    idempotency_key: str
-
-
-@dataclass(frozen=True, slots=True)
-class FeishuInboxAction:
-    """Durable handoff for the provider pipeline, not a DBOS Work."""
-
-    receipt_id: str
-    payload: dict[str, Any]
     idempotency_key: str
 
 
@@ -41,20 +30,6 @@ def plan_outbox_action(event: OutboxEvent) -> WorkflowWakeAction:
             **event.payload,
             "event_id": str(event.event_id),
         },
-        idempotency_key=str(event.event_id),
-    )
-
-
-def plan_feishu_inbox_action(event: OutboxEvent) -> FeishuInboxAction:
-    """Map a Feishu intake outbox event to an idempotent async job."""
-    if event.event_type != FEISHU_INTAKE_EVENT_TYPE:
-        raise ValueError(f"no Feishu intake action for event type {event.event_type!r}")
-    required = ("event_id", "tenant_ref", "message_id", "sender_external_subject")
-    if any(not str(event.payload.get(field) or "").strip() for field in required):
-        raise ValueError("Feishu intake event is missing provider identity metadata")
-    return FeishuInboxAction(
-        receipt_id=str(event.event_id),
-        payload=dict(event.payload),
         idempotency_key=str(event.event_id),
     )
 
@@ -104,31 +79,14 @@ def execute_outbox_action(action: WorkflowWakeAction) -> None:
     )
 
 
-def dispatch_outbox_event(
-    event: OutboxEvent,
-    *,
-    feishu_processor: Callable[[dict[str, Any]], object] | None = None,
-) -> None:
-    """Dispatch business workflow events or an explicitly supplied intake worker.
-
-    The default worker does not guess provider credentials or model runtime
-    configuration. A deployment must inject the configured Feishu pipeline;
-    otherwise the event fails closed and remains retryable in the outbox.
-    """
-    if event.event_type == FEISHU_INTAKE_EVENT_TYPE:
-        if feishu_processor is None:
-            raise ValueError("Feishu intake processor is not configured")
-        action = plan_feishu_inbox_action(event)
-        feishu_processor(action.payload)
-        return
+def dispatch_outbox_event(event: OutboxEvent) -> None:
+    """Dispatch a provider-neutral business workflow wake from the outbox."""
     execute_outbox_action(plan_outbox_action(event))
 
 
 __all__ = [
     "WorkflowWakeAction",
-    "FeishuInboxAction",
     "dispatch_outbox_event",
     "execute_outbox_action",
-    "plan_feishu_inbox_action",
     "plan_outbox_action",
 ]

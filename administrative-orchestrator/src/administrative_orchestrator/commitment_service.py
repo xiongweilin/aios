@@ -87,7 +87,7 @@ class MeetingCommitmentService:
         self.policies = policies or PolicyRepository(store)
         settings = settings or get_settings()
         self.artifact_store = artifact_store or FilesystemArtifactStore(
-            __import__("pathlib").Path(settings.feishu_artifact_root)
+            __import__("pathlib").Path(settings.intake_artifact_root)
         )
         self.settings = settings
         self.execution = ExecutionRepository(store)
@@ -151,7 +151,7 @@ class MeetingCommitmentService:
         reviewer_principal_id: str,
         external_subject: str,
         basis: dict[str, Any],
-        provider: str = "feishu",
+        provider: str,
     ) -> SpeakerPrincipalResolution:
         candidate = self._candidate(candidate_id)
         self._require_reviewer(reviewer_principal_id)

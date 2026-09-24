@@ -22,7 +22,7 @@ def _request(*, request_id: str = "request-1", digest: str = "a" * 64) -> Develo
     return DevelopmentRequest(
         id=request_id,
         target_id="target-1",
-        source="feishu-autodev",
+        source="operator-adapter",
         external_reference_digest="external-" + digest[:8],
         title="Bounded requirement",
         normalized_requirement_text="Add a deterministic response.",

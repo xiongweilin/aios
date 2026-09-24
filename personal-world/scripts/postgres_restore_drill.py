@@ -28,7 +28,7 @@ def seed(url: str, manifest_path: Path) -> None:
     service = service_for(url)
     service.put_access_profile(
         DataAccessProfile(
-            service_identity="agency-console",
+            service_identity="administrative-orchestrator",
             allowed_purposes=("*",),
             allowed_kinds=tuple(RecordKind),
             max_sensitivity=SensitivityClass.HIGHLY_SENSITIVE,
@@ -61,7 +61,7 @@ def seed(url: str, manifest_path: Path) -> None:
     )
     service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="backup-drill",
     )
     manifest_path.write_text(
@@ -71,7 +71,7 @@ def seed(url: str, manifest_path: Path) -> None:
                 "lineage_id": str(first.lineage_id),
                 "current_id": str(second.id),
                 "history_values": ["Tokyo", "Osaka"],
-                "service_identity": "agency-console",
+                "service_identity": "administrative-orchestrator",
             },
             sort_keys=True,
         ),

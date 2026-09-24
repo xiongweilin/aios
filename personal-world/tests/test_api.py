@@ -25,20 +25,20 @@ from semantic_language import SemanticRef
 def test_service_auth_and_purpose_gate(service, monkeypatch) -> None:
     monkeypatch.setenv(
         "PERSONAL_WORLD_SERVICE_TOKENS_JSON",
-        json.dumps({"agency-console": "secret", "travel": "travel-secret"}),
+        json.dumps({"administrative-orchestrator": "secret", "travel": "travel-secret"}),
     )
     client = TestClient(create_app(service))
 
     unauthenticated = client.get(
         "/v1/contracts",
-        headers={"X-Service-Identity": "agency-console", "X-Purpose": "audit"},
+        headers={"X-Service-Identity": "administrative-orchestrator", "X-Purpose": "audit"},
     )
     assert unauthenticated.status_code == 401
 
     authenticated = client.get(
         "/v1/contracts",
         headers={
-            "X-Service-Identity": "agency-console",
+            "X-Service-Identity": "administrative-orchestrator",
             "X-Purpose": "audit",
             "Authorization": "Bearer secret",
         },
@@ -59,7 +59,7 @@ def test_service_auth_and_purpose_gate(service, monkeypatch) -> None:
 def test_admin_can_manage_access_profiles(service, monkeypatch) -> None:
     monkeypatch.setenv(
         "PERSONAL_WORLD_SERVICE_TOKENS_JSON",
-        json.dumps({"agency-console": "secret"}),
+        json.dumps({"administrative-orchestrator": "secret"}),
     )
     client = TestClient(create_app(service))
     response = client.put(
@@ -71,7 +71,7 @@ def test_admin_can_manage_access_profiles(service, monkeypatch) -> None:
             max_sensitivity=SensitivityClass.PERSONAL,
         ).model_dump(mode="json"),
         headers={
-            "X-Service-Identity": "agency-console",
+            "X-Service-Identity": "administrative-orchestrator",
             "X-Purpose": "admin",
             "Authorization": "Bearer secret",
         },
@@ -84,7 +84,7 @@ def test_signed_workload_identity_and_expiry(service, monkeypatch) -> None:
     monkeypatch.setenv("PERSONAL_WORLD_AUTH_MODE", "signed-hmac")
     monkeypatch.setenv(
         "PERSONAL_WORLD_WORKLOAD_HMAC_SECRETS_JSON",
-        json.dumps({"agency-console": secret}),
+        json.dumps({"administrative-orchestrator": secret}),
     )
     monkeypatch.setenv("PERSONAL_WORLD_WORKLOAD_ASSERTION_TTL_SECONDS", "60")
     client = TestClient(create_app(service))
@@ -92,14 +92,14 @@ def test_signed_workload_identity_and_expiry(service, monkeypatch) -> None:
     timestamp = str(int(time.time()))
     signature = workload_signature(
         secret,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         timestamp=timestamp,
     )
     accepted = client.get(
         "/v1/contracts",
         headers={
-            "X-Service-Identity": "agency-console",
+            "X-Service-Identity": "administrative-orchestrator",
             "X-Purpose": "audit",
             "X-Workload-Timestamp": timestamp,
             "X-Workload-Signature": signature,
@@ -110,14 +110,14 @@ def test_signed_workload_identity_and_expiry(service, monkeypatch) -> None:
     expired_timestamp = str(int(time.time()) - 120)
     expired_signature = workload_signature(
         secret,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         timestamp=expired_timestamp,
     )
     expired = client.get(
         "/v1/contracts",
         headers={
-            "X-Service-Identity": "agency-console",
+            "X-Service-Identity": "administrative-orchestrator",
             "X-Purpose": "audit",
             "X-Workload-Timestamp": expired_timestamp,
             "X-Workload-Signature": expired_signature,
@@ -132,11 +132,11 @@ def test_root_subject_boundary_fails_closed(service, monkeypatch) -> None:
     monkeypatch.setenv("PERSONAL_WORLD_ROOT_SUBJECT_ID", str(root))
     monkeypatch.setenv(
         "PERSONAL_WORLD_SERVICE_TOKENS_JSON",
-        json.dumps({"agency-console": "secret"}),
+        json.dumps({"administrative-orchestrator": "secret"}),
     )
     client = TestClient(create_app(service))
     headers = {
-        "X-Service-Identity": "agency-console",
+        "X-Service-Identity": "administrative-orchestrator",
         "X-Purpose": "audit",
         "Authorization": "Bearer secret",
     }
@@ -161,7 +161,7 @@ def test_production_requires_root_subject_and_signed_workload_identity(service, 
         client.get(
             "/v1/contracts",
             headers={
-                "X-Service-Identity": "agency-console",
+                "X-Service-Identity": "administrative-orchestrator",
                 "X-Purpose": "audit",
                 "Authorization": "Bearer secret",
             },
@@ -210,11 +210,11 @@ def test_root_subject_boundary_covers_all_subject_bearing_surfaces(service, monk
     monkeypatch.setenv("PERSONAL_WORLD_ROOT_SUBJECT_ID", str(root))
     monkeypatch.setenv(
         "PERSONAL_WORLD_SERVICE_TOKENS_JSON",
-        json.dumps({"agency-console": "secret"}),
+        json.dumps({"administrative-orchestrator": "secret"}),
     )
     client = TestClient(create_app(service))
     headers = {
-        "X-Service-Identity": "agency-console",
+        "X-Service-Identity": "administrative-orchestrator",
         "X-Purpose": "audit",
         "Authorization": "Bearer secret",
     }
@@ -314,7 +314,7 @@ def test_root_subject_boundary_covers_all_subject_bearing_surfaces(service, monk
             "/v1/domain-projections",
             {
                 "subject_id": str(other),
-                "source_domain": "agency-console",
+                "source_domain": "administrative-orchestrator",
                 "source_object_ref": "object:1",
                 "claims": [
                     {
@@ -370,7 +370,7 @@ def test_root_subject_boundary_covers_all_subject_bearing_surfaces(service, monk
 
 def test_workload_authentication_fail_closed_paths(service, monkeypatch) -> None:
     headers = {
-        "X-Service-Identity": "agency-console",
+        "X-Service-Identity": "administrative-orchestrator",
         "X-Purpose": "audit",
     }
 
@@ -386,7 +386,7 @@ def test_workload_authentication_fail_closed_paths(service, monkeypatch) -> None
     monkeypatch.setenv("PERSONAL_WORLD_AUTH_MODE", "signed-hmac")
     monkeypatch.setenv(
         "PERSONAL_WORLD_WORKLOAD_HMAC_SECRETS_JSON",
-        json.dumps({"agency-console": "secret"}),
+        json.dumps({"administrative-orchestrator": "secret"}),
     )
     client = TestClient(create_app(service))
 

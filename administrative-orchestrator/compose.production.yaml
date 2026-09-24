@@ -27,11 +27,6 @@ x-admin-common: &admin-common
     ADMIN_KEYCLOAK_READER_SECRET: ${ADMIN_KEYCLOAK_READER_SECRET:?inject ADMIN_KEYCLOAK_READER_SECRET}
     ADMIN_AUTHORITATIVE_FACT_MAX_AGE_SECONDS: ${ADMIN_AUTHORITATIVE_FACT_MAX_AGE_SECONDS:-300}
     ADMIN_CONNECTOR_TIMEOUT_SECONDS: ${ADMIN_CONNECTOR_TIMEOUT_SECONDS:-10}
-    # Optional Feishu provider boundary. Empty credentials keep intake disabled;
-    # the API and worker fail closed until the operator configures it.
-    ADMIN_FEISHU_BASE_URL: ${ADMIN_FEISHU_BASE_URL:-https://open.feishu.cn}
-    ADMIN_FEISHU_VERIFICATION_TOKEN: ${ADMIN_FEISHU_VERIFICATION_TOKEN:-}
-    ADMIN_FEISHU_ENCRYPT_KEY: ${ADMIN_FEISHU_ENCRYPT_KEY:-}
     ADMIN_INVESTIGATION_CLIENT_URL: ${ADMIN_INVESTIGATION_CLIENT_URL:-}
     ADMIN_INVESTIGATION_CLIENT_API_KEY: ${ADMIN_INVESTIGATION_CLIENT_API_KEY:-}
     ADMIN_INVESTIGATION_CLIENT_API_KEY_FILE: ${ADMIN_INVESTIGATION_CLIENT_API_KEY_FILE:-}
@@ -176,17 +171,7 @@ services:
       ADMIN_WORKER_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-administrative}
       ADMIN_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/administrative_dbos
       ADMIN_WORKER_POLL_SECONDS: ${ADMIN_WORKER_POLL_SECONDS:-1}
-      # Worker-only Feishu app credentials are exchanged for short-lived
-      # tenant tokens for canonical reads. Keep ingress verification material
-      # separate from this provider read identity.
-      ADMIN_FEISHU_APP_ID: ${ADMIN_FEISHU_APP_ID:-}
-      ADMIN_FEISHU_APP_SECRET: ${ADMIN_FEISHU_APP_SECRET:-}
-      ADMIN_FEISHU_APP_ID_FILE: ${ADMIN_FEISHU_APP_ID_FILE:-}
-      ADMIN_FEISHU_APP_SECRET_FILE: ${ADMIN_FEISHU_APP_SECRET_FILE:-}
-      # Explicit test/manual compatibility override; leave empty in normal V1
-      # deployments when the app credential pair is configured.
-      ADMIN_FEISHU_ACCESS_TOKEN: ${ADMIN_FEISHU_ACCESS_TOKEN:-}
-      ADMIN_FEISHU_ARTIFACT_ROOT: ${ADMIN_FEISHU_ARTIFACT_ROOT:-/var/lib/administrative/intake-artifacts}
+      ADMIN_INTAKE_ARTIFACT_ROOT: ${ADMIN_INTAKE_ARTIFACT_ROOT:-/var/lib/administrative/intake-artifacts}
       ADMIN_INTAKE_MODEL_URL: ${ADMIN_INTAKE_MODEL_URL:-}
       ADMIN_INTAKE_MODEL_API_KEY: ${ADMIN_INTAKE_MODEL_API_KEY:-}
       ADMIN_INTAKE_MODEL_PROTOCOL: ${ADMIN_INTAKE_MODEL_PROTOCOL:-openai-chat}
@@ -194,22 +179,6 @@ services:
       ADMIN_INTAKE_MODEL_MAX_TOKENS: ${ADMIN_INTAKE_MODEL_MAX_TOKENS:-2400}
     volumes:
       - administrative-intake-artifacts:/var/lib/administrative/intake-artifacts
-
-  operations-console:
-    build:
-      context: operations-console
-      args:
-        VITE_OPERATIONS_API_BASE_URL: /api
-        VITE_OIDC_AUTHORITY: ${ADMIN_OIDC_ISSUER:?set ADMIN_OIDC_ISSUER}
-        VITE_OIDC_CLIENT_ID: ${ADMIN_OPERATIONS_OIDC_CLIENT_ID:?set ADMIN_OPERATIONS_OIDC_CLIENT_ID}
-        VITE_OIDC_SCOPE: ${ADMIN_OPERATIONS_OIDC_SCOPE:-openid profile email}
-    image: administrative-operations-console:production
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${ADMIN_OPERATIONS_CONSOLE_PORT:-8080}:80"
-    depends_on:
-      operations-api:
-        condition: service_healthy
 
 volumes:
   administrative-production-pgdata:

@@ -1,10 +1,10 @@
-"""Read-only operational inspection for the personal Windows profile.
+"""Optional read-only deployment inspection adapter.
 
 The inspector deliberately reports facts and escalation guidance only.  It has
 no repair capabilities: process/service enablement, Docker garbage collection,
 and unrelated security baselines stay outside this provider. The probe focuses
 on local operational reliability, repository synchronization, recovery facts,
-and the configured v2rayN/Docker facts.
+and optional container facts.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any
 
 from .config import PROJECT_ROOT, ControlPlaneConfig
-from .game_mode import read_game_mode_state
 from .provider_protocol import (
     CapabilityRequest,
     CapabilityResult,
@@ -81,8 +80,6 @@ CHECK_NAMES = (
     "codex_primary",
     "docker_exited_containers",
     "docker_build_cache",
-    "v2rayn_path",
-    "v2rayn_status",
 )
 
 HISTORICAL_SAFETY_HINT_ALERT_NAMES = frozenset(
@@ -96,8 +93,6 @@ HISTORICAL_SAFETY_HINT_ALERT_NAMES = frozenset(
         "ControlPlaneAutomaticHandlingUnavailable",
         "DockerExitedContainers",
         "DockerBuildCacheAccumulating",
-        "V2rayNPathDrift",
-        "V2rayNStatusDrift",
     }
 )
 
@@ -370,36 +365,11 @@ def _parse_size(value: Any) -> int:
         return 0
 
 
-def _path_status(payload: Mapping[str, Any], expected: str | None) -> tuple[bool | None, str]:
-    actual = str(payload.get("v2rayn_path", "")).strip()
-    running = payload.get("v2rayn_running")
-    if not actual:
-        if running is True:
-            if expected and Path(expected).is_file():
-                return (
-                    True,
-                    f"v2rayN running, path unreadable (protected process); expected={expected} exists",
-                )
-            return (
-                None,
-                f"v2rayN 进程正在运行，但可执行路径不可读；expected={expected or '<not configured>'}",
-            )
-        if expected and Path(expected).is_file():
-            return True, f"expected={expected} exists; v2rayN process is not running"
-        return None, "v2rayN 进程路径/状态未能核验"
-    if expected:
-        expected_path = os.path.normcase(os.path.abspath(expected))
-        actual_path = os.path.normcase(os.path.abspath(actual))
-        return actual_path == expected_path, f"actual={actual or '<missing>'} expected={expected}"
-    return None, f"actual={actual or '<missing>'}; expected path 未配置"
-
-
 def evaluate_environment(
     config: ControlPlaneConfig,
     payload: Mapping[str, Any],
     *,
     provider_health: Mapping[str, Any] | None = None,
-    game_mode_suppresses_docker: bool = False,
 ) -> EnvironmentSnapshot:
     """Convert raw read-only probe data into stable, alertable observations."""
 
@@ -445,22 +415,7 @@ def evaluate_environment(
     exited = payload.get("docker_exited_count")
     cache_raw = payload.get("docker_build_cache_bytes", payload.get("docker_build_cache_size"))
     cache_bytes = _parse_size(cache_raw)
-    if game_mode_suppresses_docker:
-        observations.extend(
-            [
-                _ok(
-                    "docker_exited_containers",
-                    "Docker containers are intentionally stopped by an active game session",
-                    metadata={"expected_down": True, "suppressed_by_game_mode": True},
-                ),
-                _ok(
-                    "docker_build_cache",
-                    "Docker Desktop is intentionally stopped by an active game session",
-                    metadata={"expected_down": True, "suppressed_by_game_mode": True},
-                ),
-            ]
-        )
-    elif docker_available is False:
+    if docker_available is False:
         observations.extend(
             [
                 _unknown("docker_exited_containers", "Docker CLI/daemon 未能核验"),
@@ -581,44 +536,6 @@ def evaluate_environment(
             ]
         )
 
-    path_match, path_detail = _path_status(payload, config.v2rayn_expected_path)
-    if path_match is True:
-        observations.append(_ok("v2rayn_path", path_detail))
-    elif path_match is False:
-        observations.append(
-            _problem(
-                "v2rayn_path",
-                f"v2rayN path drift: {path_detail}",
-                "人工确认实际 v2rayN.exe 路径、启动方式和配置归属；不要自动移动、替换或升级客户端。",
-                metadata={
-                    "actual_path": payload.get("v2rayn_path", ""),
-                    "expected_path": config.v2rayn_expected_path or "",
-                },
-            )
-        )
-    else:
-        observations.append(
-            _unknown("v2rayn_path", path_detail, configured=bool(config.v2rayn_expected_path))
-        )
-    if payload.get("v2rayn_running") is True:
-        observations.append(_ok("v2rayn_status", "v2rayN process is running"))
-    elif payload.get("v2rayn_running") is False and config.v2rayn_expected_path:
-        observations.append(
-            _problem(
-                "v2rayn_status",
-                "v2rayN expected process is not running",
-                "人工确认 v2rayN 启动任务、实际路径和代理出口；不要自动启动未知程序。",
-            )
-        )
-    else:
-        observations.append(
-            _unknown(
-                "v2rayn_status",
-                "v2rayN 运行状态未配置或未能核验",
-                configured=bool(config.v2rayn_expected_path),
-            )
-        )
-
     observations = (
         _lifecycle_observations(
             config,
@@ -713,14 +630,6 @@ class EnvironmentInspectionProvider:
                     self.config,
                     payload,
                     provider_health=self._provider_health,
-                    game_mode_suppresses_docker=(
-                        self.config.game_mode_enabled
-                        and read_game_mode_state(
-                            self.config.game_mode_state_path,
-                            active_max_age_seconds=self.config.game_mode_active_max_age_seconds,
-                            restore_grace_seconds=self.config.game_mode_restore_grace_seconds,
-                        ).suppress_alerts
-                    ),
                 )
             except Exception as exc:  # pragma: no cover - defensive boundary
                 probe_error = str(exc)[:500]
@@ -816,7 +725,6 @@ class EnvironmentInspectionProvider:
                 "recovery_ok",
                 "synchronization_ok",
                 "known_garbage_count",
-                "v2rayn_running",
             )
         )
         if not meaningful:
@@ -1019,11 +927,7 @@ class EnvironmentInspectionProvider:
     def _run_windows_probe(self) -> Mapping[str, Any]:
         script = """
 $ErrorActionPreference = 'SilentlyContinue'
-$v2 = @(Get-CimInstance Win32_Process -Filter \"Name='v2rayN.exe'\" | ForEach-Object {
-  $path = [string]$_.ExecutablePath
-  if (-not $path) { try { $path = [string](Get-Process -Id $_.ProcessId -ErrorAction Stop).Path } catch { } }
-  [pscustomobject]@{ ProcessId = $_.ProcessId; ExecutablePath = $path }
-})
+
 $docker = Get-Command docker -ErrorAction SilentlyContinue
 $dockerAvailable = $false
 $exited = $null
@@ -1054,8 +958,6 @@ if ($dockerAvailable) {
     }
   })
   docker_build_cache_size = if ($cache) { [string]$cache } else { '' }
-  v2rayn_running = ($v2.Count -gt 0)
-  v2rayn_path = if ($v2.Count -gt 0) { [string]$v2[0].ExecutablePath } else { '' }
 } | ConvertTo-Json -Depth 5 -Compress
 """
         executable = shutil.which("powershell.exe") or shutil.which("pwsh") or "powershell.exe"

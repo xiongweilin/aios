@@ -17,13 +17,14 @@ AIOS is the current monorepo for these consolidated source components:
 | Autonomous Development | [`autonomous-development/`](autonomous-development/) |
 | Administrative Orchestrator | [`administrative-orchestrator/`](administrative-orchestrator/) |
 
-The former standalone repositories for these components have been consolidated into this repository. `agency-console` is not part of the current tree.
+These six components are sourced and analyzed within this monorepo.
 
 Each component directory retains its own README and implementation documentation. The root repository is the Git owner for the consolidated source.
 
 ## Repository status
 
-The existing `release-windows.yml` workflow still references pre-consolidation top-level files (`go.mod`, `build.ps1`, and `profiles/`) that are absent here. It is legacy workflow content, not a verified current release pipeline.
+No Windows installer or release workflow is currently provided.
+The monorepo contains component source and backend APIs; it does not ship a user interface.
 
 ## SonarCloud
 

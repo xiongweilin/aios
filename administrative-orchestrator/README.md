@@ -1,15 +1,14 @@
 # administrative-orchestrator
 
-[![CI](https://github.com/xiongweilin/administrative-orchestrator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xiongweilin/administrative-orchestrator/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=metratio_administrative-orchestrator&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_administrative-orchestrator)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=metratio_administrative-orchestrator&metric=coverage)](https://sonarcloud.io/summary/new_code?id=metratio_administrative-orchestrator)
+> Component of the [AIOS monorepo](../README.md) at `administrative-orchestrator/`; this directory is not an independent GitHub repository.
+
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 Governed administrative automation as an external Domain Controller for
 `world-runtime`.
 
-The repository owns Administrative meaning: trusted intake, organizational authority,
+This component owns Administrative meaning: trusted intake, organizational authority,
 business obligations, effect intent, authoritative read-back, domain Outcome, completion,
 reconciliation qualification, commitments, communication, and governed reopen.
 

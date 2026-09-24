@@ -21,7 +21,7 @@ def request(
         method,
         path,
         headers={
-            "X-Service-Identity": "agency-console",
+            "X-Service-Identity": "administrative-orchestrator",
             "X-Purpose": purpose,
             "Authorization": f"Bearer {token}",
         },
@@ -61,7 +61,7 @@ def run(base_url: str, token: str) -> None:
             token=token,
             purpose="admin",
             json_body={
-                "service_identity": "agency-console",
+                "service_identity": "administrative-orchestrator",
                 "allowed_purposes": ["*"],
                 "allowed_kinds": ["fact", "preference", "relationship", "resource-link"],
                 "max_sensitivity": 30,

@@ -26,7 +26,6 @@ def test_world_runtime_dependency_is_immutable_and_agent_kernel_is_absent() -> N
     active_paths = [
         Path("pyproject.toml"),
         Path("compose.production.yaml"),
-        Path("operations-console/nginx.conf"),
         Path("Dockerfile"),
         Path("Dockerfile.runtime"),
     ]

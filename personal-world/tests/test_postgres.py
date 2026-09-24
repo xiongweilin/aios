@@ -157,7 +157,7 @@ def test_postgres_bundle_restore_after_store_recreation() -> None:
     service = PersonalWorldService(store)
     service.put_access_profile(
         DataAccessProfile(
-            service_identity="agency-console",
+            service_identity="administrative-orchestrator",
             allowed_purposes=("*",),
             allowed_kinds=tuple(RecordKind),
             max_sensitivity=SensitivityClass.HIGHLY_SENSITIVE,

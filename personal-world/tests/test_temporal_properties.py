@@ -30,7 +30,7 @@ def _fresh_service() -> PersonalWorldService:
     service = PersonalWorldService(store)
     service.put_access_profile(
         DataAccessProfile(
-            service_identity="agency-console",
+            service_identity="administrative-orchestrator",
             allowed_purposes=("*",),
             allowed_kinds=tuple(RecordKind),
             max_sensitivity=SensitivityClass.HIGHLY_SENSITIVE,
@@ -83,7 +83,7 @@ def test_as_of_is_intersection_of_record_time_and_valid_time(
     moment = BASE + timedelta(days=query_day)
     records = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=moment,
     )
@@ -136,13 +136,13 @@ def test_late_arriving_backdated_correction_does_not_rewrite_record_time(
 
     before = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=BASE,
     )
     after = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=BASE + timedelta(days=correction_recorded + 1),
     )
@@ -181,13 +181,13 @@ def test_revalidation_gets_new_record_time_and_preserves_historical_status(
     assert retracted.temporal.recorded_at == revalidation_time
     january = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=datetime(2026, 1, 15, tzinfo=UTC),
     )
     february = service.current_for_subject(
         subject,
-        service_identity="agency-console",
+        service_identity="administrative-orchestrator",
         purpose="audit",
         as_of=datetime(2026, 2, 2, tzinfo=UTC),
     )

@@ -38,7 +38,7 @@ def _workload_secrets() -> dict[str, str]:
 
 
 def _admins() -> set[str]:
-    raw = os.getenv("PERSONAL_WORLD_ADMIN_SERVICE_IDENTITIES", "agency-console")
+    raw = os.getenv("PERSONAL_WORLD_ADMIN_SERVICE_IDENTITIES", "administrative-orchestrator")
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 

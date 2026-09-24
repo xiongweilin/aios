@@ -41,13 +41,11 @@ from .environment import (
     HISTORICAL_SAFETY_HINT_ALERT_NAMES,
     EnvironmentInspectionProvider,
 )
-from .game_mode import read_game_mode_state
 from .metrics import ControlPlaneMetricsCollector
 from .monitoring import PersonalMonitoringProvider
 from .personal_operations import PersonalOperationsProvider
 from .profile_effect_rules import CAPABILITY_POLICIES
 from .provider_protocol import ProviderRegistry
-from .providers import FeishuHumanProvider, FeishuNotificationProvider
 from .runtime_bridge import (
     PERSONAL_HUMAN_INSTRUCTION_EVENT,
     PersonalRuntimeBridge,
@@ -109,7 +107,7 @@ def _task_response(bridge: PersonalRuntimeBridge, state: Any) -> TaskResponse:
 
 
 def _split_controller_reply(prompt: str) -> tuple[str, str] | None:
-    """Recognize `<controller_id> <explicit command>` from Feishu `/task`."""
+    """Recognize an explicit controller reply embedded in a task prompt."""
     first, sep, rest = prompt.strip().partition(" ")
     if not sep or not first.startswith("controller_") or not rest.strip():
         return None
@@ -138,9 +136,6 @@ def create_app(
             )
         )
     )
-    providers.register(FeishuHumanProvider())
-    if cfg.notification_enabled:
-        providers.register(FeishuNotificationProvider())
     providers.register(PersonalMonitoringProvider(cfg))
     providers.register(PersonalOperationsProvider(cfg))
     environment_provider = EnvironmentInspectionProvider(cfg)
@@ -824,26 +819,6 @@ def create_app(
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/v1/agency-console/contracts", include_in_schema=False)
-    async def agency_console_contracts() -> dict[str, object]:
-        return {
-            "manifest": "agency-console-controller-contracts-v2",
-            "system": "control-plane",
-            "contract": "control-plane-agency-console-v2",
-            "package": "0.5.0",
-            "runtime_protocol": "4.0",
-            "reads": {
-                "health": "/healthz",
-                "status": "/status",
-                "runtime": "/v1/runtime",
-            },
-            "commands": {
-                "task": "/v1/tasks",
-                "controller_command": "/v1/controllers/{controller_id}/command",
-            },
-            "command_version_semantics": "controller-waiting-state-owned-by-control-plane",
-        }
-
     @app.get("/live", include_in_schema=False)
     async def live() -> dict[str, str]:
         return {"status": "ok", "domain_controller": "control-plane"}
@@ -852,16 +827,6 @@ def create_app(
     async def ready() -> Response | dict[str, Any]:
         checks: dict[str, Any] = {}
         timeout = 5.0
-        game = (
-            read_game_mode_state(
-                cfg.game_mode_state_path,
-                active_max_age_seconds=cfg.game_mode_active_max_age_seconds,
-                restore_grace_seconds=cfg.game_mode_restore_grace_seconds,
-            )
-            if cfg.game_mode_enabled
-            else None
-        )
-        game_mode_active = game is not None and game.suppress_alerts
         async with httpx.AsyncClient(timeout=timeout) as client:
             for name, base_url in (
                 ("prometheus", cfg.prometheus_url),
@@ -877,12 +842,6 @@ def create_app(
                     }
                 except httpx.HTTPError as exc:
                     checks[name] = {"ok": False, "detail": str(exc)}
-                if (
-                    game_mode_active
-                    and name in {"prometheus", "alertmanager"}
-                    and not checks[name]["ok"]
-                ):
-                    checks[name]["expected_down"] = True
         runtime_state = await runtime_health()
         provider_health = {
             str(item.get("provider_id")): item
@@ -895,30 +854,14 @@ def create_app(
             for provider in runtime_state.get("providers", [])
             if isinstance(provider, dict) and provider.get("available") is False
         ]
-        expected_monitoring_down = game_mode_active and any(
-            value.get("expected_down") is True for value in checks.values()
-        )
-        expected_unavailable = expected_monitoring_down and set(unavailable_providers) <= {
-            "personal-monitoring"
-        }
-        checks_ok = all(
-            value["ok"] or value.get("expected_down") is True for value in checks.values()
-        )
-        ready_ok = checks_ok and (not unavailable_providers or expected_unavailable)
+        checks_ok = all(value["ok"] for value in checks.values())
+        ready_ok = checks_ok and not unavailable_providers
         profile_metrics.record_readiness(ready_ok, runtime_state)
         body: dict[str, Any] = {
             "status": ("ok" if ready_ok else "degraded"),
             "checks": checks,
             "runtime": runtime_state,
         }
-        if expected_monitoring_down:
-            body["expected_degraded"] = {
-                "reason": "game_mode_active",
-                "detail": (
-                    "Prometheus/Alertmanager and the personal-monitoring provider "
-                    "are expected to be unavailable while game mode stops containers."
-                ),
-            }
         if unavailable_providers:
             body["unavailable_providers"] = unavailable_providers
         if body["status"] == "ok":
@@ -992,15 +935,6 @@ def create_app(
 
         raw_alerts = payload.get("alerts", [])
         alerts = raw_alerts if isinstance(raw_alerts, list) else []
-        game = (
-            read_game_mode_state(
-                cfg.game_mode_state_path,
-                active_max_age_seconds=cfg.game_mode_active_max_age_seconds,
-                restore_grace_seconds=cfg.game_mode_restore_grace_seconds,
-            )
-            if cfg.game_mode_enabled
-            else None
-        )
         with suppress(TimeoutError):
             await asyncio.wait_for(recovery_complete.wait(), timeout=1)
         accepted = suppressed = repaired = waiting = queued_count = deduplicated = 0
@@ -1013,7 +947,6 @@ def create_app(
             labels = canonical_context.labels
             alert_status = canonical_context.status
             alertname = str(labels.get("alertname", "unknown"))
-            job = str(labels.get("job", ""))
             fingerprint = _alert_fingerprint(raw)
             if alert_status == "resolved":
                 async with alert_lock:
@@ -1032,12 +965,6 @@ def create_app(
                         )
                 continue
             if alert_status != "firing":
-                continue
-            game_mode_suppressible = alertname in cfg.game_mode_alertnames or (
-                alertname == "PrometheusScrapeFailed" and job in cfg.game_mode_scrape_jobs
-            )
-            if game is not None and game.suppress_alerts and game_mode_suppressible:
-                suppressed += 1
                 continue
             project_label = str(labels.get("project", "")) or None
             verification_labels = canonical_context.verification_labels
@@ -1126,21 +1053,6 @@ def create_app(
             queued=queued_count,
             deduplicated=deduplicated,
         )
-
-    @app.get("/v1/game-mode")
-    async def game_mode(x_control_plane_key: str = Header(default="")) -> dict[str, Any]:
-        require_key(x_control_plane_key)
-        state = read_game_mode_state(
-            cfg.game_mode_state_path,
-            active_max_age_seconds=cfg.game_mode_active_max_age_seconds,
-            restore_grace_seconds=cfg.game_mode_restore_grace_seconds,
-        )
-        return {
-            "phase": state.phase,
-            "status": state.status,
-            "reason": state.reason,
-            "suppress_alerts": state.suppress_alerts,
-        }
 
     @app.get("/v1/sessions/inspect")
     async def sessions(x_control_plane_key: str = Header(default="")) -> dict[str, Any]:
