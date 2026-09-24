@@ -1,0 +1,304 @@
+from __future__ import annotations
+
+import shutil
+import sys
+from pathlib import Path
+
+import httpx
+from sqlalchemy import Engine, text
+
+from autonomous_development.adapters.world_runtime import WorldRuntimeDevelopmentBridge
+from autonomous_development.application.release_catalog import ReleaseCatalogService
+from autonomous_development.application.target_registry import TargetRegistryService
+from autonomous_development.ports.persistence import OperatorRepository
+from autonomous_development.ports.process import CommandRequest, ProcessRunner
+from autonomous_development.ports.readiness import ReadinessCheck, ReadinessReport
+from autonomous_development.ports.target_contract import TargetContractLoader
+from autonomous_development.ports.traffic import TrafficRouteReader
+
+from .config import RuntimeSettings
+
+
+class RuntimeReadinessService:
+    def __init__(
+        self,
+        *,
+        settings: RuntimeSettings,
+        engine: Engine,
+        targets: TargetRegistryService,
+        releases: ReleaseCatalogService,
+        contracts: TargetContractLoader,
+        runner: ProcessRunner,
+        traffic: TrafficRouteReader | None = None,
+        http_transport: httpx.BaseTransport | None = None,
+        operator_repository: OperatorRepository | None = None,
+        operator_auth_configured: bool = True,
+    ) -> None:
+        self._settings = settings
+        self._engine = engine
+        self._targets = targets
+        self._releases = releases
+        self._contracts = contracts
+        self._runner = runner
+        self._traffic = traffic
+        self._http_transport = http_transport
+        self._operator_repository = operator_repository
+        self._operator_auth_configured = operator_auth_configured
+
+    def check(self) -> ReadinessReport:
+        checks = [
+            self._database(),
+            self._python(),
+            self._command("git", ("git", "--version")),
+            self._command("uv", ("uv", "--version")),
+            self._command("codex", ("codex", "--version")),
+            self._command(
+                "docker-daemon",
+                ("docker", "version", "--format", "{{.Server.Version}}"),
+            ),
+            self._command("k6", ("k6", "version")),
+            self._command("syft", ("syft", "version")),
+            self._command("grype", ("grype", "version")),
+            self._runtime_state(),
+            self._world_runtime(),
+            self._prometheus(),
+            self._canary_proxy(),
+        ]
+        if self._operator_repository is not None:
+            checks.append(self._operator())
+        return ReadinessReport(
+            ready=all(check.ready for check in checks),
+            checks=tuple(checks),
+        )
+
+    def _operator(self) -> ReadinessCheck:
+        if not self._operator_auth_configured:
+            return ReadinessCheck("operator-api", False, "HMAC secret file is not configured")
+        repository = self._operator_repository
+        if repository is None:
+            return ReadinessCheck("operator-api", False, "operator repository is unavailable")
+        try:
+            pending = repository.pending_event_count()
+            interventions = repository.pending_intervention_count()
+            latest = repository.latest_event_sequence()
+            return ReadinessCheck(
+                "operator-api",
+                True,
+                "authenticated; "
+                f"pending_events={pending}; pending_interventions={interventions}; "
+                f"latest_sequence={latest}",
+            )
+        except Exception as exc:
+            return ReadinessCheck("operator-api", False, type(exc).__name__)
+
+    def _database(self) -> ReadinessCheck:
+        try:
+            with self._engine.connect() as connection:
+                value = connection.execute(text("SELECT 1")).scalar_one()
+            if value != 1:
+                return ReadinessCheck("database", False, "SELECT 1 returned unexpected value")
+            return ReadinessCheck("database", True, "reachable")
+        except Exception as exc:
+            return ReadinessCheck("database", False, type(exc).__name__)
+
+    def _python(self) -> ReadinessCheck:
+        version = sys.version_info
+        ready = version >= (3, 12) and version < (3, 15)
+        return ReadinessCheck(
+            "python",
+            ready,
+            f"{version.major}.{version.minor}.{version.micro}",
+        )
+
+    def _command(self, name: str, command: tuple[str, ...]) -> ReadinessCheck:
+        binary = command[0]
+        if shutil.which(binary) is None:
+            return ReadinessCheck(name, False, "command not found")
+        try:
+            result = self._runner.run(
+                CommandRequest(
+                    command=command,
+                    cwd=self._settings.state_root,
+                    timeout_seconds=15,
+                )
+            )
+        except Exception as exc:
+            return ReadinessCheck(name, False, type(exc).__name__)
+        if result.returncode != 0:
+            return ReadinessCheck(name, False, f"exit {result.returncode}")
+        return ReadinessCheck(name, True, "functional")
+
+    def _runtime_state(self) -> ReadinessCheck:
+        try:
+            targets = self._targets.list_targets()
+            if len(targets) != 1:
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    f"V1 requires exactly one target, found {len(targets)}",
+                )
+            target = targets[0]
+            self._targets.get_active_objective(target)
+            serving = self._releases.serving(target.id)
+            if serving is None:
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    "registered target has no serving release",
+                )
+            root = Path(target.repository)
+            if not root.is_absolute() or not root.is_dir():
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    "registered repository is not an existing absolute directory",
+                )
+            contract = self._contracts.load(str(root))
+            if contract.target_id != target.id:
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    "target contract identity differs from registry",
+                )
+            if contract.revision != target.target_contract_revision:
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    "target contract revision differs from registry",
+                )
+            missing = sorted(
+                {
+                    gate.command[0]
+                    for gate in contract.verification.gates
+                    if shutil.which(gate.command[0]) is None
+                }
+            )
+            if missing:
+                return ReadinessCheck(
+                    "registered-target",
+                    False,
+                    "target gate commands missing: " + ", ".join(missing),
+                )
+            return ReadinessCheck(
+                "registered-target",
+                True,
+                f"{target.id} serving {serving.id}",
+            )
+        except Exception as exc:
+            return ReadinessCheck("registered-target", False, str(exc))
+
+    def _world_runtime(self) -> ReadinessCheck:
+        if self._settings.world_runtime_mode == "disabled":
+            return ReadinessCheck("world-runtime", True, "disabled")
+        try:
+            with httpx.Client(
+                timeout=self._settings.world_runtime_timeout_seconds,
+                trust_env=False,
+                follow_redirects=False,
+                transport=self._http_transport,
+            ) as client:
+                response = client.get(
+                    self._settings.world_runtime_base_url + "/v1/contracts"
+                )
+        except httpx.HTTPError as exc:
+            return ReadinessCheck("world-runtime", False, type(exc).__name__)
+        if response.status_code != 200:
+            return ReadinessCheck(
+                "world-runtime",
+                False,
+                f"http {response.status_code}",
+            )
+        try:
+            payload = response.json()
+        except ValueError:
+            return ReadinessCheck("world-runtime", False, "invalid json")
+        contracts = payload.get("contracts") if isinstance(payload, dict) else None
+        required = WorldRuntimeDevelopmentBridge.REQUIRED_CONTRACTS
+        if not isinstance(contracts, dict):
+            return ReadinessCheck("world-runtime", False, "malformed contract catalog")
+        if str(payload.get("runtime_protocol", "")) != (
+            WorldRuntimeDevelopmentBridge.REQUIRED_RUNTIME_PROTOCOL
+        ):
+            return ReadinessCheck("world-runtime", False, "runtime protocol mismatch")
+        if str(payload.get("semantic_language", "")) != (
+            WorldRuntimeDevelopmentBridge.REQUIRED_SEMANTIC_LANGUAGE
+        ):
+            return ReadinessCheck("world-runtime", False, "semantic-language mismatch")
+        mismatched = [
+            name
+            for name, expected in required.items()
+            if not isinstance(contracts.get(name), dict)
+            or contracts[name].get("current") != expected
+        ]
+        if mismatched:
+            return ReadinessCheck(
+                "world-runtime",
+                False,
+                "contract mismatch: " + ", ".join(sorted(mismatched)),
+            )
+        return ReadinessCheck("world-runtime", True, "exact contract surface ready")
+
+    def _prometheus(self) -> ReadinessCheck:
+        if not self._settings.telemetry_queries:
+            return ReadinessCheck(
+                "prometheus",
+                False,
+                "no telemetry queries configured",
+            )
+        return self._http(
+            "prometheus",
+            self._settings.prometheus_base_url + "/-/ready",
+            accepted={200},
+        )
+
+    def _canary_proxy(self) -> ReadinessCheck:
+        if self._traffic is not None:
+            try:
+                route = self._traffic.read_current()
+                if route is None:
+                    return ReadinessCheck(
+                        "canary-proxy",
+                        False,
+                        "no active product route",
+                    )
+                targets = self._targets.list_targets()
+                if len(targets) != 1 or route.target_id != targets[0].id:
+                    return ReadinessCheck(
+                        "canary-proxy",
+                        False,
+                        "active product route is not bound to the registered target",
+                    )
+                if route.control_release_id is None or route.candidate_deployment_id is None:
+                    return ReadinessCheck(
+                        "canary-proxy",
+                        False,
+                        "active product route lacks attribution identity",
+                    )
+            except Exception as exc:
+                return ReadinessCheck("canary-proxy", False, type(exc).__name__)
+        return self._http(
+            "canary-proxy",
+            self._settings.canary_proxy_base_url + "/__autodev/metrics/0",
+            accepted={200, 404},
+        )
+
+    def _http(
+        self,
+        name: str,
+        url: str,
+        *,
+        accepted: set[int],
+    ) -> ReadinessCheck:
+        try:
+            with httpx.Client(
+                timeout=3.0,
+                trust_env=False,
+                follow_redirects=False,
+                transport=self._http_transport,
+            ) as client:
+                response = client.get(url)
+        except httpx.HTTPError as exc:
+            return ReadinessCheck(name, False, type(exc).__name__)
+        if response.status_code not in accepted:
+            return ReadinessCheck(name, False, f"http {response.status_code}")
+        return ReadinessCheck(name, True, f"http {response.status_code}")

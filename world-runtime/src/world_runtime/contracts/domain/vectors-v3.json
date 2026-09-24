@@ -1,0 +1,135 @@
+{
+  "suite_version": "domain-controller-protocol-v3",
+  "runtime_protocol": "4.0",
+  "contracts": {
+    "domain_assignment": "domain-assignment-v3",
+    "domain_report": "domain-report-v3"
+  },
+  "vectors": [
+    {
+      "id": "positive-accepted",
+      "kind": "positive",
+      "from": "offered",
+      "expect": "accepted",
+      "payload": {
+        "id": "report:accepted",
+        "kind": "accepted"
+      }
+    },
+    {
+      "id": "report-id-required",
+      "kind": "negative",
+      "expect": "validation-error",
+      "payload": {
+        "kind": "accepted"
+      }
+    },
+    {
+      "id": "extra-field-rejected",
+      "kind": "negative",
+      "expect": "validation-error",
+      "payload": {
+        "id": "report:extra",
+        "kind": "accepted",
+        "unexpected": true
+      }
+    },
+    {
+      "id": "unknown-universal-kind-rejected",
+      "kind": "negative",
+      "expect": "validation-error",
+      "payload": {
+        "id": "report:unknown-kind",
+        "kind": "progress",
+        "basis_refs": [
+          {
+            "kind": "domain-object",
+            "id": "x:1",
+            "namespace": "universal",
+            "version": "0.1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "outcome-candidate-evidence-is-typed",
+      "kind": "negative",
+      "expect": "validation-error",
+      "payload": {
+        "id": "report:bad-evidence",
+        "kind": "outcome-candidate",
+        "evidence_refs": [
+          {
+            "kind": "goal",
+            "id": "goal:1",
+            "namespace": "universal",
+            "version": "0.1"
+          }
+        ],
+        "outcome_refs": [
+          {
+            "kind": "outcome",
+            "id": "o1",
+            "namespace": "development",
+            "version": "0.1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "outcome-candidate-outcome-is-namespaced",
+      "kind": "negative",
+      "expect": "validation-error",
+      "payload": {
+        "id": "report:bad-outcome",
+        "kind": "outcome-candidate",
+        "evidence_refs": [
+          {
+            "kind": "evidence",
+            "id": "e1",
+            "namespace": "universal",
+            "version": "0.1"
+          }
+        ],
+        "outcome_refs": [
+          {
+            "kind": "outcome",
+            "id": "o1",
+            "namespace": "universal",
+            "version": "0.1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rejected-only-from-offered",
+      "kind": "state-machine",
+      "from": "active",
+      "report_kind": "rejected",
+      "expect": "semantic-error",
+      "payload": {
+        "id": "report:late-reject",
+        "kind": "rejected"
+      }
+    },
+    {
+      "id": "completion-requires-active",
+      "kind": "state-machine",
+      "from": "offered",
+      "report_kind": "completion-proposal",
+      "expect": "semantic-error",
+      "payload": {
+        "id": "report:early-completion",
+        "kind": "completion-proposal",
+        "evidence_refs": [
+          {
+            "kind": "evidence",
+            "id": "evidence:verified",
+            "namespace": "universal",
+            "version": "0.1"
+          }
+        ]
+      }
+    }
+  ]
+}

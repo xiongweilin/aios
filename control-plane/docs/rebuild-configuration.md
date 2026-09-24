@@ -1,0 +1,38 @@
+# Control Plane 重建配置
+
+本文记录当前 Windows 个人控制平面的非敏感重建配置。运行时凭据不写入仓库，按 ratio 的重建清单从 Bitwarden 注入。
+
+## 目录和入口
+
+- 仓库：xiongweilin/control-plane
+- 目标目录：D:\agent\control-plane
+- 依赖入口：pyproject.toml、uv.lock
+- Windows 部署：deployments/windows-personal-platform/install-control-plane.ps1
+- 进程入口：deployments/windows-personal-platform/Run-ControlPlane.ps1
+- 看门狗：deployments/windows-personal-platform/Watch-ControlPlane.ps1
+- 示例配置：control_plane.toml.example
+
+## 当前配置
+
+- diagnosis_model：gpt-5.6-luna
+- execution_model：gpt-5.6-luna
+- gateway_base_url：http://127.0.0.1:4101/v1
+- Codex 客户端入口：http://127.0.0.1:4100/v1
+- 端点：/healthz、/live、/ready、/metrics、/status、/v1/tasks、/v1/alerts/alertmanager、/v1/controllers/{controller_id}/command、/v1/game-mode、/v1/sessions/inspect
+- Feishu transport 由 feishu-gateway 负责。
+- Git/Docker effect provider 只允许个人项目和仓库 allowlist 中的目标。
+- 项目注册：`autonomous-development` → `D:\agent\autonomous-development`；当前本机配置同时加入 `allowed_auto` 与 `project_dirs`，因此可作为 standing auto-repair project 解析。
+- 项目注册：`semantic-language` → `D:\agent\semantic-language`、`world-runtime` → `D:\agent\world-runtime`；当前本机配置将它们加入 `projects.project_dirs`，用于 exact project label/target resolution，但不加入 `allowed_auto`。
+- 同步巡检：`D:\agent\autonomous-development`、`D:\agent\semantic-language` 与 `D:\agent\world-runtime` 与其他个人项目一样纳入 `environment.synchronization_paths`；该列表只描述仓库同步检查，不授权跨项目写入或跳过项目自身质量门。
+- 已退役项目：`agent-kernel`、`meta-controller` 与 `world-state` 已完成 predecessor retirement；它们不再出现在 `allowed_auto`、`projects.project_dirs` 或 `environment.synchronization_paths`。历史迁移证据由 `world-runtime` acceptance record 和只读 archive 持有。
+- Steam 游戏会话在明确 Docker 预期退出时负责抑制相应 readiness 告警；未知游戏状态不触发抑制。
+
+## 安装和验证
+
+uv sync --extra dev
+pwsh -NoProfile -File .\deployments\windows-personal-platform\install-control-plane.ps1
+uv run ruff check .
+uv run mypy src
+uv run pytest -q
+
+安装脚本需要管理员 PowerShell；不要手工创建第二套启动入口。

@@ -1,0 +1,39 @@
+{
+  "version": "predecessor-migration-acceptance-v1",
+  "snapshots": [
+    {
+      "source": "agent-kernel",
+      "frozen_sha": "001717a117a2987e1b8aa21bda37dddae0f88364",
+      "fixture": "agent-kernel.json",
+      "required_namespaces": [
+        "responsibility",
+        "evidence",
+        "work",
+        "run"
+      ]
+    },
+    {
+      "source": "meta-controller",
+      "frozen_sha": "18e1078c1d6971a2232662b6cbded4ffdbc380b0",
+      "fixture": "meta-controller.json",
+      "required_namespaces": [
+        "meta_policy_event"
+      ]
+    },
+    {
+      "source": "world-state",
+      "frozen_sha": "4ed1c35ea14c7fd7d6c40d893c75131e12dbc008",
+      "fixture": "world-state.json",
+      "required_namespaces": [
+        "claim_revision",
+        "claim",
+        "evidence",
+        "assessment",
+        "unknown_revision",
+        "conflict_revision",
+        "revision",
+        "belief_verdict"
+      ]
+    }
+  ]
+}

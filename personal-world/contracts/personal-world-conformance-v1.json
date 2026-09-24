@@ -1,0 +1,22 @@
+{
+  "manifest": "personal-world-conformance-v1",
+  "provider_contract": "personal-world-contracts-v1",
+  "package_baseline": "1.0.0",
+  "semantic_ref_wire": "0.1",
+  "required_checks": [
+    "exact-contract-discovery",
+    "authenticated-purpose-bound-read",
+    "human-source-admission",
+    "correction-creates-new-revision",
+    "projection-reflects-qualified-head",
+    "erasure-removes-projection-content",
+    "erasure-removes-bundle-content",
+    "root-subject-isolation",
+    "short-lived-workload-identity"
+  ],
+  "consumer_requirements": {
+    "must_fail_on_contract_mismatch": true,
+    "must_not_treat_projection_as_authority": true,
+    "must_preserve_purpose": true
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "manifest": "personal-world-contracts-v1",
+  "package_baseline": "1.0.0",
+  "semantic_language": "0.2.0",
+  "public_record_kinds": [
+    "fact",
+    "preference",
+    "relationship",
+    "resource-link"
+  ],
+  "qualification_statuses": [
+    "candidate",
+    "current",
+    "contested",
+    "revalidation-required",
+    "superseded",
+    "retracted"
+  ],
+  "invariants": [
+    "source-observation-claim-state-non-substitution",
+    "historical-current-non-substitution",
+    "projection-truth-non-substitution",
+    "personal-context-authority-non-substitution",
+    "domain-projection-domain-ownership-non-substitution",
+    "model-inference-current-state-non-substitution",
+    "revision-cas",
+    "purpose-limited-projection",
+    "derived-retrieval-index-only"
+  ],
+  "semantic_ref_wire": "0.1"
+}

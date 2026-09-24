@@ -1,0 +1,460 @@
+{
+  "suite_version": "world-runtime-conformance-v11",
+  "vectors": [
+    {
+      "id": "responsibility-terminal-assessment-requires-basis",
+      "contract": "responsibility-assessment-v2",
+      "given": "an active standing responsibility",
+      "when": "it is assessed satisfied without basis references",
+      "expect": "reject"
+    },
+    {
+      "id": "responsibility-discharge-requires-satisfied-and-decision",
+      "contract": "responsibility-discharge-v2",
+      "given": "an active responsibility",
+      "when": "discharge is requested before a satisfied assessment or without a Decision",
+      "expect": "reject"
+    },
+    {
+      "id": "authorization-requires-active-mandate-and-decision",
+      "contract": "authorization-issue-v3",
+      "given": "no qualifying mandate/decision pair",
+      "when": "an authorization is issued",
+      "expect": "reject"
+    },
+    {
+      "id": "authorization-use-is-exact-scope",
+      "contract": "authorization-use-v1",
+      "given": "an authorization for one principal/action/resource tuple",
+      "when": "the tuple changes",
+      "expect": "reject"
+    },
+    {
+      "id": "ambiguous-effect-never-blind-redispatches",
+      "contract": "provider-reconciliation-v1",
+      "given": "a durable started provider attempt with no committed result",
+      "when": "the same idempotency identity is submitted again",
+      "expect": "reconcile exact historical provider/request or remain unknown; never invoke fresh"
+    },
+    {
+      "id": "reconciliation-contract-drift-fails-closed",
+      "contract": "reconciliation-repeatability-v1",
+      "given": "a historical repeat-safe reconciliation contract",
+      "when": "current provider/protocol contract differs",
+      "expect": "manual resolution required and no reconciliation call"
+    },
+    {
+      "id": "runtime-state-survives-restart",
+      "contract": "portable-state-bundle-v1",
+      "given": "durable responsibility/work/run state",
+      "when": "the runtime process closes and reopens the same store",
+      "expect": "stable semantic identities and current projections remain readable"
+    },
+    {
+      "id": "portable-state-rejects-dangling-graph",
+      "contract": "portable-state-bundle-v1",
+      "given": "a bundle whose Work references a missing Responsibility",
+      "when": "bundle validation/import runs",
+      "expect": "reject before durable mutation"
+    },
+    {
+      "id": "decision-applicability-is-required",
+      "contract": "responsibility-discharge-v2",
+      "given": "a satisfied Responsibility and an unrelated Decision",
+      "when": "discharge is requested",
+      "expect": "reject"
+    },
+    {
+      "id": "identity-rebound-is-rejected",
+      "contract": "decision-record-v3",
+      "given": "an existing Decision identity",
+      "when": "the same id is recorded with different semantics",
+      "expect": "reject"
+    },
+    {
+      "id": "expired-mandate-is-not-current",
+      "contract": "authorization-issue-v3",
+      "given": "an expired Mandate",
+      "when": "Authorization issuance is requested",
+      "expect": "reject"
+    },
+    {
+      "id": "expired-authorization-is-not-usable",
+      "contract": "authorization-issue-v3",
+      "given": "an expired Authorization",
+      "when": "effect use is requested",
+      "expect": "reject"
+    },
+    {
+      "id": "empty-authority-ceiling-delegates-no-effect",
+      "contract": "authorization-issue-v3",
+      "given": "a Mandate with empty authority_ceiling",
+      "when": "Authorization issuance is requested",
+      "expect": "reject"
+    },
+    {
+      "id": "discharged-responsibility-rejects-work",
+      "contract": "work-admission-v3",
+      "given": "a discharged Responsibility",
+      "when": "new Work is admitted",
+      "expect": "reject"
+    },
+    {
+      "id": "discharged-responsibility-rejects-effect",
+      "contract": "capability-invocation-v6",
+      "given": "Work belonging to a discharged Responsibility",
+      "when": "a fresh effect is invoked",
+      "expect": "reject"
+    },
+    {
+      "id": "effectful-invocation-requires-work",
+      "contract": "capability-invocation-v6",
+      "given": "a fresh effectful request with no Work",
+      "when": "provider invocation is requested",
+      "expect": "reject"
+    },
+    {
+      "id": "run-must-belong-to-work",
+      "contract": "capability-invocation-v6",
+      "given": "a Run and unrelated Work",
+      "when": "invocation references both",
+      "expect": "reject"
+    },
+    {
+      "id": "authorization-required-context-is-enforced",
+      "contract": "capability-invocation-v6",
+      "given": "Authorization with required_context",
+      "when": "public Runtime invocation carries mismatched then matched context",
+      "expect": "reject mismatch and accept match"
+    },
+    {
+      "id": "effectful-invocation-requires-durable-identity",
+      "contract": "capability-invocation-v6",
+      "given": "an otherwise valid fresh effectful invocation",
+      "when": "no durable idempotency identity is supplied",
+      "expect": "reject before provider dispatch"
+    },
+    {
+      "id": "effect-identity-rebound-is-rejected",
+      "contract": "capability-invocation-v6",
+      "given": "a completed or ambiguous effect bound to one idempotency identity",
+      "when": "the same identity is reused for a different semantic request",
+      "expect": "reject without replay, recovery, or fresh provider invocation"
+    },
+    {
+      "id": "capability-request-unknown-field-rejected",
+      "contract": "capability-invocation-v6",
+      "given": "a capability request containing an undeclared top-level field",
+      "when": "the request is parsed through the public Runtime invocation schema",
+      "expect": "reject before provider selection or effect identity binding"
+    },
+    {
+      "id": "effect-identity-cannot-rebind-through-extension-field",
+      "contract": "capability-invocation-v6",
+      "given": "a completed effect bound to one durable idempotency identity",
+      "when": "the same request identity is resubmitted with an undeclared provider-specific top-level field",
+      "expect": "reject as invalid input; extension data never reaches replay, recovery, or provider execution"
+    },
+    {
+      "id": "authority-bearing-http-requires-authentication",
+      "contract": "request-authentication-v1",
+      "given": "an authority-bearing Runtime HTTP command",
+      "when": "no authenticated credential is supplied",
+      "expect": "reject before semantic mutation"
+    },
+    {
+      "id": "claimed-principal-cannot-override-authenticated-identity",
+      "contract": "decision-record-v3",
+      "given": "a request authenticated as one principal",
+      "when": "Decision.decided_by claims another principal",
+      "expect": "reject and record no Decision"
+    },
+    {
+      "id": "revoked-delegation-cannot-act",
+      "contract": "request-authentication-v1",
+      "given": "an authenticated grantee with a previously valid delegation",
+      "when": "the delegation is revoked",
+      "expect": "subsequent delegated authentication fails closed"
+    },
+    {
+      "id": "unattested-decision-cannot-be-adopted",
+      "contract": "decision-record-v3",
+      "given": "a historical Decision recorded before Runtime Protocol 2.0 without authentication attestation",
+      "when": "an authenticated caller replays the same semantic Decision",
+      "expect": "reject; historical identity is preserved but no attestation is retroactively created"
+    },
+    {
+      "id": "unattested-authorization-cannot-execute-over-http",
+      "contract": "capability-invocation-v6",
+      "given": "a historical Authorization without Runtime Protocol 2.0 issuer attestation",
+      "when": "an authenticated HTTP caller attempts an external effect with it",
+      "expect": "reject before provider dispatch"
+    },
+    {
+      "id": "delegation-cannot-widen-authority",
+      "contract": "request-authentication-v1",
+      "given": "a delegated actor bounded to one scope and authority ceiling",
+      "when": "it attempts to create a Mandate outside that delegation",
+      "expect": "reject"
+    },
+    {
+      "id": "revoked-credential-cannot-authenticate",
+      "contract": "request-authentication-v1",
+      "given": "a previously valid Runtime bearer credential",
+      "when": "the credential is revoked",
+      "expect": "subsequent authentication fails closed"
+    },
+    {
+      "id": "bounded-subdelegation-preserves-root-authority",
+      "contract": "request-authentication-v1",
+      "given": "an authenticated parent grantee acting through a bounded active parent delegation",
+      "when": "the grantee creates a narrower child delegation for another controller",
+      "expect": "the child authenticates with the root effective principal and cannot exceed the parent delegation"
+    },
+    {
+      "id": "stable-work-identity-is-replayable",
+      "contract": "work-admission-v3",
+      "given": "an active Responsibility and a caller-supplied Work identity",
+      "when": "the same Work identity is admitted again with identical semantics",
+      "expect": "return the existing Work; changed semantics with the same identity are rejected"
+    },
+    {
+      "id": "domain-effect-requires-start-before-dispatch",
+      "contract": "domain-effect-execution-v1",
+      "given": "an attested Authorization and an external-effect request for a Domain-owned provider",
+      "when": "Runtime prepares the effect",
+      "expect": "durably bind identity and authorization but do not grant provider dispatch until start succeeds"
+    },
+    {
+      "id": "domain-effect-start-is-single-use",
+      "contract": "domain-effect-execution-v1",
+      "given": "a prepared Domain effect grant",
+      "when": "start succeeds once and is requested again",
+      "expect": "reject the second start; never grant a second provider dispatch"
+    },
+    {
+      "id": "ambiguous-domain-effect-blocks-redispatch",
+      "contract": "domain-effect-execution-v1",
+      "given": "a started Domain effect whose provider outcome is unknown",
+      "when": "the same idempotency identity is prepared again",
+      "expect": "return ambiguous state with dispatch denied until the Domain submits a reconciled final result"
+    },
+    {
+      "id": "domain-effect-result-identity-is-bound",
+      "contract": "domain-effect-execution-v1",
+      "given": "a started Domain effect bound to one request and provider",
+      "when": "the Domain reports a result for a different request or provider",
+      "expect": "reject without committing or rebinding the effect"
+    },
+    {
+      "id": "domain-effect-start-revalidates-current-authority",
+      "contract": "domain-effect-execution-v1",
+      "given": "a prepared Domain effect whose Mandate is revoked before provider dispatch",
+      "when": "the Domain requests start",
+      "expect": "reject; provider dispatch authority is never granted and Authorization use is not recorded"
+    },
+    {
+      "id": "projection-cas-cross-connection-single-winner",
+      "contract": "organization-durability-v1",
+      "given": "two independent ledger connections observe the same projection version",
+      "when": "both attempt an expected-version transition concurrently",
+      "expect": "exactly one transition wins and the other receives a concurrency conflict"
+    },
+    {
+      "id": "run-lease-cross-runtime-single-owner",
+      "contract": "organization-durability-v1",
+      "given": "two Runtime nodes share one durable Run",
+      "when": "different workers concurrently acquire the same lease generation",
+      "expect": "exactly one owner obtains the active lease"
+    },
+    {
+      "id": "domain-effect-start-cross-runtime-single-dispatch",
+      "contract": "organization-durability-v1",
+      "given": "two Runtime nodes share one prepared Domain effect",
+      "when": "both request provider start concurrently",
+      "expect": "exactly one receives dispatch authority and Authorization use is recorded once"
+    },
+    {
+      "id": "provider-attempt-cross-runtime-single-dispatch",
+      "contract": "organization-durability-v1",
+      "given": "two Runtime nodes receive the same Runtime-owned effect identity",
+      "when": "both invoke concurrently",
+      "expect": "only the reservation winner invokes the provider; the competitor replays or reconciles"
+    },
+    {
+      "id": "institutional-lineage-rejects-historical-branch",
+      "contract": "institutional-lineage-v1",
+      "given": "an institutional lineage whose root has already been superseded by a current head",
+      "when": "another Revision attempts to supersede the historical root",
+      "expect": "reject the branch and preserve the existing current head"
+    },
+    {
+      "id": "superseded-decision-is-not-currently-applicable",
+      "contract": "institutional-lineage-v1",
+      "given": "an immutable Decision that has been explicitly superseded by a successor Decision",
+      "when": "current applicability is requested for the historical Decision",
+      "expect": "reject current use while preserving the historical Decision for audit"
+    },
+    {
+      "id": "ontology-version-change-requires-revision",
+      "contract": "ontology-version-history-v1",
+      "given": "a registered ontology type definition version",
+      "when": "a new version is presented without then with an explicit Revision",
+      "expect": "direct overwrite is rejected; Revision advances current version while preserving history"
+    },
+    {
+      "id": "experience-applicability-requires-qualified-current-head",
+      "contract": "experience-memory-v2",
+      "given": "a qualified Experience that is invalidated or superseded",
+      "when": "current applicability is evaluated",
+      "expect": "historical/non-qualified Experience is not applicable and a qualified lineage head is"
+    },
+    {
+      "id": "superseded-mandate-cannot-qualify-current-authority",
+      "contract": "institutional-lineage-v1",
+      "given": "a Mandate with historical Authorization that is superseded by a successor Mandate",
+      "when": "the historical Authorization is checked for current use",
+      "expect": "preserve historical authorization records but reject current authority through the superseded Mandate"
+    },
+    {
+      "id": "goal-successor-requires-revision-required-and-explicit-decision",
+      "contract": "strategy-v2",
+      "given": "an active Goal that needs revision",
+      "when": "a successor Goal is proposed before and after revision-required state with an explicit admission Decision",
+      "expect": "reject premature successor admission; accept explicit successor only after the old Goal is revision-required"
+    },
+    {
+      "id": "revoked-decision-is-not-currently-applicable",
+      "contract": "decision-qualification-v1",
+      "given": "a recorded Decision whose current qualification is explicitly revoked with basis",
+      "when": "the Decision is reused to qualify a current transition",
+      "expect": "reject while preserving the historical Decision and revocation history"
+    },
+    {
+      "id": "revoked-authorization-is-not-usable",
+      "contract": "authorization-revocation-v1",
+      "given": "an Authorization with historical issuance and use records",
+      "when": "it is explicitly revoked and a later use is attempted",
+      "expect": "reject all later use while preserving issuance, prior uses, and revocation history"
+    },
+    {
+      "id": "strategy-reassessment-requires-explicit-lineage",
+      "contract": "strategy-assessment-v2",
+      "given": "a Goal with one current StrategyAssessment",
+      "when": "a new assessment is recorded",
+      "expect": "reject silent overwrite; accept only explicit supersession of the current assessment with reason and basis"
+    },
+    {
+      "id": "shared-authorization-distinct-runtime-effects-survive-contention",
+      "contract": "organization-durability-v1",
+      "given": "two Runtime nodes execute different durable effect identities under one active reusable Authorization",
+      "when": "their authority-use transitions contend",
+      "expect": "both distinct effects may reserve and dispatch once; neither is misclassified as replay of the other"
+    },
+    {
+      "id": "shared-authorization-distinct-domain-starts-survive-contention",
+      "contract": "organization-durability-v1",
+      "given": "two prepared Domain effects use different idempotency identities under one active reusable Authorization",
+      "when": "two Runtime nodes start them concurrently",
+      "expect": "each distinct effect may obtain one dispatch generation; contention on shared Authorization use does not falsely fence the other effect"
+    },
+    {
+      "id": "responsibility-required-dependency-blocks-parent-satisfaction",
+      "contract": "responsibility-graph-v1",
+      "given": "a parent Responsibility with an active requires relation to an unresolved child Responsibility",
+      "when": "the parent is assessed satisfied",
+      "expect": "reject until the required child is explicitly discharged; child discharge does not itself satisfy the parent"
+    },
+    {
+      "id": "responsibility-hard-dependency-cycle-rejected",
+      "contract": "responsibility-graph-v1",
+      "given": "a directed hard-dependency path A requires B and B requires C",
+      "when": "a Decision attempts to add C requires A",
+      "expect": "reject and preserve an acyclic current graph"
+    },
+    {
+      "id": "strategic-portfolio-activation-requires-decision",
+      "contract": "strategic-agency-v1",
+      "given": "recorded strategic options and a portfolio proposal",
+      "when": "activation is attempted without an applicable Decision",
+      "expect": "reject; Runtime never promotes an option or proposal into an active portfolio by score or presence alone"
+    },
+    {
+      "id": "strategic-resource-budget-unit-is-bound",
+      "contract": "strategic-agency-v1",
+      "given": "an active portfolio with a resource budget denominated in one unit",
+      "when": "an allocation uses another unit or exceeds the durable ceiling",
+      "expect": "reject without changing allocation state"
+    },
+    {
+      "id": "qualification-change-creates-review-not-invalidation",
+      "contract": "continuous-qualification-v1",
+      "given": "a currently usable subject with an active qualification dependency",
+      "when": "a new dependency version is observed",
+      "expect": "create a targeted ReviewObligation while leaving the owned subject unchanged"
+    },
+    {
+      "id": "qualification-action-assessment-remains-pending",
+      "contract": "continuous-qualification-v1",
+      "given": "an open ReviewObligation assessed as requiring reauthorization, reopen, retirement, or revalidation",
+      "when": "the assessment is recorded but no owning-subsystem resolution exists",
+      "expect": "keep the review pending until explicit resolution is recorded"
+    },
+    {
+      "id": "state-export-requires-direct-root-principal",
+      "contract": "state-access-v2",
+      "given": "an authenticated delegated controller",
+      "when": "whole-agency StateBundle export is requested",
+      "expect": "reject; only a directly authenticated root principal may export or import complete agency state"
+    },
+    {
+      "id": "sensitive-runtime-read-requires-authentication",
+      "contract": "state-access-v2",
+      "given": "durable Responsibility or DomainAssignment state exists",
+      "when": "a caller reads it without Runtime authentication",
+      "expect": "reject before returning durable semantic state"
+    },
+    {
+      "id": "public-command-unknown-field-rejected",
+      "contract": "state-access-v2",
+      "given": "a Runtime Protocol 4.0 public command with an undeclared top-level field",
+      "when": "the HTTP request is parsed",
+      "expect": "return validation error before semantic mutation"
+    },
+    {
+      "id": "delegated-transition-requires-operation-authority",
+      "contract": "transition-authority-v1",
+      "given": "an authenticated delegated actor whose active delegation lacks the requested Runtime operation",
+      "when": "the actor records or performs that generic Runtime transition",
+      "expect": "reject even though representation of the root principal is authenticated"
+    },
+    {
+      "id": "delegated-effect-use-respects-action-resource-ceiling",
+      "contract": "transition-authority-v1",
+      "given": "a delegated actor with Runtime transition authority but a narrower effect action/resource ceiling",
+      "when": "the actor tries to invoke a reality-changing capability outside that ceiling",
+      "expect": "reject before fresh dispatch even if a root Authorization identifier is known"
+    },
+    {
+      "id": "terminal-work-rejects-fresh-run",
+      "contract": "fresh-execution-lifecycle-v1",
+      "given": "a terminal Work",
+      "when": "a new Run is started",
+      "expect": "reject; historical Work remains readable but cannot authorize fresh execution"
+    },
+    {
+      "id": "terminal-run-rejects-fresh-invocation-but-replay-survives",
+      "contract": "fresh-execution-lifecycle-v1",
+      "given": "an effect was committed under a Run that later became terminal",
+      "when": "the same durable effect identity is replayed and a different fresh effect is attempted",
+      "expect": "replay the committed result without dispatch, but reject the new fresh effect"
+    },
+    {
+      "id": "provider-result-read-is-principal-actor-bound",
+      "contract": "read-authorization-v1",
+      "given": "a provider result created by one authenticated actor for one effective principal",
+      "when": "another principal or another delegated actor attempts to read it",
+      "expect": "reject; the original actor and direct owning principal remain authorized"
+    }
+  ]
+}

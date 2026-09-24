@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xiongweilin.github.io/world-runtime/contracts/domain/domain-assignment-v1.schema.json",
+  "title": "DomainAssignment v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "responsibility_ref",
+    "domain",
+    "controller"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "responsibility_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controller": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mandate_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "goal_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "constraint_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "authority_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "acceptance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "resource_budget": {
+      "type": "object"
+    },
+    "review_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

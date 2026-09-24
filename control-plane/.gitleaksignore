@@ -1,0 +1,4 @@
+# Reviewed Gitleaks false positive.
+# Historical CI used secret-backed Basic authentication; no credential value was committed.
+# Ignore only this exact historical finding.
+88124ed0f200a87c19f9538f7b87b75fcf72d703:.github/workflows/ci.yml:curl-auth-user:124

@@ -1,0 +1,450 @@
+catalog_version = "world-runtime-contracts-v10"
+owner = "world-runtime/contracts"
+runtime_protocol = "4.0"
+semantic_language = "0.2.0"
+
+[contracts.request_authentication]
+current = "request-authentication-v2"
+owner = "world-runtime/identity"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = true
+
+[contracts.persistent_responsibility]
+current = "persistent-responsibility-v3"
+owner = "world-runtime/responsibility"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+public_write = "domain-bounded"
+
+[contracts.responsibility_assessment]
+current = "responsibility-assessment-v3"
+owner = "world-runtime/responsibility"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.responsibility_discharge]
+current = "responsibility-discharge-v3"
+owner = "world-runtime/responsibility"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.responsibility_graph]
+current = "responsibility-graph-v1"
+owner = "world-runtime/responsibility"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.work_admission]
+current = "work-admission-v4"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.run_lifecycle]
+current = "run-lifecycle-v2"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.run_fencing]
+current = "run-fencing-v2"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.decision_record]
+current = "decision-record-v4"
+owner = "world-runtime/decisions"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.decision_qualification]
+current = "decision-qualification-v1"
+owner = "world-runtime/decisions"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = true
+
+[contracts.mandate_registration]
+current = "mandate-registration-v4"
+owner = "world-runtime/governance"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = true
+
+[contracts.authorization_issue]
+current = "authorization-issue-v4"
+owner = "world-runtime/governance"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = true
+
+[contracts.authorization_use]
+current = "authorization-use-v1"
+owner = "world-runtime/governance"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = true
+
+[contracts.authorization_revocation]
+current = "authorization-revocation-v1"
+owner = "world-runtime/governance"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = true
+
+[contracts.capability_invocation]
+current = "capability-invocation-v6"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.domain_effect_execution]
+current = "domain-effect-execution-v3"
+owner = "world-runtime/effect-boundary"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = true
+
+[contracts.provider_attempt]
+current = "provider-attempt-v2"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+authority_bearing = false
+
+[contracts.provider_result]
+current = "provider-result-v1"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+authority_bearing = false
+
+[contracts.reconciliation]
+current = "provider-reconciliation-v1"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.reconciliation_repeatability]
+current = "reconciliation-repeatability-v1"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+authority_bearing = false
+
+[contracts.recovery_disposition]
+current = "recovery-disposition-v1"
+owner = "world-runtime/recovery"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+authority_bearing = false
+
+[contracts.recovery_application]
+current = "recovery-application-v1"
+owner = "world-runtime/recovery"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+
+[contracts.organization_durability]
+current = "organization-durability-v1"
+owner = "world-runtime/ledger"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[contracts.postgres_backup_restore]
+current = "postgres-backup-restore-v1"
+owner = "world-runtime/ledger"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[contracts.portable_state_bundle]
+current = "portable-state-bundle-v1"
+owner = "world-runtime/ledger"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.institutional_lineage]
+current = "institutional-lineage-v1"
+owner = "world-runtime/lineage"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[contracts.ontology_version_history]
+current = "ontology-version-history-v1"
+owner = "world-runtime/ontology"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[contracts.epistemic_state]
+current = "epistemic-state-v1"
+owner = "world-runtime/epistemics"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.claim_revision]
+current = "claim-revision-v1"
+owner = "world-runtime/epistemics"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.epistemic_evaluation]
+current = "epistemic-evaluation-v1"
+owner = "world-runtime/epistemics"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.cognitive_control]
+current = "cognitive-control-v1"
+owner = "world-runtime/cognition"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.experience_memory]
+current = "experience-memory-v2"
+owner = "world-runtime/memory"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.strategy]
+current = "strategy-v2"
+owner = "world-runtime/strategy"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+
+[contracts.domain_assignment]
+current = "domain-assignment-v3"
+owner = "world-runtime/domains"
+semantic_path = "docs/contracts/runtime-contracts.md"
+schema_path = "domain/domain-assignment-v3.schema.json"
+vectors_path = "domain/vectors-v3.json"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.domain_report]
+current = "domain-report-v3"
+owner = "world-runtime/domains"
+semantic_path = "docs/contracts/runtime-contracts.md"
+schema_path = "domain/domain-report-v3.schema.json"
+vectors_path = "domain/vectors-v3.json"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.strategic_agency]
+current = "strategic-agency-v1"
+owner = "world-runtime/strategy"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = true
+
+[contracts.continuous_qualification]
+current = "continuous-qualification-v1"
+owner = "world-runtime/qualification"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = false
+
+[contracts.state_access]
+current = "state-access-v2"
+owner = "world-runtime/identity"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+public_read = true
+authority_bearing = true
+
+
+[contracts.transition_authority]
+current = "transition-authority-v1"
+owner = "world-runtime/identity"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = true
+
+[contracts.fresh_execution_lifecycle]
+current = "fresh-execution-lifecycle-v1"
+owner = "world-runtime/execution"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_command = true
+authority_bearing = false
+
+[contracts.read_authorization]
+current = "read-authorization-v1"
+owner = "world-runtime/identity"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public_read = true
+authority_bearing = true
+
+[contracts.strategy_assessment]
+current = "strategy-assessment-v2"
+owner = "world-runtime/strategy"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[contracts.goal_lifecycle_transition]
+current = "goal-lifecycle-transition-v1"
+owner = "world-runtime/strategy"
+semantic_path = "docs/contracts/runtime-contracts.md"
+public = false
+authority_bearing = false
+
+[invariants.provider_success_not_outcome]
+statement = "Provider success is an invocation fact and never proves a domain Outcome or GoalAchievement."
+owner = "world-runtime/execution"
+
+[invariants.authorization_not_effect]
+statement = "Authorization permits an action; it does not prove the action or its real-world effect occurred."
+owner = "world-runtime/governance"
+
+[invariants.ambiguous_result_no_redispatch]
+statement = "A durable started provider attempt without a committed result blocks redispatch until reconciliation resolves it."
+owner = "world-runtime/execution"
+
+[invariants.domain_outcome_authority]
+statement = "Domain Controllers own domain-specific outcome verification and completion semantics."
+owner = "domain-controller"
+
+[invariants.semantic_language_boundary]
+statement = "Cross-domain meaning primitives are owned by semantic-language, not by the Runtime contract catalog."
+owner = "semantic-language"
+
+[invariants.durable_effect_identity]
+statement = "Every fresh effectful invocation has a durable idempotency identity before provider dispatch, and that identity cannot rebound to a different semantic request."
+owner = "world-runtime/execution"
+
+
+[invariants.closed_capability_request]
+statement = "CapabilityRequest rejects undeclared top-level fields; every provider-visible executable input must enter through a declared, versioned request field."
+owner = "world-runtime/execution"
+
+[invariants.claimed_identity_not_authentication]
+statement = "Caller-supplied principal/decided_by fields never establish identity; authority-bearing HTTP commands are bound to authenticated Runtime credentials."
+owner = "world-runtime/identity"
+
+[invariants.delegation_revocation_is_current]
+statement = "Delegated identity is usable only while every delegation in its chain is active and unexpired."
+owner = "world-runtime/identity"
+
+[invariants.domain_reality_effect_boundary]
+statement = "A Domain-owned reality-changing provider may dispatch only after Runtime has durably authorized, identity-bound, and started the exact effect; replay after start never grants fresh dispatch."
+owner = "world-runtime/effect-boundary"
+
+[invariants.projection_cas_is_cross_process]
+statement = "Projection expected-version writes are database-level compare-and-swap operations; at most one concurrent transition may win a version."
+owner = "world-runtime/ledger"
+
+[invariants.provider_dispatch_has_single_reservation_winner]
+statement = "For one durable effect identity, at most one Runtime node may reserve a fresh provider attempt and dispatch; competitors must replay or reconcile."
+owner = "world-runtime/execution"
+
+[invariants.run_lease_is_database_fenced]
+statement = "Concurrent Runtime nodes may not hold the same active Run lease generation under different owners."
+owner = "world-runtime/execution"
+
+[invariants.durable_backend_portability]
+statement = "Portable StateBundle semantics are independent of the concrete durable ledger backend."
+owner = "world-runtime/ledger"
+
+[invariants.institutional_history_is_append_only]
+statement = "Supersession changes current qualification by recording a Revision lineage; historical semantic objects are never rewritten into their successor."
+owner = "world-runtime/lineage"
+
+[invariants.institutional_lineage_is_single_head]
+statement = "One institutional lineage has at most one current head; revisions from a historical non-head object are rejected rather than creating silent branches."
+owner = "world-runtime/lineage"
+
+[invariants.current_qualification_is_not_history]
+statement = "Historical existence and current applicability are distinct: a superseded Decision, Goal, Mandate, Experience, or ontology version remains auditable without remaining current."
+owner = "world-runtime/lineage"
+
+[invariants.superseded_authority_is_not_current]
+statement = "Superseding a Mandate preserves historical Authorization/use records but the superseded Mandate cannot qualify new or continued authority use."
+owner = "world-runtime/governance"
+
+[invariants.experience_applicability_requires_current_qualification]
+statement = "An Experience is currently applicable only when it is the lineage head and its current lifecycle status is qualified."
+owner = "world-runtime/memory"
+
+[invariants.revoked_decision_is_not_current]
+statement = "A revoked Decision remains historical evidence but cannot qualify a current transition or Authorization."
+owner = "world-runtime/decisions"
+
+[invariants.revoked_authorization_is_not_usable]
+statement = "Authorization revocation preserves issuance/use history while preventing every future use."
+owner = "world-runtime/governance"
+
+[invariants.strategy_reassessment_requires_lineage]
+statement = "Replacing a current StrategyAssessment requires an explicit single-head supersession lineage; silent assessment overwrite is invalid."
+owner = "world-runtime/strategy"
+
+[invariants.responsibility_dependency_is_not_completion]
+statement = "Required child discharge is a prerequisite for parent satisfaction; child completion never silently discharges or satisfies the parent Responsibility."
+owner = "world-runtime/responsibility"
+
+[invariants.strategy_requires_explicit_decision]
+statement = "Strategic options and evaluations never select themselves; activating or retiring a portfolio requires an applicable authenticated Decision."
+owner = "world-runtime/strategy"
+
+[invariants.strategy_has_no_universal_utility_function]
+statement = "World Runtime stores externally produced strategic evaluations but does not rank options with a built-in universal value, cost, or risk score."
+owner = "world-runtime/strategy"
+
+[invariants.resource_budget_is_unit_bound]
+statement = "A strategic resource allocation must match the unit of its declared portfolio budget and may not exceed the database-fenced budget ceiling."
+owner = "world-runtime/strategy"
+
+[invariants.dependency_change_creates_review_not_invalidation]
+statement = "A qualification dependency change creates a targeted ReviewObligation; it never silently invalidates, revokes, reopens, retires, or reauthorizes the owned subject."
+owner = "world-runtime/qualification"
+
+[invariants.review_assessment_is_not_resolution]
+statement = "A review assessment requiring revalidation, reopen, retirement, or reauthorization remains pending until the owning subsystem records an explicit resolution."
+owner = "world-runtime/qualification"
+
+[invariants.sensitive_state_reads_require_authentication]
+statement = "Durable semantic state reads require authenticated Runtime identity; whole-agency StateBundle export/import requires direct authentication as the deployment-configured root principal, and the HTTP whole-agency state surface is disabled when no root principal is configured."
+owner = "world-runtime/identity"
+
+[invariants.delegated_transition_requires_operation_authority]
+statement = "Delegated representation never implies generic Runtime transition authority; each delegated mutation must be covered by the active delegation's explicit operation ceiling."
+owner = "world-runtime/identity"
+
+[invariants.effect_authority_remains_distinct]
+statement = "Runtime transition authority does not replace Mandate/Authorization action-resource authority for reality-changing effects."
+owner = "world-runtime/governance"
+
+[invariants.terminal_execution_cannot_start_fresh_work]
+statement = "Terminal Work or Run state cannot qualify a fresh provider or Domain dispatch; historical idempotent replay and reconciliation remain permitted."
+owner = "world-runtime/execution"
+
+[invariants.provider_result_read_is_actor_bound]
+statement = "Provider results and reconciliation state are readable only by the owning effective principal and, for delegated access, the authenticated actor that created the attempt; legacy unbound results require direct root access."
+owner = "world-runtime/identity"
+
+[invariants.public_command_schemas_are_closed]
+statement = "Runtime Protocol 4.0 public command models reject undeclared top-level fields instead of silently ignoring input."
+owner = "world-runtime/contracts"

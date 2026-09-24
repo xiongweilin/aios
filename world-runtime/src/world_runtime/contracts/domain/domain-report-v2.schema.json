@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xiongweilin.github.io/world-runtime/contracts/domain/domain-report-v2.schema.json",
+  "title": "DomainReport v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "progress",
+        "evidence-submission",
+        "outcome-candidate",
+        "escalation",
+        "completion-proposal"
+      ]
+    },
+    "basis_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/semanticRef"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "outcome_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/outcomeRef"
+      }
+    },
+    "detail": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "semanticRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "namespace",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "const": "0.1"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "namespace": {
+                "const": "universal"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "claim",
+                  "evidence",
+                  "unknown",
+                  "conflict",
+                  "goal",
+                  "constraint",
+                  "mandate",
+                  "proposal",
+                  "decision",
+                  "commitment",
+                  "permission",
+                  "obligation",
+                  "authorization",
+                  "capability",
+                  "action",
+                  "effect",
+                  "outcome",
+                  "acceptance",
+                  "revision",
+                  "responsibility"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "namespace",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "const": "evidence"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "const": "0.1"
+        }
+      }
+    },
+    "outcomeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "namespace",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "const": "outcome"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "const": "universal"
+          }
+        },
+        "version": {
+          "const": "0.1"
+        }
+      }
+    }
+  }
+}
