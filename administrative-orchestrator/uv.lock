@@ -27,14 +27,14 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-runtime = [
-    { name = "world-runtime" },
-]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+]
+runtime = [
+    { name = "world-runtime" },
 ]
 
 [package.metadata]
@@ -60,9 +60,9 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.35" },
     { name = "structlog", specifier = ">=24.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
-    { name = "world-runtime", marker = "extra == 'runtime'", git = "https://github.com/xiongweilin/world-runtime.git?rev=9905e67d508650b45ac58c26124487a4f9ebce03" },
+    { name = "world-runtime", marker = "extra == 'runtime'", git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=main" },
 ]
-provides-extras = ["dev", "runtime"]
+provides-extras = ["runtime", "dev"]
 
 [[package]]
 name = "alembic"
@@ -1233,7 +1233,7 @@ wheels = [
 [[package]]
 name = "semantic-language"
 version = "0.2.0"
-source = { git = "https://github.com/xiongweilin/semantic-language.git?rev=db148570322f2eed2141e41d4d08ddf697c22749#db148570322f2eed2141e41d4d08ddf697c22749" }
+source = { git = "https://github.com/xiongweilin/aios.git?subdirectory=semantic-language&rev=main#ef570f2f2c648f26e2d3de04eccfdf384b47dc93" }
 
 [[package]]
 name = "six"
@@ -1573,7 +1573,7 @@ wheels = [
 [[package]]
 name = "world-runtime"
 version = "1.1.0"
-source = { git = "https://github.com/xiongweilin/world-runtime.git?rev=9905e67d508650b45ac58c26124487a4f9ebce03#9905e67d508650b45ac58c26124487a4f9ebce03" }
+source = { git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=main#ef570f2f2c648f26e2d3de04eccfdf384b47dc93" }
 dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
