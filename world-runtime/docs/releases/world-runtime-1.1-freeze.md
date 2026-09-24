@@ -1,38 +1,20 @@
-# World Runtime 1.1 freeze
+# World Runtime 1.1 contract
 
-This document freezes Runtime Protocol 4.0 as the authority/lifecycle/read
-isolation hardening release over the World Runtime 1.0 governed-agency kernel.
+World Runtime 1.1 defines Runtime Protocol 4.0 and the authority/lifecycle/read-isolation
+requirements of the current 1.1 line.
 
-It does not reopen the 1.0 semantic ownership boundary. It versions the
-breaking security requirements that could not correctly remain under Runtime
-Protocol 3.0.
+## Contract identifiers
 
-## Baseline
-
-- semantic-language: `0.2.0`
-- semantic-language commit: `eb8c6cb1757256ea9961201bd66ea79952de6134`
 - world-runtime package: `1.1.0`
-- world-runtime implementation/evidence baseline:
-  `02c83f2a8e8cf68fc27897fec8bb8096b6dd8d39`
 - Runtime Protocol: `4.0`
 - contract catalog: `world-runtime-contracts-v10`
 - reference conformance: `world-runtime-conformance-v11`
 - Domain Controller protocol: `domain-controller-protocol-v3`
+- semantic-language: `0.2.0`
 
-Frozen Controller commits:
+## Ownership boundary
 
-- control-plane: `475cc5b3bbc714e65d71f133f4dfa838b249d817`
-- administrative-orchestrator: `c44ca76daf6e2d9ecd4ab182d170176ff740babb`
-- autonomous-development: `7a738277d3bb0bc71a7e620bbfedda6ebd4d9dd9`
-
-The baseline above is the last non-freeze-evidence candidate before this
-document and the 1.1 matrix were added. Commits after it may finalize pins,
-release evidence, documentation, or CI metadata, but must not silently change
-Protocol 4.0 semantics without moving the baseline.
-
-## Frozen 1.0 ownership boundary
-
-World Runtime continues to own durable generic agency mechanics:
+World Runtime owns durable generic agency mechanics:
 
 ```text
 identity / trust
@@ -46,14 +28,12 @@ execution / recovery / reality-effect fencing
 backend-neutral durable ledger
 ```
 
-It still does not own Personal World facts, UI projections, model routing,
-reusable cognitive procedures, domain-specific process/lifecycle semantics,
-universal business-process semantics, a universal strategy scoring function,
-or external payment/device/government trust infrastructure.
+It does not own Personal World facts, operator-interface state, model routing,
+reusable cognitive procedures, domain-specific lifecycle semantics, universal
+business-process semantics, a universal strategy scoring function, or external
+system authority.
 
-## Protocol 4.0 frozen distinctions
-
-Protocol 4.0 adds and freezes these non-substitution rules:
+## Protocol 4.0 distinctions
 
 ```text
 Authentication != Representation
@@ -66,10 +46,10 @@ Historical ambiguous attempt != new attempt
 
 Authenticated read != arbitrary principal read
 Effective principal match != sibling delegated-actor access
-Legacy unbound provider result != generally readable result
+Unbound provider result != generally readable result
 ```
 
-Together with the 1.0 rules:
+Together with the core non-substitution rules:
 
 ```text
 Unknown != False
@@ -89,23 +69,18 @@ Historical qualification != Current qualification
 ## 1.1.x evolution rule
 
 The meaning of Runtime Protocol 4.0 and existing identifiers in
-`world-runtime-contracts-v10` is frozen.
+`world-runtime-contracts-v10` is stable.
 
 A 1.1.x patch may correct defects, strengthen tests/failure paths, harden an
-already-frozen invariant, or improve performance without changing semantic
-identity or authority.
+existing invariant, or improve performance without changing semantic identity or authority.
 
-A change must move to a later protocol/catalog identifier if it changes accepted
-wire input in a breaking way, changes authentication/representation/authority
-requirements, changes fresh-execution legality, changes provider-result read
-authorization, changes durable semantic identity, or changes the meaning of an
-existing transition.
+A change requires a later protocol/catalog identifier if it changes accepted wire input in a
+breaking way, authentication/representation/authority requirements, fresh-execution legality,
+provider-result read authorization, durable semantic identity, or the meaning of an existing
+transition.
 
-## Release acceptance
+## Acceptance
 
-The canonical compatibility evidence is
-`docs/releases/current-system-matrix-1.1.0.md`.
-
-Protocol 4.0 is accepted only when ordinary Runtime CI, PostgreSQL integration,
-the three-Controller HTTP matrix, and the Controllers' own CI/security/trust
-gates are green at the frozen commits.
+Acceptance requires the AIOS root checks plus fresh Runtime and Domain Controller verification
+against the current monorepo revision. A passing historical revision is not evidence for the
+current tree.
