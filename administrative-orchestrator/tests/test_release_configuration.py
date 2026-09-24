@@ -11,15 +11,17 @@ def test_world_runtime_dependency_is_immutable_and_agent_kernel_is_absent() -> N
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
     prefix = (
         "world-runtime @ "
-        "git+https://github.com/xiongweilin/world-runtime.git@"
+        "git+https://github.com/xiongweilin/aios.git@"
     )
     line = next(
         item.strip().strip('",')
         for item in pyproject.splitlines()
         if prefix in item
     )
-    revision = line.split(prefix, 1)[1]
+    revision_and_path = line.split(prefix, 1)[1]
+    revision, subdirectory = revision_and_path.split("#", 1)
     assert _is_full_git_sha(revision)
+    assert subdirectory == "subdirectory=world-runtime"
 
     active_paths = [
         Path("pyproject.toml"),

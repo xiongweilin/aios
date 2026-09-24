@@ -28,7 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 runtime = [
-  "world-runtime @ git+https://github.com/xiongweilin/aios.git@main#subdirectory=world-runtime",
+  "world-runtime @ git+https://github.com/xiongweilin/aios.git@9c0c391adae2bfb8c2b2beaa3c4bba8f6a9cef90#subdirectory=world-runtime",
 ]
 dev = [
   "pytest>=8.3",

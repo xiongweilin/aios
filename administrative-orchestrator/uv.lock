@@ -60,7 +60,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.35" },
     { name = "structlog", specifier = ">=24.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
-    { name = "world-runtime", marker = "extra == 'runtime'", git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=main" },
+    { name = "world-runtime", marker = "extra == 'runtime'", git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=9c0c391adae2bfb8c2b2beaa3c4bba8f6a9cef90" },
 ]
 provides-extras = ["runtime", "dev"]
 
@@ -1573,7 +1573,7 @@ wheels = [
 [[package]]
 name = "world-runtime"
 version = "1.1.0"
-source = { git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=main#ef570f2f2c648f26e2d3de04eccfdf384b47dc93" }
+source = { git = "https://github.com/xiongweilin/aios.git?subdirectory=world-runtime&rev=9c0c391adae2bfb8c2b2beaa3c4bba8f6a9cef90#9c0c391adae2bfb8c2b2beaa3c4bba8f6a9cef90" }
 dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
