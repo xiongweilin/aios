@@ -225,7 +225,7 @@ The component verification surface is expected to cover:
 - predecessor runtime code is absent;
 - exact Runtime protocol mismatch fails closed.
 
-Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow; historical standalone component CI is not current evidence.
+Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow.
 
 
 ## Reality effect boundary
