@@ -11,7 +11,7 @@ Run `dist/aios.exe` to open the compact selector. It separates dependency servic
 - Agency Console BFF is a fixed default: every start starts or reuses it, and every stop stops it when AIOS owns its process.
 - Feishu gateways remain outside this controller for now.
 
-The controller starts selected services in dependency-first order and stops them in reverse order. It launches each project's executable entry point directly rather than depending on separate project start/stop launchers. Control Plane requests elevation through the normal Windows UAC prompt when needed. A service already reachable is not launched again. AIOS only terminates processes it started and still recognizes; externally started processes are reported but left alone. Administrative Orchestrator uses its project Compose file; stop is `docker compose stop`, preserving containers and volumes.
+The controller starts selected services in dependency-first order and stops them in reverse order. It launches each project's executable entry point directly rather than depending on separate project start/stop launchers. Control Plane requests elevation through the normal Windows UAC prompt when needed. A service already reachable is not launched again. AIOS stops tracked processes by PID plus creation-time identity; it can also stop an existing service after its listening port and process command are verified against that project. An unverified port occupant is left untouched and reported. Administrative Orchestrator uses its project Compose file; stop is `docker compose stop`, preserving containers and volumes.
 
 After a start action, the controller opens `https://aios.metratio.com`. Extension presence and installation guidance are determined by the page's Extension/Local Bridge handshake, never by the executable.
 
@@ -30,7 +30,7 @@ Local profile, process records, and logs live under `%LOCALAPPDATA%\Metratio\AIO
 
 ## Workflow and ownership
 
-Human authority is the explicit Start/Stop button plus the checked profile. The executable validates service IDs, applies idempotent running checks, launches the project's direct command, records only processes it launches, and writes local operational logs. Each service owner remains authoritative for its service code and configuration. Running is a no-op on retry; failed/stopped services can be retried. Stop affects only selected services plus the fixed-default BFF; Compose stop preserves durable data. Invalid service IDs are rejected, and failures remain visible in the window/logs. Feishu services are outside this workflow.
+Human authority is the explicit Start/Stop button plus the checked profile. The executable validates service IDs, applies idempotent running checks, launches the project's direct command, records process identities, and writes local operational logs. Each service owner remains authoritative for its service code and configuration. Running is a no-op on retry; failed/stopped services can be retried. Stop affects only selected services plus the fixed-default BFF; Compose stop preserves durable data. Invalid service IDs are rejected, and failures remain visible in the window/logs. Feishu services are outside this workflow.
 
 ## Build
 

@@ -411,7 +411,7 @@ func stopServices(ids []string) error {
 
 func startOne(s service, state *runState) (string, error) {
 	if s.id == "agency-console-bff" && tcpOpen(s.port) {
-		pid, ok, err := findAgencyConsoleBFFListener()
+		pid, ok, err := findServiceListener(s)
 		if err != nil {
 			return "", err
 		}
@@ -518,29 +518,27 @@ func stopOneMessage(s service, state *runState) (string, error) {
 	if s.id == "world-runtime" && serviceReachable(service{id: "control-plane", port: 18083, health: "http://127.0.0.1:18083/live"}) {
 		return s.label + " 未关闭。", errors.New("Control Plane is still active and supervises World Runtime; select Control Plane too")
 	}
-	if s.id == "agency-console-bff" {
-		ref, managed := state.Processes[s.id]
-		if (!managed || !processMatches(ref)) && serviceReachable(s) {
-			pid, verified, err := findAgencyConsoleBFFListener()
-			if err != nil {
-				return "Agency Console BFF 未关闭。", err
-			}
-			if !verified {
-				return "Agency Console BFF 未关闭。", errors.New("port 8787 is occupied, but its process is not verified as Agency Console BFF")
-			}
-			created, err := processCreationTime(uint32(pid))
-			if err != nil || created == 0 {
-				return "Agency Console BFF 未关闭。", errors.New("could not verify Agency Console BFF process identity")
-			}
-			ref = processRef{PID: pid, Creation: created, Executable: "node.exe"}
-			state.Processes[s.id] = ref
-		}
-	}
 	ref, ok := state.Processes[s.id]
-	if !ok {
-		if serviceReachable(s) {
-			return s.label + " 正在运行，但不是由 AIOS 托管；为避免误停外部进程，未关闭。", nil
+	if (!ok || !processMatches(ref)) && serviceReachable(s) {
+		if ok {
+			delete(state.Processes, s.id)
 		}
+		pid, verified, err := findServiceListener(s)
+		if err != nil {
+			return s.label + " 未关闭。", err
+		}
+		if !verified {
+			return s.label + " 未关闭。", fmt.Errorf("port %d is occupied, but the process is not verified as %s", s.port, s.label)
+		}
+		created, err := processCreationTime(uint32(pid))
+		if err != nil || created == 0 {
+			return s.label + " 未关闭。", fmt.Errorf("could not verify the %s process identity", s.label)
+		}
+		ref = processRef{PID: pid, Creation: created}
+		state.Processes[s.id] = ref
+		ok = true
+	}
+	if !ok {
 		return s.label + " 已停止。", nil
 	}
 	if !processMatches(ref) {
@@ -739,24 +737,41 @@ func serviceReachable(s service) bool {
 	return s.port > 0 && tcpOpen(s.port)
 }
 
-func findAgencyConsoleBFFListener() (int, bool, error) {
+func findServiceListener(s service) (int, bool, error) {
 	ps, err := exec.LookPath("powershell.exe")
 	if err != nil {
 		return 0, false, err
 	}
-	command := `$listener = Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -eq $listener) { exit 2 }; $p = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $listener.OwningProcess); if ($p.Name -ne 'node.exe' -or $p.CommandLine -notlike '*D:\agent\agency-console*') { exit 3 }; [Console]::Out.WriteLine($p.ProcessId)`
+	match := ""
+	switch s.id {
+	case "world-runtime":
+		match = `$p.CommandLine -match 'world_runtime|18086'`
+	case "personal-world":
+		match = `$p.CommandLine -match 'personal_world\.api\.app'`
+	case "litellm-gateway":
+		match = `$p.CommandLine -match 'run_server\.py'`
+	case "control-plane":
+		match = `$p.CommandLine -match 'control_plane|control-plane'`
+	case "autonomous-development":
+		match = `$p.CommandLine -match 'autonomous_development|autonomous-development'`
+	case "agency-console-bff":
+		match = `$p.Name -eq 'node.exe' -and $p.CommandLine -like '*D:\agent\agency-console*'`
+	default:
+		return 0, false, fmt.Errorf("no process identity rule exists for %s", s.id)
+	}
+	command := fmt.Sprintf(`$listeners = Get-NetTCPConnection -State Listen -LocalPort %d -ErrorAction SilentlyContinue; foreach ($listener in $listeners) { $p = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $listener.OwningProcess); if ($null -ne $p -and (%s)) { [Console]::Out.WriteLine($p.ProcessId); exit 0 } }; exit 3`, s.port, match)
 	cmd := exec.Command(ps, "-NoProfile", "-Command", command)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	output, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && (exitErr.ExitCode() == 2 || exitErr.ExitCode() == 3) {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 3 {
 			return 0, false, nil
 		}
 		return 0, false, err
 	}
 	pid, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil || pid <= 0 {
-		return 0, false, errors.New("could not parse the verified Agency Console BFF process ID")
+		return 0, false, fmt.Errorf("could not parse the verified %s process ID", s.label)
 	}
 	return pid, true, nil
 }
