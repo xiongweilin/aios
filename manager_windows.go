@@ -410,6 +410,21 @@ func stopServices(ids []string) error {
 }
 
 func startOne(s service, state *runState) (string, error) {
+	if s.id == "agency-console-bff" && tcpOpen(s.port) {
+		pid, ok, err := findAgencyConsoleBFFListener()
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", errors.New("port 8787 is occupied by a process that is not verified as Agency Console BFF; left unchanged")
+		}
+		created, err := processCreationTime(uint32(pid))
+		if err != nil || created == 0 {
+			return "", errors.New("Agency Console BFF is reachable, but its process identity could not be recorded")
+		}
+		state.Processes[s.id] = processRef{PID: pid, Creation: created, Executable: "node.exe"}
+		return "Agency Console BFF 已在运行；已识别并纳入默认关闭管理。", nil
+	}
 	if s.health != "" && httpOK(s.health) || s.port > 0 && tcpOpen(s.port) {
 		return s.label + " 已在运行；跳过重复启动。", nil
 	}
@@ -502,6 +517,24 @@ func stopOneMessage(s service, state *runState) (string, error) {
 	}
 	if s.id == "world-runtime" && serviceReachable(service{id: "control-plane", port: 18083, health: "http://127.0.0.1:18083/live"}) {
 		return s.label + " 未关闭。", errors.New("Control Plane is still active and supervises World Runtime; select Control Plane too")
+	}
+	if s.id == "agency-console-bff" {
+		ref, managed := state.Processes[s.id]
+		if (!managed || !processMatches(ref)) && serviceReachable(s) {
+			pid, verified, err := findAgencyConsoleBFFListener()
+			if err != nil {
+				return "Agency Console BFF 未关闭。", err
+			}
+			if !verified {
+				return "Agency Console BFF 未关闭。", errors.New("port 8787 is occupied, but its process is not verified as Agency Console BFF")
+			}
+			created, err := processCreationTime(uint32(pid))
+			if err != nil || created == 0 {
+				return "Agency Console BFF 未关闭。", errors.New("could not verify Agency Console BFF process identity")
+			}
+			ref = processRef{PID: pid, Creation: created, Executable: "node.exe"}
+			state.Processes[s.id] = ref
+		}
 	}
 	ref, ok := state.Processes[s.id]
 	if !ok {
@@ -704,6 +737,28 @@ func serviceReachable(s service) bool {
 		return true
 	}
 	return s.port > 0 && tcpOpen(s.port)
+}
+
+func findAgencyConsoleBFFListener() (int, bool, error) {
+	ps, err := exec.LookPath("powershell.exe")
+	if err != nil {
+		return 0, false, err
+	}
+	command := `$listener = Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -eq $listener) { exit 2 }; $p = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $listener.OwningProcess); if ($p.Name -ne 'node.exe' -or $p.CommandLine -notlike '*D:\agent\agency-console*') { exit 3 }; [Console]::Out.WriteLine($p.ProcessId)`
+	cmd := exec.Command(ps, "-NoProfile", "-Command", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && (exitErr.ExitCode() == 2 || exitErr.ExitCode() == 3) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil || pid <= 0 {
+		return 0, false, errors.New("could not parse the verified Agency Console BFF process ID")
+	}
+	return pid, true, nil
 }
 
 func httpOK(url string) bool {
