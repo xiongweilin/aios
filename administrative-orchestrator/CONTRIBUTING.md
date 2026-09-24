@@ -16,6 +16,6 @@ uv run ruff check .
 uv run pytest -q
 ```
 
-For changes that touch migrations, DBOS workflows, production connectors, Kernel integration, or Operations surfaces, also run the relevant Compose/E2E or recorded acceptance lane described in `docs/production-operations.md` and `docs/acceptance/`.
+For changes that touch migrations, DBOS workflows, production connectors, Runtime integration, or Operations surfaces, also run the relevant verification described in `docs/production-operations.md`.
 
 Architectural changes should state which layer owns the new concept, which stronger claims it is explicitly not allowed to make, and what evidence establishes completion.
