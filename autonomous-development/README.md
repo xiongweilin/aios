@@ -37,7 +37,7 @@ requirement
   -> repeat
 ```
 
-V1 deliberately does **not** implement a coding agent. Codex is the engineering executor. This repository owns the durable development lifecycle, evidence, quality gates, progressive delivery, feedback attribution, promotion and rollback decisions around Codex.
+V1 deliberately does **not** make a specific coding agent part of its domain semantics. Engineering execution is a provider boundary; concrete executors are deployment choices. This component owns the durable development lifecycle, evidence, quality gates, progressive delivery, feedback attribution, promotion and rollback decisions around the selected executor.
 
 ## V1 design
 
@@ -78,6 +78,6 @@ With `AUTODEV_WORLD_RUNTIME_MODE=cutover`, Runtime Protocol 4.0 requires
 `AUTODEV_WORLD_RUNTIME_BEARER_TOKEN`. Deployment, traffic mutation, source
 promotion, and source restore remain Development-owned provider semantics, but
 their reality-changing dispatches pass through `domain-effect-execution-v3`
-before Docker, traffic-state, or Git mutation occurs. Read-only observation,
+before configured deployment, traffic-state, or Git mutation occurs. Read-only observation,
 candidate worktrees, implementation, build, and verification remain local to
 Development.
