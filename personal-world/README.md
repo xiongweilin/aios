@@ -48,7 +48,7 @@ Every API caller must provide `X-Service-Identity` and `X-Purpose`; projection a
 filtered by the caller's data-access profile and sensitivity ceiling.
 
 See `docs/architecture.md`, `docs/contracts.md`, `docs/threat-model.md`, and
-`docs/releases/v0.1-v0.9.md`.
+`docs/releases/v1.0.md`.
 
 
 ## v1.0 closure
