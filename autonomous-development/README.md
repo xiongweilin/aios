@@ -14,10 +14,7 @@ Local-first autonomous software development and product-evolution control plane.
 
 The V1 lifecycle surface and provider-neutral operator API are part of this component. The disposable
 acceptance target uses a pinned Python 3.14 Alpine image, an upstream-fixed zlib package and
-an unchanged `grype --fail-on high` security gate. See
-[the acceptance target record](acceptance/target/README.md) and the
-[local deployment runbook](docs/v1-local-deployment.md) for the current definition and
-verification boundary.
+an unchanged `grype --fail-on high` security gate. See [the acceptance target record](acceptance/target/README.md) for the disposable verification fixture.
 
 The system owns the closed loop:
 
@@ -42,7 +39,6 @@ V1 deliberately does **not** make a specific coding agent part of its domain sem
 ## V1 design
 
 - Canonical V1 architecture, semantics, lifecycle and acceptance criteria: [docs/v1-design.md](docs/v1-design.md)
-- Local bootstrap and operation procedure: [docs/v1-local-deployment.md](docs/v1-local-deployment.md)
 - Human requirement/operator API contract: [docs/operator-contract.md](docs/operator-contract.md)
 - External research basis and adopted/rejected ideas: [docs/v1-research-basis.md](docs/v1-research-basis.md)
 
