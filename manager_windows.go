@@ -1,3 +1,5 @@
+//go:build windows && !product
+
 package main
 
 import (
@@ -437,6 +439,41 @@ func stopServices(ids []string) error {
 	return nil
 }
 
+func agencyConsoleCloudEntryEnv() []string {
+	env := []string{
+		"AGENCY_CONSOLE_DEPLOYMENT_ROLE=cloud-entry",
+		"AGENCY_CONSOLE_MODE=real",
+		"AUTH_MODE=session",
+		"AGENCY_CONSOLE_COOKIE_SECURE=true",
+		"ALLOWED_ORIGINS=https://aios.metratio.com",
+	}
+	for _, name := range []string{
+		"AGENCY_CONSOLE_PRINCIPAL_REF",
+		"PERSONAL_WORLD_SUBJECT_ID",
+		"WORLD_RUNTIME_BASE_URL",
+		"WORLD_RUNTIME_BEARER_TOKEN",
+		"WORLD_RUNTIME_DELEGATION_ID",
+		"PERSONAL_WORLD_BASE_URL",
+		"PERSONAL_WORLD_BEARER_TOKEN",
+		"PERSONAL_WORLD_WORKLOAD_HMAC_SECRET",
+		"PERSONAL_WORLD_SERVICE_IDENTITY",
+		"CONTROL_PLANE_BASE_URL",
+		"CONTROL_PLANE_API_KEY",
+		"ADMINISTRATIVE_BASE_URL",
+		"ADMIN_AGENCY_CONSOLE_SHARED_SECRET",
+		"AUTONOMOUS_DEVELOPMENT_BASE_URL",
+		"AUTONOMOUS_DEVELOPMENT_TARGET_ID",
+		"AUTONOMOUS_DEVELOPMENT_OPERATOR_SECRET",
+		"AGENCY_CONSOLE_DOMAINS",
+		"AGENCY_CONSOLE_RESPONSIBILITY_REFS",
+		"AGENCY_CONSOLE_ADMINISTRATIVE_CASE_REFS",
+		"AGENCY_CONSOLE_DEVELOPMENT_REQUIREMENT_REFS",
+	} {
+		env = append(env, name+"=")
+	}
+	return env
+}
+
 func startOne(s service, state *runState) (string, error) {
 	if (s.id == "agency-console-bff" || s.id == "agency-console-web") && tcpOpen(s.port) {
 		pid, ok, err := findServiceListener(s)
@@ -526,10 +563,12 @@ func startOne(s service, state *runState) (string, error) {
 		})
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	case "agency-console-bff":
-		pid, err := startTracked(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev:bff"}, s.root)
+		env := append(agencyConsoleCloudEntryEnv(), "HOST=0.0.0.0", "PORT=8787")
+		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev:bff"}, s.root, env)
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	case "agency-console-web":
-		pid, err := startTracked(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev"}, s.root)
+		env := append(agencyConsoleCloudEntryEnv(), "HOSTNAME=0.0.0.0", "PORT=3000", "AGENCY_CONSOLE_BFF_INTERNAL_URL=http://127.0.0.1:8787", "NEXT_PUBLIC_BFF_BASE_URL=http://127.0.0.1:8787")
+		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev"}, s.root, env)
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	default:
 		return "", fmt.Errorf("no start command is configured for %s", s.id)

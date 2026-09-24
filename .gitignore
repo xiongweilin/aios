@@ -7,3 +7,7 @@
 *.tmp
 *.log
 *.exe~
+/dist/AIOS-Setup.exe
+/dist/aios-dev.exe
+/installer/payload/aios.exe
+/installer/payload/stable-profile.json

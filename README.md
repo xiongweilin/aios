@@ -1,43 +1,48 @@
 # AIOS
 
-Windows service controller for the local Personal AIOS profile. The repository contains only the controller; project source stays in its owner repositories.
+This repository owns the AIOS Manager, Setup bootstrapper, and tested component-composition profile. Component implementation remains in its owner repositories; AIOS records immutable release versions and coordinates lifecycle.
 
-## Use
+## User installation
 
-Run `dist/aios.exe` to open the compact selector. It separates dependency services from Domain services. The last checked profile is saved locally and restored the next time the window opens. Opening the window does not start or stop anything; choose an action explicitly. Start and Stop run asynchronously so the selector remains responsive.
-
-- Dependencies: World Runtime, Personal World, LiteLLM Gateway.
-- Domain services: Control Plane, Administrative Orchestrator, Autonomous Development.
-- Agency Console Web and BFF are fixed defaults: every start starts or reuses both and opens the browser only after the web endpoint is ready; every stop stops both when AIOS owns their processes.
-- Feishu gateways remain outside this controller for now.
-
-The controller starts selected services in dependency-first order and stops them in reverse order. Selecting Control Plane automatically starts its hard World Runtime dependency if it was not selected. It launches each project's executable entry point directly rather than depending on separate project start/stop launchers. Control Plane requests elevation through the normal Windows UAC prompt when needed. A service already reachable is not launched again. AIOS stops tracked processes by PID plus creation-time identity; it can also stop an existing service after its listening port and process command are verified against that project. An unverified port occupant is left untouched and reported. Administrative Orchestrator uses its project Compose file; stop is `docker compose stop`, preserving containers and volumes.
-
-After a start action, the controller opens `https://aios.metratio.com`. Extension presence and installation guidance are determined by the page's Extension/Local Bridge handshake, never by the executable.
-
-## Commands
+The public entry point is a single `AIOS-Setup.exe`. It installs the daily Manager separately from durable user data and creates Start Menu/Desktop shortcuts. The Manager and component binaries may be replaced; long-lived state remains under:
 
 ```text
-aios.exe start [service-id ...]
-aios.exe stop [service-id ...]
-aios.exe status [service-id ...]
-aios.exe logs [service-id ...]
+%USERPROFILE%\.aios\
+├─ config\
+├─ state\
+├─ data\
+├─ logs\
+├─ components\
+└─ domains\
+   ├─ autonomous-development\
+   ├─ administrative\
+   └─ ...
 ```
 
-Use `start` or `stop` without IDs to apply the complete selectable profile. `status` reports the profile's services and both default entry services. `logs` opens the local AIOS log folder, or the selected service log when an ID is provided. The GUI always applies the remembered selection; Agency Console Web and BFF remain fixed defaults.
+The Manager executable is installed under `%LOCALAPPDATA%\Programs\Metratio\AIOS\`. Uninstalling the Manager removes the program and shortcuts only; it does not delete `%USERPROFILE%\.aios`.
 
-Local profile, process records, and logs live under `%LOCALAPPDATA%\Metratio\AIOS`; they are not committed to this repository.
+The Manager accepts `install`, `update`, `start`, `stop`, `status`, `logs`, `repair`, and `uninstall`. Installation and lifecycle actions are gated on a compatibility-validated profile. Each profile pins owner repository, release tag, asset URL, SHA-256, protocol contracts, and passing integration evidence. It never downloads a component's `latest` release.
 
-## Workflow and ownership
+**Release state:** owner repositories do not yet publish the required compatible Windows artifacts, so there is no `profiles/stable.json` and no usable public Setup release. The build can be exercised for engineering verification, but the release workflow blocks publication until the profile is complete and verified.
 
-Human authority is the explicit Start/Stop button plus the checked profile. The executable validates service IDs, applies idempotent running checks, launches the project's direct command, records process identities, and writes local operational logs. Each service owner remains authoritative for its service code and configuration. Running is a no-op on retry; failed/stopped services can be retried. Stop affects only selected services plus the fixed-default Agency Console Web and BFF; Compose stop preserves durable data. Invalid service IDs are rejected, and failures remain visible in the window/logs. Feishu services are outside this workflow.
+## Developer controller
+
+The pre-existing source-checkout service controller is still available as `dist/aios-dev.exe` for development workstations. It remains separate from the public Manager and may use developer tools and checked-out project repositories. It is not included in `AIOS-Setup.exe` or GitHub Releases.
+
+## Release profile ownership
+
+`profiles/aios-profile.schema.json` defines the manifest contract. The profile is owned here; component artifacts are owned by each component's repository. Upgrade installs a tested profile version. Previous version directories remain available for rollback; repair uses the same pinned artifacts. User data and domain state remain outside replaceable component directories.
 
 ## Build
 
-Requires Go 1.22 or newer on Windows and the inbox Windows PowerShell 5.1 UI runtime.
+Requires Go 1.22+ and Windows PowerShell. Run from Windows:
 
 ```powershell
 ./build.ps1
 ```
 
-The packaged executable is `dist/aios.exe`.
+This produces:
+
+- `dist/AIOS-Setup.exe` — the only end-user release asset.
+- `dist/aios.exe` — the public AIOS Manager embedded by Setup.
+- `dist/aios-dev.exe` — developer-only source controller, never attached to a public release.

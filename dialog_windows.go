@@ -1,3 +1,5 @@
+//go:build windows && !product
+
 package main
 
 import (
