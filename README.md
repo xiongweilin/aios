@@ -1,6 +1,7 @@
 # AIOS
 
 [![SonarCloud Analysis](https://github.com/xiongweilin/aios/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/xiongweilin/aios/actions/workflows/sonarcloud.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_aios)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=bugs)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=code_smells)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
