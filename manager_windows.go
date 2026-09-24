@@ -38,6 +38,13 @@ var services = []service{
 	{id: "autonomous-development", label: "Autonomous Development", port: 8765, root: `D:\agent\autonomous-development`, category: "domain"},
 }
 
+func defaultEntryServices() []service {
+	return []service{
+		{id: "agency-console-bff", label: "Agency Console BFF", port: 8787, root: `D:\agent\agency-console`},
+		{id: "agency-console-web", label: "Agency Console Web", port: 3000, health: "http://127.0.0.1:3000/", root: `D:\agent\agency-console`},
+	}
+}
+
 type processRef struct {
 	PID        int    `json:"pid"`
 	Creation   uint64 `json:"creationFileTime"`
@@ -362,19 +369,27 @@ func startServices(ids []string) error {
 			startedAny = true
 		}
 	}
-	console := service{id: "agency-console-bff", label: "Agency Console BFF", port: 8787, root: `D:\agent\agency-console`}
-	message, err := startOne(console, &state)
-	fmt.Println("[默认] " + message)
-	if err != nil {
-		failures = append(failures, fmt.Sprintf("Agency Console BFF: %v", err))
-	} else {
-		startedAny = true
+	for _, entry := range defaultEntryServices() {
+		message, err := startOne(entry, &state)
+		fmt.Printf("[默认] %s\n", message)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", entry.label, err))
+		} else {
+			startedAny = true
+		}
 	}
 	if err := saveState(state); err != nil {
 		failures = append(failures, "save process state: "+err.Error())
 	}
 	if startedAny {
-		openBrowser()
+		entries := defaultEntryServices()
+		if !waitForService(entries[0], 20*time.Second) {
+			failures = append(failures, "Agency Console BFF did not become reachable on 127.0.0.1:8787")
+		} else if !waitForService(entries[1], 45*time.Second) {
+			failures = append(failures, "Agency Console Web did not become ready on 127.0.0.1:3000; browser was not opened")
+		} else {
+			openBrowser()
+		}
 	}
 	if len(failures) > 0 {
 		return errors.New(strings.Join(failures, "; "))
@@ -392,12 +407,15 @@ func stopServices(ids []string) error {
 		return err
 	}
 	var failures []string
-	console := service{id: "agency-console-bff", label: "Agency Console BFF", port: 8787, root: `D:\agent\agency-console`}
-	if err := stopOne(console, &state); err != nil {
-		fmt.Printf("[默认] %s: %v\n", console.label, err)
-		failures = append(failures, fmt.Sprintf("%s: %v", console.label, err))
-	} else {
-		fmt.Println("[默认] Agency Console BFF 已关闭或未由 AIOS 托管。")
+	entries := defaultEntryServices()
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if err := stopOne(entry, &state); err != nil {
+			fmt.Printf("[默认] %s: %v\n", entry.label, err)
+			failures = append(failures, fmt.Sprintf("%s: %v", entry.label, err))
+		} else {
+			fmt.Printf("[默认] %s 已关闭或未由 AIOS 托管。\n", entry.label)
+		}
 	}
 	for i := len(services) - 1; i >= 0; i-- {
 		s := services[i]
@@ -420,20 +438,20 @@ func stopServices(ids []string) error {
 }
 
 func startOne(s service, state *runState) (string, error) {
-	if s.id == "agency-console-bff" && tcpOpen(s.port) {
+	if (s.id == "agency-console-bff" || s.id == "agency-console-web") && tcpOpen(s.port) {
 		pid, ok, err := findServiceListener(s)
 		if err != nil {
 			return "", err
 		}
 		if !ok {
-			return "", errors.New("port 8787 is occupied by a process that is not verified as Agency Console BFF; left unchanged")
+			return "", fmt.Errorf("port %d is occupied by a process that is not verified as %s; left unchanged", s.port, s.label)
 		}
 		created, err := processCreationTime(uint32(pid))
 		if err != nil || created == 0 {
-			return "", errors.New("Agency Console BFF is reachable, but its process identity could not be recorded")
+			return "", fmt.Errorf("%s is reachable, but its process identity could not be recorded", s.label)
 		}
 		state.Processes[s.id] = processRef{PID: pid, Creation: created, Executable: "node.exe"}
-		return "Agency Console BFF 已在运行；已识别并纳入默认关闭管理。", nil
+		return s.label + " 已在运行；已识别并纳入默认关闭管理。", nil
 	}
 	if s.health != "" && httpOK(s.health) || s.port > 0 && tcpOpen(s.port) {
 		return s.label + " 已在运行；跳过重复启动。", nil
@@ -509,6 +527,9 @@ func startOne(s service, state *runState) (string, error) {
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	case "agency-console-bff":
 		pid, err := startTracked(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev:bff"}, s.root)
+		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
+	case "agency-console-web":
+		pid, err := startTracked(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev"}, s.root)
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	default:
 		return "", fmt.Errorf("no start command is configured for %s", s.id)
@@ -728,16 +749,35 @@ func showStatus(ids []string) error {
 		}
 		fmt.Printf("%-30s %s\n", s.label, status)
 	}
-	console := service{id: "agency-console-bff", label: "Agency Console BFF", port: 8787}
-	status := "stopped"
-	if serviceReachable(console) {
-		status = "running"
-		if ref, ok := state.Processes[console.id]; ok && processMatches(ref) {
-			status = "running (AIOS)"
+	for _, entry := range defaultEntryServices() {
+		status := "stopped"
+		if serviceReachable(entry) {
+			status = "running"
+			if ref, ok := state.Processes[entry.id]; ok && processMatches(ref) {
+				status = "running (AIOS)"
+			}
 		}
+		fmt.Printf("%-30s %s [default]\n", entry.label, status)
 	}
-	fmt.Printf("%-30s %s [default]\n", console.label, status)
 	return nil
+}
+
+func waitForService(s service, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		ready := serviceReachable(s)
+		if s.id == "agency-console-web" {
+			ready = s.health != "" && httpOK(s.health)
+		}
+		if ready {
+			return true
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	if s.id == "agency-console-web" {
+		return s.health != "" && httpOK(s.health)
+	}
+	return serviceReachable(s)
 }
 
 func serviceReachable(s service) bool {
@@ -766,6 +806,8 @@ func findServiceListener(s service) (int, bool, error) {
 		match = `$p.CommandLine -match 'autonomous_development|autonomous-development'`
 	case "agency-console-bff":
 		match = `$p.Name -eq 'node.exe' -and $p.CommandLine -like '*D:\agent\agency-console*'`
+	case "agency-console-web":
+		match = `$p.Name -eq 'node.exe' -and $p.CommandLine -like '*D:\agent\agency-console*' -and $p.CommandLine -like '*next*dev*'`
 	default:
 		return 0, false, fmt.Errorf("no process identity rule exists for %s", s.id)
 	}
