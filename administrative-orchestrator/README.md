@@ -60,7 +60,7 @@ completion.
 - Administrative `ExecutionAuthorization` and `EffectRecord`;
 - domain-specific verification, `ConfirmedOutcome`, completion and reopen;
 - employee lifecycle, financial transaction, commitment and communication semantics;
-- product Operations API/Console and Administrative integration contracts.
+- Operations API and Administrative integration contracts.
 
 `world-runtime` owns:
 
@@ -135,7 +135,7 @@ The current system covers:
 - meeting self-commitments and explicit responsibility discharge;
 - governed internal communication;
 - bounded investigation/reframing/reopen;
-- Operations API/Console;
+- Operations API;
 - PostgreSQL/DBOS durability and Runtime-state DR.
 
 It does not claim payment/settlement authority, proof of human read, delegated commitment
@@ -176,8 +176,7 @@ Historical migrations, tags, or ADRs may retain predecessor and milestone vocabu
 it would corrupt replay or lineage. Staged M5–M9 deployment and acceptance artifacts are preserved
 by Git history rather than carried in the current V1 tree.
 
-Current V1 acceptance is the repository CI, Production Trust workflow, Runtime integration gates,
-and the current production operations contract below.
+Historical standalone repository CI and workflow names are not current monorepo evidence. Current acceptance must be grounded in AIOS root checks, fresh component verification, Runtime integration gates, and the production operations contract below.
 
 ## Development
 
@@ -187,8 +186,7 @@ uv run ruff check .
 uv run pytest -q
 ```
 
-CI additionally proves the World Runtime boundary, absence of active Agent Kernel ownership,
-Compose E2E, DBOS restart, Production Trust invariants, dependency/security gates, and SonarQube quality.
+The retained component tests and scripts cover the World Runtime boundary, DBOS behavior, deployment fixtures, and production invariants. Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow; former standalone CI names are historical.
 
 Current architecture: `docs/architecture.md`.
 Canonical Administrative vocabulary: `docs/contracts/domain-model.md`.
