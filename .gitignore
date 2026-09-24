@@ -1,0 +1,9 @@
+/data/
+/logs/
+/autodev/
+/console/
+/personal-world/
+/runtime/
+*.tmp
+*.log
+*.exe~
