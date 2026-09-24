@@ -193,7 +193,7 @@ Before rolling back:
 
 ## Acceptance evidence
 
-Current acceptance requires fresh component verification, Runtime integration gates, repository-level AIOS checks, and production/read-back evidence appropriate to the deployment being assessed. Historical standalone workflow names are not current evidence. Run-specific evidence belongs in CI artifacts or an operator-controlled evidence store, not as staged milestone snapshots in the source tree.
+Current acceptance requires fresh component verification, Runtime integration gates, repository-level AIOS checks, and production/read-back evidence appropriate to the deployment being assessed. Run-specific evidence belongs in CI artifacts or an operator-controlled evidence store.
 
 Unit tests and local fixtures prove repository semantics; they are not relabeled as real-provider
 evidence.
