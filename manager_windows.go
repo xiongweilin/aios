@@ -564,11 +564,14 @@ func startOne(s service, state *runState) (string, error) {
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	case "agency-console-bff":
 		env := append(agencyConsoleCloudEntryEnv(), "HOST=0.0.0.0", "PORT=8787")
-		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev:bff"}, s.root, env)
+		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run start --workspace @agency-console/bff"}, s.root, env)
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	case "agency-console-web":
-		env := append(agencyConsoleCloudEntryEnv(), "HOSTNAME=0.0.0.0", "PORT=3000", "AGENCY_CONSOLE_BFF_INTERNAL_URL=http://127.0.0.1:8787", "NEXT_PUBLIC_BFF_BASE_URL=http://127.0.0.1:8787")
-		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run dev"}, s.root, env)
+		env := append(agencyConsoleCloudEntryEnv(), "HOSTNAME=0.0.0.0", "PORT=3000", "AGENCY_CONSOLE_BFF_INTERNAL_URL=http://127.0.0.1:8787", "NEXT_PUBLIC_BFF_BASE_URL=/api")
+		if output, buildErr := runLoggedWithEnv(s.id+"-build", s.root, env, "cmd.exe", "/d", "/s", "/c", "npm run build --workspace @agency-console/web"); buildErr != nil {
+			return loggedMessage(s.label+" production build", output, buildErr)
+		}
+		pid, err := startTrackedWithEnv(s, state, "cmd.exe", []string{"/d", "/s", "/c", "npm run start --workspace @agency-console/web"}, s.root, env)
 		return fmt.Sprintf("%s 启动中（PID %d）。", s.label, pid), err
 	default:
 		return "", fmt.Errorf("no start command is configured for %s", s.id)
@@ -727,6 +730,10 @@ func startElevated(s service, state *runState, program string, args []string, di
 }
 
 func runLogged(id, dir, program string, args ...string) (string, error) {
+	return runLoggedWithEnv(id, dir, nil, program, args...)
+}
+
+func runLoggedWithEnv(id, dir string, extraEnv []string, program string, args ...string) (string, error) {
 	path, err := logPath(id)
 	if err != nil {
 		return "", err
@@ -738,6 +745,9 @@ func runLogged(id, dir, program string, args ...string) (string, error) {
 	defer log.Close()
 	cmd := exec.Command(program, args...)
 	cmd.Dir = dir
+	if extraEnv != nil {
+		cmd.Env = mergeEnvironment(os.Environ(), extraEnv)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	var output bytes.Buffer
 	writer := io.MultiWriter(log, &output)
