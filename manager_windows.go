@@ -334,6 +334,13 @@ func startServices(ids []string) error {
 	for _, id := range ids {
 		selected[id] = true
 	}
+	effective := map[string]bool{}
+	for id, isSelected := range selected {
+		effective[id] = isSelected
+	}
+	if selected["control-plane"] {
+		effective["world-runtime"] = true
+	}
 	state, err := loadState()
 	if err != nil {
 		return err
@@ -341,10 +348,13 @@ func startServices(ids []string) error {
 	var failures []string
 	startedAny := false
 	for _, s := range services {
-		if !selected[s.id] {
+		if !effective[s.id] {
 			continue
 		}
 		message, err := startOne(s, &state)
+		if !selected[s.id] {
+			message = "[自动依赖] " + message
+		}
 		fmt.Println(message)
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", s.label, err))

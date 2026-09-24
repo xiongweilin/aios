@@ -80,7 +80,7 @@ Add-ServiceLayer '依赖层' 'dependency' 78
 Add-ServiceLayer 'Domain 层' 'domain' 232
 
 $hint = New-Object System.Windows.Forms.Label
-$hint.Text = '选择将应用于启动与关闭；profile 会即时保存。打开窗口本身不会改变服务状态。'
+$hint.Text = 'Control Plane 会自动启动其硬依赖 World Runtime；profile 即时保存。打开窗口本身不改变服务状态。'
 $hint.Location = New-Object System.Drawing.Point(20, 390)
 $hint.Size = New-Object System.Drawing.Size(480, 36)
 $form.Controls.Add($hint)
