@@ -170,13 +170,9 @@ docs/
   production-operations.md
 ```
 
-## Historical identifiers
+## Stable compatibility identifiers
 
-Historical migrations, tags, or ADRs may retain predecessor and milestone vocabulary where changing
-it would corrupt replay or lineage. Staged M5–M9 deployment and acceptance artifacts are preserved
-by Git history rather than carried in the current V1 tree.
-
-Historical standalone repository CI and workflow names are not current monorepo evidence. Current acceptance must be grounded in AIOS root checks, fresh component verification, Runtime integration gates, and the production operations contract below.
+Persisted migration, wire, policy, and audit identifiers that participate in replay or external compatibility remain stable. Current acceptance is grounded in AIOS root checks, fresh component verification, Runtime integration gates, and the production operations contract below.
 
 ## Development
 
@@ -186,7 +182,7 @@ uv run ruff check .
 uv run pytest -q
 ```
 
-The retained component tests and scripts cover the World Runtime boundary, DBOS behavior, deployment fixtures, and production invariants. Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow; former standalone CI names are historical.
+The component tests and scripts cover the World Runtime boundary, DBOS behavior, deployment fixtures, and production invariants. Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow.
 
 Current architecture: `docs/architecture.md`.
 Canonical Administrative vocabulary: `docs/contracts/domain-model.md`.
