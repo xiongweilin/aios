@@ -1,8 +1,10 @@
 param([Parameter(Mandatory)][string]$ExePath)
 
 $ErrorActionPreference = 'Stop'
+Write-Output 'AIOS selector: host started'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Write-Output 'AIOS selector: UI assemblies loaded'
 
 function Invoke-Aios([string[]]$Arguments) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -31,6 +33,7 @@ $services = @(
     [pscustomobject]@{ Id = 'autonomous-development'; Label = 'Autonomous Development'; Layer = 'domain' }
 )
 $profileResult = Invoke-Aios @('profile', 'get')
+Write-Output "AIOS selector: profile command exit $($profileResult.ExitCode)"
 $remembered = @{}
 if ($profileResult.ExitCode -eq 0) {
     foreach ($id in ($profileResult.Text -split "`r?`n")) { if ($id) { $remembered[$id] = $true } }
@@ -43,6 +46,12 @@ $form.ClientSize = New-Object System.Drawing.Size(520, 635)
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
 $form.MinimizeBox = $true
+$form.ShowInTaskbar = $true
+$form.TopMost = $true
+$form.Add_Shown({
+    $form.Activate()
+    $form.BringToFront()
+})
 
 $title = New-Object System.Windows.Forms.Label
 $title.Text = 'Personal AIOS'
@@ -168,4 +177,6 @@ $logsButton.Add_Click({
 })
 $form.Controls.Add($logsButton)
 
+Write-Output 'AIOS selector: entering dialog'
 [void]$form.ShowDialog()
+Write-Output 'AIOS selector: dialog closed'
