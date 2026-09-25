@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_no_embedded_or_predecessor_runtime_code() -> None:
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[3]
     forbidden_paths = [
         "src/agent_kernel",
         "src/meta_controller",
@@ -27,7 +27,7 @@ def test_no_embedded_or_predecessor_runtime_code() -> None:
 
 
 def test_profile_source_has_no_world_runtime_python_imports() -> None:
-    root = Path(__file__).resolve().parents[1] / "src" / "control_plane"
+    root = Path(__file__).resolve().parents[3] / "src" / "control_plane"
     predecessor_imports = ("from agent_" + "kernel", "from meta_" + "controller")
     text = "\n".join(path.read_text(encoding="utf-8") for path in root.rglob("*.py"))
     for token in predecessor_imports:
@@ -37,9 +37,8 @@ def test_profile_source_has_no_world_runtime_python_imports() -> None:
 
 
 def test_profile_has_no_world_runtime_package_dependency() -> None:
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[3]
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
-    lock = (root / "uv.lock").read_text(encoding="utf-8")
     assert "world-runtime @" not in pyproject
     assert "world-runtime.git" not in pyproject
-    assert 'name = "world-runtime"' not in lock
+    assert not (root / "uv.lock").exists()
