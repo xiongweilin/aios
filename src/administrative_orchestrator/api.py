@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from importlib.metadata import version as package_version
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -71,7 +71,7 @@ from .unit_of_work import AdministrativeUnitOfWork
 
 app = FastAPI(
     title="Administrative Orchestrator",
-    version=package_version("administrative-orchestrator"),
+    version=package_version("aios"),
 )
 
 _settings = get_settings()
