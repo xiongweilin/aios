@@ -55,18 +55,26 @@ There is one Python project, one dependency graph, one source root and one test 
 AIOS has no UI. Services expose API/CLI boundaries and run as containers.
 
 ```bash
-docker compose up -d personal-world world-runtime
-docker compose --profile domains up -d
+docker compose up -d
 ```
 
-Agent implementations, LLM providers, Prometheus and other external systems are integrations, not semantic owners.
+All AIOS runtime components are containers. The host does not run Personal World, World Runtime,
+Control Plane, Administrative, or Autonomous Development as native programs. The host only
+provides the container runtime and bind-mounted resources such as an Autodev workspace or Docker
+socket.
+
+Agent implementations, LLM providers, Prometheus and other external dependencies are reached
+through container-network endpoints or external APIs. AIOS runtime configuration must not depend
+on a host-local program listener.
 
 ## Development
 
+The product runtime remains container-only. Repository checks may run in CI or a disposable
+development container; they are not product deployment paths.
+
 ```bash
-python -m pip install -e '.[dev]'
-pytest
-ruff check src tests
+docker build -t aios:local .
+docker compose config --quiet
 ```
 
 Component-specific semantics and contracts live under the corresponding `docs/` and `contracts/` paths.
