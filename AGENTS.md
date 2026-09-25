@@ -11,6 +11,6 @@ Ownership:
 
 Do not recreate component repositories or top-level component project roots. New Python source belongs under the single `src/` tree and tests under the single `tests/` tree.
 
-AIOS is headless and container-native. UI concerns do not belong here. Agent, model, monitoring and other external systems must remain replaceable integrations.
+AIOS is headless and container-only at runtime. Every AIOS service runs through the root Compose topology; native Windows services, scheduled tasks, systemd units, or host Python/Node processes are not valid runtime paths. UI concerns do not belong here. Agent, model, monitoring and other external systems must remain replaceable integrations reached through container-network endpoints or external APIs.
 
 Preserve semantic boundaries: evidence is not authority, authorization is not effect, provider success is not outcome, and domain completion remains domain-owned.
