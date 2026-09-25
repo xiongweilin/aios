@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ADMIN_SRC = Path("src/domains/administrative_orchestrator"
+ADMIN_SRC = Path("src/domains/administrative_orchestrator")
 
 DBOS_ALLOWED = {
     ADMIN_SRC / "worker.py",
@@ -36,10 +36,9 @@ LEGACY_RAW_EXECUTION_CALLS = (
 
 
 def test_dbos_imports_stay_at_durable_orchestration_boundary() -> None:
-    root = ADMIN_SRC
     violations: list[str] = []
-    for path in root.rglob("*.py":
-        text = path.read_text(encoding="utf-8"
+    for path in ADMIN_SRC.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
         if ("from dbos import" in text or "import dbos" in text) and path not in DBOS_ALLOWED:
             violations.append(str(path))
     assert violations == []
@@ -48,22 +47,21 @@ def test_dbos_imports_stay_at_durable_orchestration_boundary() -> None:
 def test_domain_core_does_not_import_transport_or_orchestration_layers() -> None:
     violations: list[str] = []
     for path in DOMAIN_CORE_MODULES:
-        text = path.read_text(encoding="utf-8"
+        text = path.read_text(encoding="utf-8")
         for snippet in FORBIDDEN_DOMAIN_IMPORTS:
             if snippet in text:
-                violations.append(f"{path}: {snippet}"
+                violations.append(f"{path}: {snippet}")
     assert violations == []
 
 
 def test_runtime_code_does_not_use_legacy_raw_execution_persistence() -> None:
     """Keep realization/outcome writes behind ExecutionRepository invariants."""
-    root = Path("src/administrative_orchestrator"
     violations: list[str] = []
-    for path in root.rglob("*.py":
+    for path in ADMIN_SRC.rglob("*.py"):
         if path == ADMIN_SRC / "persistence.py":
             continue
-        text = path.read_text(encoding="utf-8"
+        text = path.read_text(encoding="utf-8")
         for call in LEGACY_RAW_EXECUTION_CALLS:
             if call in text:
-                violations.append(f"{path}: {call}"
+                violations.append(f"{path}: {call}")
     assert violations == []
