@@ -13,7 +13,7 @@ from administrative_orchestrator.integrations.production_effects import (
     OdooFinancialEffectConnector,
     OdooFinancialVerifier,
 )
-from scripts.production_world_runtime_stack import ProductionEffectProvider
+from scripts.domains.administrative.production_world_runtime_stack import ProductionEffectProvider
 
 
 def _connector(
