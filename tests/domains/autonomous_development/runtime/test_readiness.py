@@ -97,6 +97,7 @@ def configured(tmp_path: Path) -> RuntimeSettings:
         database_url=SecretStr("sqlite+pysqlite:///:memory:"),
         dbos_system_database_url=SecretStr("sqlite:///:memory:"),
         state_root=tmp_path.resolve(),
+        workspace_root=tmp_path.resolve(),
         telemetry_queries={"requests": "up"},
     )
 
