@@ -122,8 +122,8 @@ permission to resend.
 Administrative still performs independent authoritative read-back and owns the resulting
 business Outcome.
 
-Production provider registration is in `scripts/production_world_runtime_stack.py`.
-Runtime state backup/restore is in `scripts/world_runtime_state_backup.py`.
+Production provider registration is in `scripts/domains/administrative/production_world_runtime_stack.py`.
+Runtime state backup/restore is in `scripts/domains/administrative/world_runtime_state_backup.py`.
 
 ## Supported slices
 
@@ -143,47 +143,31 @@ assignment, or unrestricted autonomous administration.
 
 ## Repository map
 
+From the AIOS repository root:
+
 ```text
-src/administrative_orchestrator/
-  domain.py
-  authority.py
-  governance.py
-  obligations.py
-  completion.py
-  commitment_*.py
-  investigation_*.py
-  responsibility_discharge.py
-  integrations/world_runtime.py
-  integrations/production_effects.py
-  workflows/
-  operations/
-
-scripts/
-  production_world_runtime_stack.py
-  world_runtime_state_backup.py
-  production_preflight.py
-
-docs/
-  architecture.md
-  contracts/
-  adr/
-  production-operations.md
+src/administrative_orchestrator/        domain source
+tests/domains/administrative/           domain tests
+scripts/domains/administrative/         operational helpers
+docs/domains/administrative/            domain documentation
+migrations/domains/administrative/      database migrations
+config/domains/administrative/          runtime examples
 ```
 
-## Stable compatibility identifiers
+## Stable identifiers
 
-Persisted migration, wire, policy, and audit identifiers that participate in replay or external compatibility remain stable. Current acceptance is grounded in AIOS root checks, fresh component verification, Runtime integration gates, and the production operations contract below.
+Persisted wire, policy, effect, and audit identifiers that participate in replay or external compatibility remain stable. Current acceptance is grounded in AIOS root checks, Runtime integration gates, and the production operations contract below.
 
 ## Development
 
 ```bash
-uv sync --extra dev
-uv run ruff check .
-uv run pytest -q
+python -m pip install -e '.[dev]'
+ruff check src tests
+pytest -q tests/domains/administrative
 ```
 
 The component tests and scripts cover the World Runtime boundary, DBOS behavior, deployment fixtures, and production invariants. Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow.
 
-Current architecture: `docs/architecture.md`.
-Canonical Administrative vocabulary: `docs/contracts/domain-model.md`.
-Production operations: `docs/production-operations.md`.
+Current architecture: `architecture.md`.
+Canonical Administrative vocabulary: `contracts/domain-model.md`.
+Production operations: `production-operations.md`.
