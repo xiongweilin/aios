@@ -346,6 +346,7 @@ def compose_runtime(settings: RuntimeSettings) -> RuntimeComposition:
     deployment_provider: DeploymentProvider = DockerDeploymentProvider(
         runner,
         evidence_store,
+        command_cwd=settings.workspace_root,
     )
     if world_runtime is not None:
         deployment_provider = RuntimeBoundDeploymentProvider(
