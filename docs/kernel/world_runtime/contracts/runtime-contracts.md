@@ -95,9 +95,6 @@ evidence/outcome lineage. It does not manufacture a new Goal or silently revise 
 A contract version changes only when externally observable Runtime semantics change. Internal
 refactors do not mint new contract versions.
 
-Historical predecessor contract identifiers may be cited by migration tooling, but they are not
-aliases and do not remain active Runtime APIs.
-
 
 ## Durable effect identity
 
