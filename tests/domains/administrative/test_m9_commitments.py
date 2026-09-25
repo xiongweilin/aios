@@ -178,12 +178,14 @@ def test_candidate_intake_identity_resolution_and_confirmed_case(tmp_path: Path)
         service.resolve_speaker(
             candidate.candidate_commitment_id,
             reviewer_principal_id="person:reviewer",
+            provider="messaging-provider",
             external_subject="ou_missing",
             basis={"source": "operator"},
         )
     resolution = service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator", "transcript_speaker": "Alice"},
     )
@@ -233,6 +235,7 @@ def test_assignment_and_ambiguous_candidates_never_cross_admission(tmp_path: Pat
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -261,6 +264,7 @@ def test_fulfillment_requires_the_qualified_committer_and_is_idempotent(tmp_path
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -307,6 +311,7 @@ def test_due_drive_reuses_authorization_when_clock_advances(tmp_path: Path) -> N
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -354,6 +359,7 @@ def test_due_drive_recovers_persisted_overdue_without_reminder(tmp_path: Path) -
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -396,6 +402,7 @@ def test_due_revision_requalifies_authority_and_stales_old_communication(tmp_pat
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -436,6 +443,7 @@ def test_cancellation_stales_prepared_communication_without_deleting_history(tmp
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -482,6 +490,7 @@ def _prepared_communication_service(
     service.resolve_speaker(
         candidate.candidate_commitment_id,
         reviewer_principal_id="person:reviewer",
+        provider="messaging-provider",
         external_subject="ou_committer",
         basis={"source": "operator"},
     )
@@ -645,6 +654,7 @@ def test_operations_commitment_routes_cover_review_confirm_detail_and_attest(
     resolved = operations_api.resolve_commitment_speaker(
         fresh_candidate.candidate_commitment_id,
         operations_api.CommitmentSpeakerResolutionBody(
+            provider="messaging-provider",
             external_subject="ou_committer",
             basis={"source": "operator"},
         ),
