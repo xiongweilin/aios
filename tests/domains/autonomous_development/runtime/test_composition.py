@@ -204,6 +204,7 @@ def settings(tmp_path: Path, database_url: str, **overrides: object) -> RuntimeS
             f"sqlite:///{tmp_path / 'dbos.sqlite3'}"
         ),
         "state_root": (tmp_path / "state").resolve(),
+        "workspace_root": tmp_path.resolve(),
         "telemetry_queries": {"requests": "up"},
     }
     values.update(overrides)
@@ -289,6 +290,7 @@ def test_compose_runtime_rejects_proxy_binding_mismatch(tmp_path: Path) -> None:
         database_url=SecretStr("sqlite+pysqlite:///:memory:"),
         dbos_system_database_url=SecretStr("sqlite:///:memory:"),
         state_root=tmp_path.resolve(),
+        workspace_root=tmp_path.resolve(),
         api_port=8765,
         canary_proxy_base_url="http://127.0.0.1:9999/product",
         telemetry_queries={"requests": "up"},
