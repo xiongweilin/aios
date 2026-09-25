@@ -123,8 +123,23 @@ class CodexProvider:
                 error={"type": "invalid_request", "message": "prompt required"},
             )
         sandbox = CODEX_SANDBOX_BY_CAPABILITY.get(request.capability, "read-only")
-        repo = str(request.parameters.get("repo", "") or "")
-        cwd = Path(repo) if repo else Path.cwd()
+        repo = str(request.parameters.get("repo", "") or "").strip()
+        if not repo:
+            return CapabilityResult(
+                request_id=request.id,
+                provider_id=self.descriptor.id,
+                status="failed",
+                error={"type": "invalid_request", "message": "explicit repo path required"},
+            )
+        cwd = Path(repo).expanduser()
+        if not cwd.is_absolute():
+            return CapabilityResult(
+                request_id=request.id,
+                provider_id=self.descriptor.id,
+                status="failed",
+                error={"type": "invalid_request", "message": "repo path must be absolute"},
+            )
+        cwd = cwd.resolve()
         boundary = None
         if self._execution_boundary is not None:
             boundary = self._execution_boundary.prepare(str(cwd), sandbox)
