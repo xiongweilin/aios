@@ -226,8 +226,10 @@ def bootstrap_runtime(settings: RuntimeSettings, manifest_path: Path) -> dict[st
 
 
 def _upgrade_database(settings: RuntimeSettings) -> None:
-    repo_root = Path(__file__).resolve().parents[3]
-    config = Config(str(repo_root / "config/domains/autonomous_development/alembic.ini"))
+    if settings.alembic_script_location is None:
+        raise RuntimeError("AUTODEV_ALEMBIC_SCRIPT_LOCATION is required")
+    config = Config()
+    config.set_main_option("script_location", str(settings.alembic_script_location))
     database_url = settings.database_url.get_secret_value().replace("%", "%%")
     config.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(config, "head")
