@@ -175,6 +175,14 @@ def main() -> int:
         "control_plane.toml.example",
         "control_plane.container.toml",
     }
+    legacy_source_locators = {
+        "src/semantic_language/",
+        "src/personal_world/",
+        "src/world_runtime/",
+        "src/control_plane/",
+        "src/administrative_orchestrator/",
+        "src/autonomous_development/",
+    }
     text_suffixes = {".py", ".md", ".toml", ".yaml", ".yml", ".json", ".txt"}
     for path in ROOT.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in text_suffixes:
@@ -190,6 +198,14 @@ def main() -> int:
             errors.append(
                 f"retired component config locator in {path.relative_to(ROOT).as_posix()}: "
                 + ", ".join(present)
+            )
+        old_source_paths = sorted(
+            item for item in legacy_source_locators if item in source_text
+        )
+        if old_source_paths:
+            errors.append(
+                f"retired flat source locator in {path.relative_to(ROOT).as_posix()}: "
+                + ", ".join(old_source_paths)
             )
 
     forbidden_runtime_paths = []
