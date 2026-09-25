@@ -1,6 +1,6 @@
 # administrative-orchestrator
 
-> AIOS domain component. Source: `src/administrative_orchestrator/`. Runtime: root `compose.yaml`.
+> AIOS domain component. Source: `src/domains/administrative_orchestrator/`. Runtime: root `compose.yaml`.
 
 
 Governed administrative automation as an external Domain Controller for
@@ -99,7 +99,7 @@ These are product invariants, not naming conventions.
 ## World Runtime boundary
 
 The production boundary is implemented by
-`src/administrative_orchestrator/integrations/world_runtime.py`.
+`src/domains/administrative_orchestrator/integrations/world_runtime.py`.
 
 Administrative compiles a governed effect into:
 
@@ -144,7 +144,7 @@ assignment, or unrestricted autonomous administration.
 From the AIOS repository root:
 
 ```text
-src/administrative_orchestrator/        domain source
+src/domains/administrative_orchestrator/        domain source
 tests/domains/administrative/           domain tests
 scripts/domains/administrative/         operational helpers
 docs/domains/administrative/            domain documentation
