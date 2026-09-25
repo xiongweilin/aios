@@ -296,10 +296,10 @@ def test_production_worker_uses_provider_neutral_intake_configuration() -> None:
         _REPOSITORY_ROOT / "config/domains/administrative/.env.production.example"
     ).read_text(encoding="utf-8")
     worker_block = compose.split("  administrative-worker:\n", maxsplit=1)[1].split(
-        "\n  autonomous-development:", maxsplit=1
+        "\n  autodev-migrate:", maxsplit=1
     )[0]
-    assert "ADMIN_INTAKE_ARTIFACT_ROOT" in worker_block
-    assert "ADMIN_INTAKE_MODEL_URL" in worker_block
-    assert "ADMIN_INTAKE_ARTIFACT_ROOT" in worker_block
+    assert "<<: *administrative-environment" in worker_block
+    assert "ADMIN_INTAKE_ARTIFACT_ROOT:" in compose
+    assert "ADMIN_INTAKE_MODEL_URL:" in compose
     assert "ADMIN_INTAKE_ARTIFACT_ROOT=" in production_env
     assert "ADMIN_INTAKE_MODEL_API_KEY=" in production_env
