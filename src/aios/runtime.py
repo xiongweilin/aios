@@ -22,7 +22,15 @@ def create_world_runtime() -> WorldRuntime:
             root_principal=root_principal,
         )
 
-    path = Path(os.getenv("WORLD_RUNTIME_SQLITE_PATH", "/var/lib/aios/world-runtime.db"))
+    raw_path = os.getenv("WORLD_RUNTIME_SQLITE_PATH", "").strip()
+    if not raw_path:
+        raise RuntimeError(
+            "WORLD_RUNTIME_POSTGRES_DSN or WORLD_RUNTIME_SQLITE_PATH is required"
+        )
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        raise RuntimeError("WORLD_RUNTIME_SQLITE_PATH must be an absolute path")
+    path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return WorldRuntime.sqlite(path, runtime_id=runtime_id, root_principal=root_principal)
 
