@@ -1,6 +1,6 @@
 # control-plane
 
-> AIOS domain component. Source: `src/control_plane/`. Runtime: root `compose.yaml`.
+> AIOS domain component. Source: `src/domains/control_plane/`. Runtime: root `compose.yaml`.
 
 
 An AIOS Domain Controller component for [world-runtime](../world-runtime/README.md), focused on authenticated personal/platform operations, monitoring, bounded repair, and narrowly scoped effects.
