@@ -1,16 +1,7 @@
 # personal-world
 
-> Component of the [AIOS monorepo](../README.md) at `personal-world/`; this directory is not an independent GitHub repository.
+> AIOS kernel component. Source: `src/personal_world/`. Runtime: root `compose.yaml`.
 
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-1.0.0-6f42c1)
-
-`personal-world` is the durable, user-owned representation of one person's evolving world.
-It preserves provenance, temporal lineage, qualification, privacy boundaries, and purpose-limited
-context projection so models and agents can be replaced without losing personal continuity.
-
-Current package: **1.0.0 durable personal-context baseline**.
 
 ## Permanent ownership boundary
 
@@ -31,25 +22,13 @@ The central non-substitution rules are:
 - Domain projection != domain ownership.
 - Model inference != accepted personal preference or fact.
 
-## Development
+## Runtime
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e '.[dev]'
-pytest
-uvicorn personal_world.api.app:app --reload
-```
+Personal World has no native host deployment path. It runs as the `personal-world` service in the
+root AIOS Compose topology. Its durable state is mounted at `/var/lib/aios`.
 
-By default the service uses `sqlite:///./personal-world.db`. Set `PERSONAL_WORLD_DATABASE_URL`
-to a PostgreSQL SQLAlchemy URL for shared durable operation.
-
-Every API caller must provide `X-Service-Identity` and `X-Purpose`; projection and search reads are
-filtered by the caller's data-access profile and sensitivity ceiling.
-
-See `docs/architecture.md`, `docs/contracts.md`, `docs/threat-model.md`, and
-`docs/releases/v1.0.md`.
-
+The API contract still requires `X-Service-Identity` and `X-Purpose`; projection and search reads
+remain constrained by caller data-access and sensitivity rules.
 
 ## v1.0 closure
 
