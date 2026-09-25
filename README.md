@@ -47,7 +47,6 @@ docs/
 contracts/
 migrations/
 scripts/
-deploy/
 ```
 
 There is one Python project, one dependency graph, one source root and one test root. Semantic, kernel and domain ownership are physical source groups inside that single project.
