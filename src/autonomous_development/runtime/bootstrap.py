@@ -154,6 +154,7 @@ def bootstrap_runtime(settings: RuntimeSettings, manifest_path: Path) -> dict[st
     deployment_provider = DockerDeploymentProvider(
         runner,
         evidence_store,
+        command_cwd=settings.workspace_root,
     )
     deployment_spec = DeploymentSpec(
         deployment_id=release.deployment_id,
