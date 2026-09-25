@@ -24,7 +24,7 @@ M5 authority and verification chain.
 
 M6 remains in the `administrative-orchestrator` product monorepo. The
 repository gains an Administrative Intake Plane as an upstream semantic
-boundary, implemented under `src/administrative_orchestrator/intake/` when
+boundary, implemented under `src/domains/administrative_orchestrator/intake/` when
 the durable implementation begins. Inbox, document evidence, and future
 meeting shadow support share this repository because they depend on the
 same Administrative migrations, identity bindings, admission policy, and
