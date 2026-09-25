@@ -170,4 +170,5 @@ The component tests and scripts cover the World Runtime boundary, DBOS behavior,
 
 Current architecture: `architecture.md`.
 Canonical Administrative vocabulary: `contracts/domain-model.md`.
+Workflow authority contract: `contracts/workflow-authority.md`.
 Production operations: `production-operations.md`.
