@@ -1,6 +1,6 @@
 # autonomous-development
 
-> AIOS domain component. Source: `src/autonomous_development/`. Runtime: root `compose.yaml`.
+> AIOS domain component. Source: `src/domains/autonomous_development/`. Runtime: root `compose.yaml`.
 
 
 Container-native autonomous software development and product-evolution control plane.
