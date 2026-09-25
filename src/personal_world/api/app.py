@@ -357,13 +357,10 @@ def create_app(service: PersonalWorldService | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def run() -> None:
     uvicorn.run(
-        "personal_world.api.app:app",
-        host=os.getenv("PERSONAL_WORLD_HOST", "127.0.0.1"),
+        create_app(),
+        host=os.getenv("PERSONAL_WORLD_HOST", "0.0.0.0"),
         port=int(os.getenv("PERSONAL_WORLD_PORT", "8080")),
         reload=False,
     )
