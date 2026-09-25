@@ -1,9 +1,7 @@
 # administrative-orchestrator
 
-> Component of the [AIOS monorepo](../README.md) at `administrative-orchestrator/`; this directory is not an independent GitHub repository.
+> AIOS domain component. Source: `src/administrative_orchestrator/`. Runtime: root `compose.yaml`.
 
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 Governed administrative automation as an external Domain Controller for
 `world-runtime`.
@@ -158,15 +156,12 @@ config/domains/administrative/          runtime examples
 
 Persisted wire, policy, effect, and audit identifiers that participate in replay or external compatibility remain stable. Current acceptance is grounded in AIOS root checks, Runtime integration gates, and the production operations contract below.
 
-## Development
+## Runtime
 
-```bash
-python -m pip install -e '.[dev]'
-ruff check src tests
-pytest -q tests/domains/administrative
-```
+Administrative API, worker, migrations and PostgreSQL dependencies are container-owned by the root
+AIOS Compose topology. There is no component-local Compose file and no native host service path.
 
-The component tests and scripts cover the World Runtime boundary, DBOS behavior, deployment fixtures, and production invariants. Repository-level static analysis and quality-gate status are owned by the AIOS monorepo root workflow.
+Repository verification is owned by the root AIOS CI workflow.
 
 Current architecture: `architecture.md`.
 Canonical Administrative vocabulary: `contracts/domain-model.md`.
