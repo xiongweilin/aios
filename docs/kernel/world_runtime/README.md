@@ -1,6 +1,6 @@
 # world-runtime
 
-> AIOS kernel component. Source: `src/world_runtime/`. Runtime: root `compose.yaml`.
+> AIOS kernel component. Source: `src/kernel/world_runtime/`. Runtime: root `compose.yaml`.
 
 
 Persistent semantic runtime for long-lived agency.
@@ -44,7 +44,7 @@ Provider success therefore never means domain Outcome or GoalAchievement.
 ## Canonical contracts
 
 Runtime-owned lifecycle, authority, execution, and recovery semantics are versioned in
-`src/world_runtime/contracts/catalog.toml` and exposed by `GET /v1/contracts`.
+`src/kernel/world_runtime/contracts/catalog.toml` and exposed by `GET /v1/contracts`.
 
 The semantic rules behind that catalog are in `docs/contracts/runtime-contracts.md`.
 
