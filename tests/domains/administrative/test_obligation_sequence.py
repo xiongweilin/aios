@@ -139,7 +139,12 @@ def test_0032_backfills_historical_runtime_order(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("ADMIN_DATABASE_URL", database_url)
     get_settings.cache_clear()
     repo_root = Path(__file__).resolve().parents[3]
-    config = Config(str(repo_root / "config/domains/administrative/alembic.ini"))
+    config = Config()
+    config.set_main_option(
+        "script_location",
+        str((repo_root / "migrations/domains/administrative/alembic").resolve()),
+    )
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
     try:
         command.upgrade(config, "0031_adaptive_investigation")
