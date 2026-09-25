@@ -10,10 +10,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ADMIN_", extra="ignore")
 
-    database_url: str = "sqlite+pysqlite:///./data/administrative.db"
+    database_url: str = "sqlite+pysqlite:///:memory:"
     worker_database_url: str | None = None
     dbos_system_database_url: str | None = None
-    sandbox_database_url: str = "sqlite+pysqlite:///./data/administrative-sandbox.db"
+    sandbox_database_url: str = "sqlite+pysqlite:///:memory:"
     sandbox_base_url: str = "http://127.0.0.1:8010"
     provider_timeout_seconds: float = 10.0
     worker_poll_seconds: float = 1.0
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     external_effects_enabled: bool = False
     auto_create_schema: bool = True
 
-    intake_artifact_root: str = "./data/intake-artifacts"
+    intake_artifact_root: str = ""
     # Outbound communication uses a provider-neutral transport contract.
     communication_gateway_base_url: str = ""
     communication_transport_secret: SecretStr | None = None
