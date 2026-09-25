@@ -23,12 +23,15 @@ The names above are internal semantic owners, not separate products or repositor
 ```text
 src/
   aios/                         product composition
-  semantic_language/            cross-domain semantics
-  personal_world/               kernel: personal continuity
-  world_runtime/                kernel: agency continuity
-  control_plane/                domain: operations
-  administrative_orchestrator/  domain: administration
-  autonomous_development/       domain: software development
+  semantic/
+    semantic_language/          cross-domain semantics
+  kernel/
+    personal_world/             personal continuity
+    world_runtime/              agency continuity
+  domains/
+    control_plane/              operations
+    administrative_orchestrator/
+    autonomous_development/
 
 tests/
   semantic/
@@ -47,7 +50,7 @@ scripts/
 deploy/
 ```
 
-There is one Python project, one dependency graph, one source root and one test root.
+There is one Python project, one dependency graph, one source root and one test root. Semantic, kernel and domain ownership are physical source groups inside that single project.
 
 ## Runtime
 

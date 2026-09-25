@@ -54,12 +54,12 @@ aios-migrate = "aios.migrations:main"
 [tool.hatch.build.targets.wheel]
 packages = [
   "src/aios",
-  "src/semantic_language",
-  "src/personal_world",
-  "src/world_runtime",
-  "src/control_plane",
-  "src/administrative_orchestrator",
-  "src/autonomous_development",
+  "src/semantic/semantic_language",
+  "src/kernel/personal_world",
+  "src/kernel/world_runtime",
+  "src/domains/control_plane",
+  "src/domains/administrative_orchestrator",
+  "src/domains/autonomous_development",
 ]
 
 [tool.pytest.ini_options]
@@ -70,7 +70,7 @@ markers = [
   "postgres: requires PostgreSQL",
   "integration: requires external services",
 ]
-pythonpath = ["src", "."]
+pythonpath = ["src", "src/semantic", "src/kernel", "src/domains", "."]
 
 [tool.ruff]
 target-version = "py312"
@@ -81,7 +81,7 @@ select = ["F"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/administrative_orchestrator/integrations/odoo_effects.py" = ["SIM114"]
+"src/domains/administrative_orchestrator/integrations/odoo_effects.py" = ["SIM114"]
 
 [tool.importlinter]
 root_packages = ["autonomous_development"]

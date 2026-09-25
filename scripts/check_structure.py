@@ -74,8 +74,24 @@ def main() -> int:
             + ", ".join(sorted(nested_singletons))
         )
 
-    expected_packages = {
-        "aios",
+    expected_source_packages = {
+        "src/aios",
+        "src/semantic/semantic_language",
+        "src/kernel/personal_world",
+        "src/kernel/world_runtime",
+        "src/domains/control_plane",
+        "src/domains/administrative_orchestrator",
+        "src/domains/autonomous_development",
+    }
+    missing_packages = {
+        path
+        for path in expected_source_packages
+        if not (ROOT / path / "__init__.py").is_file()
+    }
+    if missing_packages:
+        errors.append("source package missing: " + ", ".join(sorted(missing_packages)))
+
+    retired_flat_packages = {
         "semantic_language",
         "personal_world",
         "world_runtime",
@@ -83,16 +99,18 @@ def main() -> int:
         "administrative_orchestrator",
         "autonomous_development",
     }
-    actual_packages = {
-        path.name
-        for path in (ROOT / "src").iterdir()
-        if path.is_dir() and (path / "__init__.py").is_file()
+    returned_flat_packages = {
+        name for name in retired_flat_packages if (ROOT / "src" / name).exists()
     }
-    missing_packages = expected_packages - actual_packages
-    if missing_packages:
-        errors.append("source package missing: " + ", ".join(sorted(missing_packages)))
+    if returned_flat_packages:
+        errors.append(
+            "flat component source roots returned: "
+            + ", ".join(sorted(returned_flat_packages))
+        )
 
     for group in ("semantic", "kernel", "domains"):
+        if not (ROOT / "src" / group).is_dir():
+            errors.append(f"source ownership group missing: src/{group}")
         if not (ROOT / "tests" / group).is_dir():
             errors.append(f"test ownership group missing: tests/{group}")
         if not (ROOT / "docs" / group).is_dir():
