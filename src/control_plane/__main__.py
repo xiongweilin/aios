@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from pathlib import Path
 
 import uvicorn
 
@@ -12,6 +13,7 @@ from .telemetry import configure_telemetry
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="control-plane")
+    parser.add_argument("--config", default=None)
     parser.add_argument("--host", default=None)
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--log-level", default="info")
@@ -21,7 +23,7 @@ def main() -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    config = ControlPlaneConfig.load()
+    config = ControlPlaneConfig.load(Path(args.config) if args.config else None)
     app = create_app(config)
     configure_telemetry(app)
     uvicorn.run(
