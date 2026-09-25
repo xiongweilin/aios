@@ -71,7 +71,7 @@ services:
 
   control-plane:
     <<: *aios-service
-    command: ["control-plane", "--host", "0.0.0.0", "--port", "18083"]
+    command: ["control-plane", "--config", "/app/config/domains/control_plane.container.toml", "--host", "0.0.0.0", "--port", "18083"]
     environment:
       CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:-local-aios}
       CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN: ${CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN:-}
@@ -80,7 +80,6 @@ services:
       - "127.0.0.1:18083:18083"
     volumes:
       - control-plane-data:/var/lib/aios
-      - ./config/domains/control_plane.container.toml:/app/control_plane.toml:ro
     depends_on:
       world-runtime:
         condition: service_started
