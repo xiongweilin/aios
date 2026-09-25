@@ -19,6 +19,7 @@ class RuntimeSettings(BaseSettings):
     database_url: SecretStr
     dbos_system_database_url: SecretStr
     state_root: Path
+    workspace_root: Path
     alembic_script_location: Path | None = None
     operator_hmac_secret_file: Path | None = None
     operator_hmac_ttl_seconds: int = Field(default=300, ge=30, le=3600)
@@ -54,12 +55,12 @@ class RuntimeSettings(BaseSettings):
     def from_environment(cls) -> RuntimeSettings:
         return cls()  # type: ignore[call-arg]
 
-    @field_validator("state_root", mode="before")
+    @field_validator("state_root", "workspace_root", mode="before")
     @classmethod
-    def validate_state_root(cls, value: object) -> Path:
+    def validate_runtime_root(cls, value: object) -> Path:
         path = Path(str(value)).expanduser()
         if not path.is_absolute():
-            raise ValueError("state_root must be an absolute path")
+            raise ValueError("runtime paths must be absolute")
         return path.resolve()
 
     @field_validator("alembic_script_location", mode="before")
