@@ -74,8 +74,8 @@ class RuntimeSettings(BaseSettings):
     @field_validator("api_host")
     @classmethod
     def validate_api_host(cls, value: str) -> str:
-        if value != "127.0.0.1":
-            raise ValueError("V1 control API must bind to 127.0.0.1")
+        if value not in {"127.0.0.1", "0.0.0.0"}:
+            raise ValueError("control API must bind to loopback or all container interfaces")
         return value
 
     @field_validator(
