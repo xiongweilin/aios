@@ -8,11 +8,11 @@ state_db = "/var/lib/aios/control-plane.db"
 artifact_root = "/var/lib/aios/artifacts"
 
 [model]
-gateway_base_url = "http://host.docker.internal:4101/v1"
+gateway_base_url = "http://model-api:8080/v1"
 session_dir = "/var/lib/aios/agent-sessions"
 
 [monitoring]
-prometheus_url = "http://host.docker.internal:19090"
+prometheus_url = "http://prometheus:9090"
 notification_enabled = false
 
 [environment]
