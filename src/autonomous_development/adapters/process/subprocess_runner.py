@@ -86,24 +86,13 @@ def _bounded(value: str, limit: int) -> str:
 
 
 def _runtime_python_directory() -> str:
-    package_root = Path(__file__).resolve().parents[4]
-    executable_name = "python.exe" if os.name == "nt" else "python"
-    virtual_environment = package_root / ".venv" / (
-        "Scripts" if os.name == "nt" else "bin"
-    )
-    project_python = virtual_environment / executable_name
-    if project_python.exists():
-        return str(virtual_environment)
     return os.path.dirname(sys.executable)
 
 
 def _resolve_command(command: tuple[str, ...]) -> list[str]:
     resolved = list(command)
     if resolved and resolved[0].lower() in {"python", "python.exe"}:
-        executable_name = "python.exe" if os.name == "nt" else "python"
-        project_python = Path(_runtime_python_directory()) / executable_name
-        if project_python.exists():
-            resolved[0] = str(project_python)
+        resolved[0] = sys.executable
     return resolved
 
 
