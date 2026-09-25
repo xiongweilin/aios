@@ -66,6 +66,7 @@ def test_repeated_ensure_reuses_matching_deployment(tmp_path: Path) -> None:
     provider = DockerDeploymentProvider(
         runner,
         LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        command_cwd=tmp_path.resolve(),
     )
     provider.ensure(_spec())
     assert not any(request.command[:2] == ("docker", "run") for request in runner.requests)
@@ -75,6 +76,7 @@ def test_identity_conflict_fails_closed(tmp_path: Path) -> None:
     provider = DockerDeploymentProvider(
         FakeDockerRunner(existing=True, wrong_image=True),
         LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        command_cwd=tmp_path.resolve(),
     )
     with pytest.raises(DeploymentProviderError, match="conflicts"):
         provider.ensure(_spec())
