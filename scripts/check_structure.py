@@ -15,7 +15,6 @@ REQUIRED_ROOTS = {
     "src",
     "tests",
     "docs",
-    "config",
     "migrations",
     "scripts",
 }
@@ -38,6 +37,9 @@ def main() -> int:
     for name in sorted(REQUIRED_ROOTS):
         if not (ROOT / name).is_dir():
             errors.append(f"required unified root missing: {name}")
+
+    if (ROOT / "config").exists():
+        errors.append("component-local config root is forbidden; use root .env/.env.example")
 
     for name in sorted(SINGLETON_FILES):
         if not (ROOT / name).is_file():
@@ -146,6 +148,30 @@ def main() -> int:
         if present:
             errors.append(
                 f"hard-coded runtime path in {source_name}: " + ", ".join(present)
+            )
+
+    legacy_config_locators = {
+        "config/domains/",
+        "config/kernel/",
+        ".env.production.example",
+        "control_plane.toml.example",
+        "control_plane.container.toml",
+    }
+    text_suffixes = {".py", ".md", ".toml", ".yaml", ".yml", ".json", ".txt"}
+    for path in ROOT.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in text_suffixes:
+            continue
+        if path == ROOT / "scripts" / "check_structure.py":
+            continue
+        try:
+            source_text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        present = sorted(item for item in legacy_config_locators if item in source_text)
+        if present:
+            errors.append(
+                f"retired component config locator in {path.relative_to(ROOT).as_posix()}: "
+                + ", ".join(present)
             )
 
     forbidden_runtime_paths = []
