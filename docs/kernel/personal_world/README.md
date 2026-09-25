@@ -1,6 +1,6 @@
 # personal-world
 
-> AIOS kernel component. Source: `src/personal_world/`. Runtime: root `compose.yaml`.
+> AIOS kernel component. Source: `src/kernel/personal_world/`. Runtime: root `compose.yaml`.
 
 
 ## Permanent ownership boundary
