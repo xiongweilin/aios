@@ -180,7 +180,7 @@ Codex review is additive evidence for maintainability and defects that determini
 Proposed Python package:
 
 ~~~text
-src/autonomous_development/
+src/domains/autonomous_development/
     domain/
         models.py
         enums.py
