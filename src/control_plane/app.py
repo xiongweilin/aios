@@ -34,7 +34,7 @@ from .alert_policy import (
 from .audit import inspect_session_fields, redact_value
 from .codex_boundary import CodexExecutionBoundary, ThreadIsolatedCodexProvider
 from .codex_provider import CodexProvider
-from .config import ControlPlaneConfig
+from .config import ConfigurationError, ControlPlaneConfig
 from .domain_controller import ControllerStatus, PersonalController
 from .domain_store import DomainEvent, DomainJournal, new_id
 from .environment import (
@@ -120,9 +120,19 @@ def create_app(
     runtime_transport: httpx.BaseTransport | None = None,
 ) -> FastAPI:
     cfg = config or ControlPlaneConfig.load()
+    if cfg.state_db is None:
+        raise ConfigurationError("CONTROL_PLANE_STATE_DB is required")
+    if cfg.artifact_root is None:
+        raise ConfigurationError("CONTROL_PLANE_ARTIFACT_ROOT is required")
+    if cfg.agent_session_dir is None:
+        raise ConfigurationError("CONTROL_PLANE_AGENT_SESSION_DIR is required")
+    if cfg.codex_worktree_root is None:
+        raise ConfigurationError("CONTROL_PLANE_AGENT_WORKTREE_ROOT is required")
+
     cfg.state_db.parent.mkdir(parents=True, exist_ok=True)
     cfg.artifact_root.mkdir(parents=True, exist_ok=True)
     cfg.agent_session_dir.mkdir(parents=True, exist_ok=True)
+    cfg.codex_worktree_root.mkdir(parents=True, exist_ok=True)
 
     journal = DomainJournal(cfg.state_db)
     providers = ProviderRegistry()
