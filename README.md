@@ -25,7 +25,7 @@ The names above are internal semantic owners, not separate products or repositor
 
 ```text
 src/
-  aios/                         product composition
+  aios/                         runtime composition
   semantic/
     semantic_language/          cross-domain semantics
   kernel/
@@ -56,7 +56,7 @@ There is one Python project, one dependency graph, one source root and one test 
 
 ## Runtime
 
-AIOS has no UI. Services expose API/CLI boundaries and run as containers.
+AIOS has no UI. Services expose API/CLI integration boundaries and run as containers.
 
 ```bash
 docker compose up -d
@@ -71,9 +71,18 @@ Agent implementations, LLM providers, Prometheus and other external dependencies
 through container-network endpoints or external APIs. AIOS runtime configuration must not depend
 on a host-local program listener.
 
+AIOS is designed for continuous, unattended operation, not as an interactive assistant product.
+The user does not routinely operate the runtime directly. When inspection, explanation, or
+maintenance is needed, the user may connect through an existing external Agent product for a
+short-lived session. That Agent reads authoritative state, explains the condition, performs only
+bounded authorized changes, verifies read-back and recovery, reports the result, and disconnects.
+The Agent session is not a durable authority owner or a required runtime dependency; AIOS continues
+operating after it ends. API/CLI boundaries are for system integration and maintenance, not a
+primary user-management interface.
+
 ## Development
 
-The product runtime remains container-only. Repository checks may run in CI or a disposable
+The AIOS runtime remains container-only. Repository checks may run in CI or a disposable
 development container; they are not product deployment paths.
 
 ```bash
