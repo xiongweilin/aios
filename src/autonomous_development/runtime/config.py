@@ -85,12 +85,12 @@ class RuntimeSettings(BaseSettings):
         "personal_world_base_url",
     )
     @classmethod
-    def validate_loopback_url(cls, value: str) -> str:
+    def validate_service_url(cls, value: str) -> str:
         parsed = urlsplit(value)
         if parsed.scheme not in {"http", "https"}:
             raise ValueError("runtime service URL must use http or https")
-        if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise ValueError("V1 runtime service URL must use loopback")
+        if not parsed.hostname:
+            raise ValueError("runtime service URL must include a hostname")
         if not parsed.port:
             raise ValueError("runtime service URL must include an explicit port")
         return value.rstrip("/")
