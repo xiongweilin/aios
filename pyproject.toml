@@ -68,7 +68,7 @@ markers = [
   "postgres: requires PostgreSQL",
   "integration: requires external services",
 ]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.ruff]
 target-version = "py312"
