@@ -29,6 +29,12 @@ jobs:
         run: python scripts/check_structure.py
       - name: Compose
         run: docker compose config --quiet
+      - name: Build image
+        run: docker build --tag aios:ci .
+      - name: Container import smoke
+        run: >-
+          docker run --rm aios:ci python -c
+          "import aios, semantic_language, personal_world, world_runtime, control_plane, administrative_orchestrator, autonomous_development"
       - name: Compile
         run: python -m compileall -q src
       - name: Ruff
