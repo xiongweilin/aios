@@ -11,6 +11,7 @@ htmlcov/
 *.sqlite3
 .env
 .env.*
+control_plane.toml
 !.env.example
 dist/
 build/
