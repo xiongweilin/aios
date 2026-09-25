@@ -50,6 +50,19 @@ port = 18083
         encoding="utf-8",
     )
     monkeypatch.setenv("CONTROL_PLANE_API_KEY", "test-key")
+    monkeypatch.setenv("CONTROL_PLANE_STATE_DB", str((tmp_path / "state.db").resolve()))
+    monkeypatch.setenv(
+        "CONTROL_PLANE_ARTIFACT_ROOT",
+        str((tmp_path / "artifacts").resolve()),
+    )
+    monkeypatch.setenv(
+        "CONTROL_PLANE_AGENT_SESSION_DIR",
+        str((tmp_path / "sessions").resolve()),
+    )
+    monkeypatch.setenv(
+        "CONTROL_PLANE_AGENT_WORKTREE_ROOT",
+        str((tmp_path / "worktrees").resolve()),
+    )
 
     cfg = ControlPlaneConfig.load(config_path)
 
