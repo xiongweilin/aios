@@ -1,12 +1,13 @@
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DOC_ROOT = REPO_ROOT / "docs" / "domains" / "administrative"
 CANONICAL_LANGUAGE_FILES = (
-    ROOT / "docs/contracts/domain-model.md",
-    ROOT / "docs/contracts/workflow-authority.md",
-    ROOT / "docs/architecture.md",
+    DOC_ROOT / "contracts" / "domain-model.md",
+    DOC_ROOT / "contracts" / "workflow-authority.md",
+    DOC_ROOT / "architecture.md",
 )
-CURRENT_LANGUAGE_FILES = (ROOT / "README.md", *CANONICAL_LANGUAGE_FILES)
+CURRENT_LANGUAGE_FILES = (DOC_ROOT / "README.md", *CANONICAL_LANGUAGE_FILES)
 MILESTONE_TOKENS = {f"M{number}" for number in range(20)}
 
 
@@ -21,17 +22,16 @@ def test_canonical_language_does_not_depend_on_delivery_milestones() -> None:
         assert not milestone_words, f"{path} leaks milestone vocabulary: {milestone_words}"
 
 
-def test_current_language_uses_the_runtime_execution_authorization_term() -> None:
+def test_current_language_uses_runtime_execution_authorization_term() -> None:
     for path in CURRENT_LANGUAGE_FILES:
         text = path.read_text(encoding="utf-8")
         assert "AdministrativeExecutionGrant" not in text
         assert "ExecutionAuthorization" in text
 
 
-def test_readme_separates_current_v1_from_historical_stages() -> None:
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "docs/contracts/domain-model.md" in text
-    assert "## Historical identifiers" in text
-    assert "Staged M5–M9 deployment and acceptance artifacts are preserved" in text
-    assert "Current V1 acceptance" in text
-    assert "Production Trust workflow" in text
+def test_readme_routes_to_current_contracts() -> None:
+    text = (DOC_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "docs/contracts/domain-model.md" not in text
+    assert "contracts/domain-model.md" in text
+    assert "contracts/workflow-authority.md" in text
+    assert "Historical identifiers" not in text
