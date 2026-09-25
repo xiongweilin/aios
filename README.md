@@ -1,6 +1,6 @@
 # AIOS
 
-AIOS is one headless, container-native system.
+AIOS is one headless, container-only runtime.
 
 ```text
 semantic
