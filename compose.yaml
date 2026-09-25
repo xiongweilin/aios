@@ -30,7 +30,6 @@ x-autodev-environment: &autodev-environment
 services:
   postgres:
     image: postgres:17-bookworm
-    profiles: ["domains"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: aios
@@ -72,16 +71,15 @@ services:
 
   control-plane:
     <<: *aios-service
-    profiles: ["domains"]
     command: ["control-plane", "--host", "0.0.0.0", "--port", "18083"]
     environment:
-      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:?set CONTROL_PLANE_API_KEY}
+      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:-local-aios}
       CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN: ${CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN:-}
       CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID: ${CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID:-}
     ports:
       - "127.0.0.1:18083:18083"
     volumes:
-      - control-plane-data:/app/data
+      - control-plane-data:/var/lib/aios
       - ./config/domains/control_plane.container.toml:/app/control_plane.toml:ro
     depends_on:
       world-runtime:
@@ -89,7 +87,6 @@ services:
 
   administrative-migrate:
     <<: *aios-service
-    profiles: ["domains"]
     restart: "no"
     command:
       ["alembic", "-c", "config/domains/administrative/alembic.ini", "upgrade", "head"]
@@ -101,7 +98,6 @@ services:
 
   administrative-api:
     <<: *aios-service
-    profiles: ["domains"]
     command:
       ["python", "-m", "uvicorn", "administrative_orchestrator.api:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
@@ -116,7 +112,6 @@ services:
 
   administrative-worker:
     <<: *aios-service
-    profiles: ["domains"]
     command: ["python", "-m", "administrative_orchestrator.worker"]
     environment:
       <<: *administrative-environment
@@ -128,7 +123,6 @@ services:
 
   autodev-migrate:
     <<: *aios-service
-    profiles: ["domains"]
     restart: "no"
     command:
       ["alembic", "-c", "config/domains/autonomous_development/alembic.ini", "upgrade", "head"]
@@ -140,7 +134,6 @@ services:
 
   autonomous-development:
     <<: *aios-service
-    profiles: ["domains"]
     command: ["autonomous-development", "serve"]
     environment:
       <<: *autodev-environment
@@ -148,6 +141,8 @@ services:
       - "127.0.0.1:18110:8765"
     volumes:
       - autonomous-development-data:/var/lib/aios
+      - ${AUTODEV_WORKSPACE_PATH:-.}:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       autodev-migrate:
         condition: service_completed_successfully
