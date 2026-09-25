@@ -5,7 +5,46 @@ x-aios-service: &aios-service
   image: aios:local
   restart: unless-stopped
 
+x-administrative-environment: &administrative-environment
+  ADMIN_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative
+  ADMIN_WORKER_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative
+  ADMIN_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative_dbos
+  ADMIN_RUNTIME_PROFILE: development
+  ADMIN_AUTH_MODE: development
+  ADMIN_WORLD_RUNTIME_MODE: disabled
+  ADMIN_AUTO_CREATE_SCHEMA: "false"
+  ADMIN_INTAKE_ARTIFACT_ROOT: /var/lib/aios/intake-artifacts
+  ADMIN_INTAKE_MODEL_URL: ${ADMIN_INTAKE_MODEL_URL:-}
+  ADMIN_INTAKE_MODEL_API_KEY: ${ADMIN_INTAKE_MODEL_API_KEY:-}
+  ADMIN_INTAKE_MODEL_NAME: ${ADMIN_INTAKE_MODEL_NAME:-}
+
+x-autodev-environment: &autodev-environment
+  AUTODEV_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/autodev
+  AUTODEV_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/autodev_dbos
+  AUTODEV_STATE_ROOT: /var/lib/aios
+  AUTODEV_API_HOST: 0.0.0.0
+  AUTODEV_API_PORT: "8765"
+  AUTODEV_WORLD_RUNTIME_MODE: disabled
+  AUTODEV_PERSONAL_WORLD_MODE: disabled
+
 services:
+  postgres:
+    image: postgres:17-bookworm
+    profiles: ["domains"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aios
+      POSTGRES_PASSWORD: aios-internal
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aios -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-databases.sql:/docker-entrypoint-initdb.d/10-aios-databases.sql:ro
+
   personal-world:
     <<: *aios-service
     command: ["personal-world"]
@@ -45,50 +84,76 @@ services:
       - control-plane-data:/app/data
       - ./config/domains/control_plane.container.toml:/app/control_plane.toml:ro
     depends_on:
-      - world-runtime
+      world-runtime:
+        condition: service_started
+
+  administrative-migrate:
+    <<: *aios-service
+    profiles: ["domains"]
+    restart: "no"
+    command:
+      ["alembic", "-c", "config/domains/administrative/alembic.ini", "upgrade", "head"]
+    environment:
+      <<: *administrative-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   administrative-api:
     <<: *aios-service
     profiles: ["domains"]
-    command: ["python", "-m", "uvicorn", "administrative_orchestrator.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    command:
+      ["python", "-m", "uvicorn", "administrative_orchestrator.api:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
-      ADMIN_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
-      ADMIN_AUTH_MODE: development
-      ADMIN_WORLD_RUNTIME_MODE: disabled
+      <<: *administrative-environment
     ports:
       - "127.0.0.1:18100:8000"
     volumes:
       - administrative-data:/var/lib/aios
+    depends_on:
+      administrative-migrate:
+        condition: service_completed_successfully
 
   administrative-worker:
     <<: *aios-service
     profiles: ["domains"]
     command: ["python", "-m", "administrative_orchestrator.worker"]
     environment:
-      ADMIN_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
-      ADMIN_WORKER_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
-      ADMIN_WORLD_RUNTIME_MODE: disabled
+      <<: *administrative-environment
     volumes:
       - administrative-data:/var/lib/aios
+    depends_on:
+      administrative-migrate:
+        condition: service_completed_successfully
+
+  autodev-migrate:
+    <<: *aios-service
+    profiles: ["domains"]
+    restart: "no"
+    command:
+      ["alembic", "-c", "config/domains/autonomous_development/alembic.ini", "upgrade", "head"]
+    environment:
+      <<: *autodev-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   autonomous-development:
     <<: *aios-service
     profiles: ["domains"]
     command: ["autonomous-development", "serve"]
     environment:
-      AUTODEV_DATABASE_URL: ${AUTODEV_DATABASE_URL:-postgresql+psycopg://aios:aios@host.docker.internal:5432/autodev}
-      AUTODEV_DBOS_SYSTEM_DATABASE_URL: ${AUTODEV_DBOS_SYSTEM_DATABASE_URL:-postgresql+psycopg://aios:aios@host.docker.internal:5432/autodev_dbos}
-      AUTODEV_STATE_ROOT: /var/lib/aios
-      AUTODEV_API_HOST: 0.0.0.0
-      AUTODEV_API_PORT: "8765"
-      AUTODEV_WORLD_RUNTIME_MODE: disabled
-      AUTODEV_PERSONAL_WORLD_MODE: disabled
+      <<: *autodev-environment
     ports:
       - "127.0.0.1:18110:8765"
     volumes:
       - autonomous-development-data:/var/lib/aios
+    depends_on:
+      autodev-migrate:
+        condition: service_completed_successfully
 
 volumes:
+  postgres-data:
   personal-world-data:
   world-runtime-data:
   control-plane-data:
