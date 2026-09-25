@@ -43,7 +43,6 @@ docs/
 
 contracts/
 migrations/
-config/
 scripts/
 deploy/
 ```
