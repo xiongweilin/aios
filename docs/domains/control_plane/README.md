@@ -173,8 +173,7 @@ Universal responsibility, assignment and decision state is never reconstructed l
 The following must not return:
 
 ```text
-src/world_runtime/
-world-runtime Python dependency
+embedded or copied World Runtime implementation inside control_plane
 in-process WorldRuntime construction
 copied World Runtime cognition/execution/ledger kernel
 agent-kernel compatibility layer
@@ -202,20 +201,18 @@ Transport integrations do not mint authority or decide that a universal objectiv
 ## Setup
 
 ```powershell
-uv sync --extra dev
-uv run control-plane
+python -m pip install -e '.[dev]'
+control-plane
 ```
 
-Example configuration is `control_plane.toml.example`. Copy it to the ignored local `control_plane.toml` and set the external World Runtime endpoint plus machine-owned paths.
+Example configuration is `config/domains/control_plane/control_plane.toml.example`. Copy it to the repository root as the ignored local `control_plane.toml` and set the World Runtime endpoint plus machine-owned paths.
 
 ## Verification
 
 ```powershell
-uv sync --frozen --extra dev
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src
-uv run pytest -q
+ruff check src/control_plane tests/domains/control_plane
+mypy src/control_plane
+pytest -q tests/domains/control_plane
 ```
 
 The component verification surface is expected to cover:
