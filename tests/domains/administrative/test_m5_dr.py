@@ -7,7 +7,7 @@ from administrative_orchestrator.world_runtime_state_dr import (
     restore_world_runtime_state,
     verify_world_runtime_state_backup,
 )
-from scripts.world_runtime_state_backup import main
+from scripts.domains.administrative.world_runtime_state_backup import main
 
 
 def test_world_runtime_state_online_backup_restore_round_trip(tmp_path):
