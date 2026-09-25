@@ -48,6 +48,8 @@ personal-world = "personal_world.api.app:run"
 world-runtime = "aios.runtime:run_world_runtime"
 control-plane = "control_plane.__main__:main"
 autonomous-development = "autonomous_development.cli.main:main"
+aios-init-databases = "aios.database_init:main"
+aios-migrate = "aios.migrations:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
