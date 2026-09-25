@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -137,7 +138,8 @@ def test_0032_backfills_historical_runtime_order(monkeypatch, tmp_path) -> None:
     database_url = f"sqlite+pysqlite:///{database_path}"
     monkeypatch.setenv("ADMIN_DATABASE_URL", database_url)
     get_settings.cache_clear()
-    config = Config("alembic.ini")
+    repo_root = Path(__file__).resolve().parents[3]
+    config = Config(str(repo_root / "config/domains/administrative/alembic.ini"))
 
     try:
         command.upgrade(config, "0031_adaptive_investigation")
