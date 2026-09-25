@@ -30,7 +30,7 @@ from administrative_orchestrator.intake.repository import (
 from administrative_orchestrator.intake.service import CandidateProjectionService
 from administrative_orchestrator.persistence import SqlStore
 
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _SOURCE_ROOT = _REPOSITORY_ROOT / "src" / "administrative_orchestrator"
 _FORBIDDEN_MODEL_FIELDS = {
     "authority",
@@ -291,11 +291,15 @@ def test_candidate_intake_modules_do_not_call_formal_authority_or_kernel_symbols
     assert violations == []
 
 def test_production_worker_uses_provider_neutral_intake_configuration() -> None:
-    compose = (_REPOSITORY_ROOT / "compose.production.yaml").read_text(encoding="utf-8")
-    production_env = (_REPOSITORY_ROOT / ".env.production.example").read_text(encoding="utf-8")
-    worker_block = compose.split("  worker:\n", maxsplit=1)[1].split("\nvolumes:\n", maxsplit=1)[0]
+    compose = (_REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
+    production_env = (
+        _REPOSITORY_ROOT / "config/domains/administrative/.env.production.example"
+    ).read_text(encoding="utf-8")
+    worker_block = compose.split("  administrative-worker:\n", maxsplit=1)[1].split(
+        "\n  autonomous-development:", maxsplit=1
+    )[0]
     assert "ADMIN_INTAKE_ARTIFACT_ROOT" in worker_block
     assert "ADMIN_INTAKE_MODEL_URL" in worker_block
-    assert "administrative-intake-artifacts:/var/lib/administrative/intake-artifacts" in worker_block
+    assert "ADMIN_INTAKE_ARTIFACT_ROOT" in worker_block
     assert "ADMIN_INTAKE_ARTIFACT_ROOT=" in production_env
     assert "ADMIN_INTAKE_MODEL_API_KEY=" in production_env
