@@ -134,8 +134,12 @@ def main() -> int:
         "D:\\",
         "C:\\",
         "Path.home()",
-        'sqlite:///./',
-        'sqlite+pysqlite:///./',
+        "Path.cwd()",
+        "os.getcwd()",
+        "__file__",
+        ".resolve().parents",
+        "sqlite:///./",
+        "sqlite+pysqlite:///./",
     }
     for source_name, source_text in runtime_texts.items():
         present = sorted(item for item in forbidden_literals if item in source_text)
