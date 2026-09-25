@@ -39,7 +39,7 @@ WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH=/var/lib/world-runtime/world-runtime.d
 World Runtime source now lives in the same AIOS monorepo. Deployment identity must therefore be pinned and recorded at the built artifact/image and AIOS commit level; `pyproject.toml` is not a locator for a separate Runtime repository.
 There is no deployment-level Agent Kernel revision source.
 
-Use `.env.production.example` as the configuration inventory.
+Use the root `.env.example` as the configuration inventory and inject deployment-specific values through `.env` or the deployment secret/config owner.
 
 ## Preflight
 
