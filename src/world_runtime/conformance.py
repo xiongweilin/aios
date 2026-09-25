@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
+from importlib.resources import files
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -52,8 +53,8 @@ def _conformance_token(name: str) -> str:
 
 
 def conformance_vectors() -> dict[str, Any]:
-    path = Path(__file__).with_name("contracts") / "vectors.json"
-    value = json.loads(path.read_text(encoding="utf-8"))
+    resource = files("world_runtime.contracts").joinpath("vectors.json")
+    value = json.loads(resource.read_text(encoding="utf-8"))
     if value.get("suite_version") != SUITE_VERSION:
         raise ValueError("World Runtime conformance suite version mismatch")
     if not isinstance(value.get("vectors"), list) or not value["vectors"]:
