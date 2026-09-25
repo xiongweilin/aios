@@ -1,9 +1,7 @@
 # control-plane
 
-> Component of the [AIOS monorepo](../README.md) at `control-plane/`; this directory is not an independent GitHub repository.
+> AIOS domain component. Source: `src/control_plane/`. Runtime: root `compose.yaml`.
 
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 An AIOS Domain Controller component for [world-runtime](../world-runtime/README.md), focused on authenticated personal/platform operations, monitoring, bounded repair, and narrowly scoped effects.
 
@@ -50,7 +48,7 @@ World Runtime remains the canonical owner of cross-domain semantic objects such 
 
 The boundary is protocol-based, not Python-import-based.
 
-Production source must not import `world_runtime`, and `pyproject.toml` / `uv.lock` must not depend on the `world-runtime` Python package. Component verification should preserve both constraints.
+Production source must not import `world_runtime`, and the unified `pyproject.toml` must not introduce a package-level dependency from Control Plane to World Runtime. Component verification preserves the protocol boundary.
 
 ## Runtime handshake
 
@@ -198,22 +196,15 @@ The service exposes a narrow operational API for:
 
 Transport integrations do not mint authority or decide that a universal objective is complete.
 
-## Setup
+## Runtime
 
-```powershell
-python -m pip install -e '.[dev]'
-control-plane
-```
-
-Example configuration is `config/domains/control_plane/control_plane.toml.example`. Copy it to the repository root as the ignored local `control_plane.toml` and set the World Runtime endpoint plus machine-owned paths.
+Control Plane has no native host launcher. It runs as the `control-plane` service in the root
+Compose topology. World Runtime, agent/model endpoints and monitoring are addressed through
+container-network endpoints or external APIs; host-local listeners are not part of the runtime contract.
 
 ## Verification
 
-```powershell
-ruff check src/control_plane tests/domains/control_plane
-mypy src/control_plane
-pytest -q tests/domains/control_plane
-```
+Repository verification is owned by the root CI workflow.
 
 The component verification surface is expected to cover:
 
