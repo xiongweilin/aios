@@ -1,11 +1,9 @@
 # autonomous-development
 
-> Component of the [AIOS monorepo](../README.md) at `autonomous-development/`; this directory is not an independent GitHub repository.
+> AIOS domain component. Source: `src/autonomous_development/`. Runtime: root `compose.yaml`.
 
-![Python 3.12–3.14](https://img.shields.io/badge/python-3.12--3.14-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-Local-first autonomous software development and product-evolution control plane.
+Container-native autonomous software development and product-evolution control plane.
 
 > A durable, evidence-driven lifecycle boundary for requirement intake, verification,
 > progressive delivery, feedback attribution, promotion and rollback.
@@ -61,7 +59,7 @@ opaque evidence references for Runtime assessment/Decision/discharge.
 World Runtime does **not** own worktrees, Git branches, Docker builds, verification gates,
 canary stages, source promotion, rollback, or `ReleasedVersion` semantics.
 
-V1 targets one registered software/Agent product at a time. The product goal is human-owned; implementation and iterative improvement inside that goal may run autonomously. Host OS, model gateway, container runtime, and monitoring are deployment/provider choices, not lifecycle semantics.
+V1 targets one registered software/Agent product at a time. The product goal is human-owned; implementation and iterative improvement inside that goal may run autonomously. The container runtime is the only local execution substrate. Agent/model and monitoring dependencies are container-network services or external APIs, not host-local programs.
 
 The implementation exposes an operator API and durable workflow boundary without a bundled user
 interface. Human requirements enter the provider-neutral operator API and are never converted into
@@ -77,3 +75,11 @@ their reality-changing dispatches pass through `domain-effect-execution-v3`
 before configured deployment, traffic-state, or Git mutation occurs. Read-only observation,
 candidate worktrees, implementation, build, and verification remain local to
 Development.
+
+
+## Container runtime
+
+Autonomous Development runs only as the `autonomous-development` service in the root AIOS Compose
+topology. It receives a workspace through `/workspace` and uses the mounted Docker socket to build,
+inspect and manage sibling target containers. No native Autodev service or host Python process is a
+supported runtime path.
