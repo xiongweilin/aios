@@ -4,7 +4,7 @@ This document defines Runtime-owned lifecycle, authority, persistence, and execu
 Cross-domain meaning remains owned by `semantic-language`. Domain completion and real-world
 outcome qualification remain owned by Domain Controllers.
 
-The canonical version manifest is `src/world_runtime/contracts/catalog.toml`.
+The canonical version manifest is `src/kernel/world_runtime/contracts/catalog.toml`.
 
 ## Ownership rules
 
