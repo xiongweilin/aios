@@ -15,6 +15,7 @@ def make_config(tmp_path: Path) -> ControlPlaneConfig:
     return ControlPlaneConfig(
         api_key="test-key",
         codex_cli=tmp_path / "codex.cmd",
+        remote_sha_cache_path=(tmp_path / "remote-sha-cache.json").resolve(),
         docker_build_cache_max_bytes=1024,
         docker_expected_exited_containers=("sample-migration-1",),
         automatic_handling_enabled=True,
@@ -150,16 +151,15 @@ def test_remote_sha_cache_handles_missing_invalid_and_expired_entries(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    cache_path = tmp_path / "remote-sha-cache.json"
-    monkeypatch.setattr(environment, "REMOTE_SHA_CACHE_PATH", cache_path)
+    cache_path = (tmp_path / "remote-sha-cache.json").resolve()
 
-    assert environment._load_remote_cache() == {}
+    assert environment._load_remote_cache(cache_path) == {}
 
     cache_path.write_bytes(b"not-json")
-    assert environment._load_remote_cache() == {}
+    assert environment._load_remote_cache(cache_path) == {}
 
     cache_path.write_text(json.dumps({"entries": []}), encoding="utf-8")
-    assert environment._load_remote_cache() == {}
+    assert environment._load_remote_cache(cache_path) == {}
 
     now = time.time()
     cache_path.write_text(
@@ -179,7 +179,7 @@ def test_remote_sha_cache_handles_missing_invalid_and_expired_entries(
         ),
         encoding="utf-8",
     )
-    cache = environment._load_remote_cache()
+    cache = environment._load_remote_cache(cache_path)
 
     assert environment._cached_remote_sha(cache, "fresh") == "abc"
     assert environment._cached_remote_sha(cache, "expired") == ""
@@ -209,7 +209,7 @@ def test_lifecycle_probe_reports_fresh_repository_and_chezmoi_subjects(
     monkeypatch.setattr(
         environment,
         "_load_remote_cache",
-        lambda: {raw_repo: {"sha": head_sha, "checked_at": time.time()}},
+        lambda _path: {raw_repo: {"sha": head_sha, "checked_at": time.time()}},
     )
 
     def run_command(args: list[str], *, timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -263,7 +263,7 @@ def test_lifecycle_probe_marks_stale_cache_unknown_and_starts_refresh(
         "which",
         find_probe_tool,
     )
-    monkeypatch.setattr(environment, "_load_remote_cache", lambda: {})
+    monkeypatch.setattr(environment, "_load_remote_cache", lambda _path: {})
     monkeypatch.setattr(provider, "_spawn_remote_refresh", lambda paths: refreshed.append(paths))
 
     def run_command(args: list[str], *, timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -313,7 +313,7 @@ def test_lifecycle_probe_reports_local_sync_failures(
         "which",
         find_probe_tool,
     )
-    monkeypatch.setattr(environment, "_load_remote_cache", lambda: {})
+    monkeypatch.setattr(environment, "_load_remote_cache", lambda _path: {})
 
     def run_command(args: list[str], *, timeout: float) -> subprocess.CompletedProcess[bytes]:
         del timeout
@@ -374,7 +374,7 @@ def test_lifecycle_probe_reports_remote_mismatch(
     monkeypatch.setattr(
         environment,
         "_load_remote_cache",
-        lambda: {raw_repo: {"sha": "d" * 40, "checked_at": time.time()}},
+        lambda _path: {raw_repo: {"sha": "d" * 40, "checked_at": time.time()}},
     )
 
     def run_command(args: list[str], *, timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -406,9 +406,14 @@ def test_remote_refresh_writes_sha_cache_and_is_rate_limited(
     cache_path = tmp_path / "remote-sha-cache.json"
     raw_repo = str(repo)
     remote_sha = "f" * 40
-    provider = EnvironmentInspectionProvider(make_config(tmp_path))
-    monkeypatch.setattr(environment, "REMOTE_SHA_CACHE_PATH", cache_path)
-    monkeypatch.setattr(environment, "_load_remote_cache", lambda: {"existing": {"sha": "old"}})
+    provider = EnvironmentInspectionProvider(
+        replace(make_config(tmp_path), remote_sha_cache_path=cache_path)
+    )
+    monkeypatch.setattr(
+        environment,
+        "_load_remote_cache",
+        lambda _path: {"existing": {"sha": "old"}},
+    )
     monkeypatch.setattr(environment.shutil, "which", lambda name: "git" if name == "git" else None)
 
     class ImmediateThread:
