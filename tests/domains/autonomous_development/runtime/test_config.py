@@ -11,6 +11,7 @@ def settings(tmp_path: Path, **overrides: object) -> RuntimeSettings:
         "database_url": SecretStr("sqlite+pysqlite:///:memory:"),
         "dbos_system_database_url": SecretStr("sqlite:///:memory:"),
         "state_root": tmp_path.resolve(),
+        "workspace_root": tmp_path.resolve(),
         "telemetry_queries": {"requests": "sum(rate(http_requests_total[5m]))"},
     }
     values.update(overrides)
@@ -47,10 +48,11 @@ def test_runtime_settings_reject_incomplete_service_urls(tmp_path: Path) -> None
         settings(tmp_path, world_runtime_base_url="http://world-runtime")
 
 
-def test_runtime_settings_reject_relative_state_root() -> None:
+def test_runtime_settings_reject_relative_state_root(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         RuntimeSettings(
             database_url=SecretStr("sqlite+pysqlite:///:memory:"),
             dbos_system_database_url=SecretStr("sqlite:///:memory:"),
             state_root=Path("relative"),
+            workspace_root=tmp_path.resolve(),
         )
