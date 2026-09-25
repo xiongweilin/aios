@@ -113,8 +113,9 @@ def _require_loopback(base_url: str) -> None:
         "127.0.0.1",
         "localhost",
         "::1",
+        "prometheus",
     }:
-        raise ValueError("V1 Prometheus telemetry is restricted to local loopback")
+        raise ValueError("V1 Prometheus telemetry requires loopback or the Compose Prometheus service")
 
 
 def _safe_id(value: str, field_name: str) -> str:

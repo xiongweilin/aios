@@ -5,7 +5,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,9 @@ class RuntimeSettings(BaseSettings):
     state_root: Path
     workspace_root: Path
     docker_network: str | None = None
+    codex_app_server_url: str = ""
+    codex_app_server_token_file: Path | None = None
+    codex_host_path_map_file: Path | None = None
     alembic_script_location: Path | None = None
     operator_hmac_secret_file: Path | None = None
     operator_hmac_ttl_seconds: int = Field(default=300, ge=30, le=3600)
@@ -73,6 +76,36 @@ class RuntimeSettings(BaseSettings):
         if not path.is_absolute():
             raise ValueError("alembic_script_location must be an absolute path")
         return path.resolve()
+
+    @field_validator("codex_app_server_token_file", "codex_host_path_map_file", mode="before")
+    @classmethod
+    def validate_optional_codex_path(cls, value: object) -> Path | None:
+        if value is None or str(value).strip() == "":
+            return None
+        path = Path(str(value)).expanduser()
+        if not path.is_absolute():
+            raise ValueError("Codex App Server paths must be absolute")
+        return path.resolve()
+
+    @field_validator("codex_app_server_url")
+    @classmethod
+    def validate_codex_app_server_url(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"ws", "wss"} or not parsed.hostname or not parsed.port:
+            raise ValueError("Codex App Server URL must use ws(s)://host:port")
+        return value
+
+    @model_validator(mode="after")
+    def require_codex_transport_files(self) -> RuntimeSettings:
+        if self.codex_app_server_url and (
+            self.codex_app_server_token_file is None
+            or self.codex_host_path_map_file is None
+        ):
+            raise ValueError("remote Codex App Server requires token and host path map files")
+        return self
 
     @field_validator("operator_hmac_secret_file", mode="before")
     @classmethod

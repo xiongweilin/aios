@@ -123,6 +123,7 @@ class DiagnosisService:
                 cwd=repository_root,
                 sandbox=CodexSandbox.READ_ONLY,
                 resume_key=f"diagnosis:{diagnosis_id}",
+                request_id=f"autodev:diagnosis:{diagnosis_id}",
                 output_schema=_DIAGNOSIS_SCHEMA,
                 timeout_seconds=timeout_seconds,
             )

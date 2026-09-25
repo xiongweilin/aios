@@ -385,7 +385,19 @@ def evaluate_environment(
         token in cli_text.lower()
         for token in ("opencodex", "open-codex", "old-codex", "legacy-codex")
     )
-    if provider_available is False:
+    if provider_available is True:
+        transport = "remote Codex App Server" if config.codex_app_server_url else "local CLI"
+        observations = [
+            _ok(
+                "codex_primary",
+                f"provider_available=true; transport={transport}",
+                metadata={
+                    "provider_available": True,
+                    "transport": transport,
+                },
+            )
+        ]
+    elif provider_available is False:
         observations = [
             _problem(
                 "codex_primary",

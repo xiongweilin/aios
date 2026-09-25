@@ -22,6 +22,7 @@ class CodexTurnRequest:
     model: str | None = None
     output_schema: Mapping[str, object] | None = None
     timeout_seconds: int = 1800
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.prompt.strip():
@@ -32,6 +33,8 @@ class CodexTurnRequest:
             raise ValueError("Codex timeout must be positive")
         if self.resume_key is not None and not self.resume_key.strip():
             raise ValueError("Codex resume key must be non-empty when provided")
+        if self.request_id is not None and not self.request_id.strip():
+            raise ValueError("Codex request id must be non-empty when provided")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,3 +62,11 @@ class CodexProvider(Protocol):
 
 class CodexProviderError(RuntimeError):
     """Codex could not complete the requested bounded engineering turn."""
+
+
+class CodexOutcomeUnknown(CodexProviderError):
+    """A turn may have run, but AIOS did not receive a terminal result."""
+
+    def __init__(self, request_id: str, message: str) -> None:
+        self.request_id = request_id
+        super().__init__(message)

@@ -9,11 +9,13 @@ from pathlib import Path
 
 from autonomous_development.ports.codex import (
     CodexEvent,
+    CodexOutcomeUnknown,
     CodexProvider,
     CodexProviderError,
     CodexTurnRequest,
     CodexTurnResult,
 )
+from integrations.codex_app_server import CodexBridgeError, RemoteCodexAppServer
 
 
 class CodexExecProvider(CodexProvider):
@@ -24,6 +26,7 @@ class CodexExecProvider(CodexProvider):
         *,
         command: Sequence[str] = ("codex",),
         thread_journal_root: Path | None = None,
+        remote_app_server: RemoteCodexAppServer | None = None,
     ) -> None:
         if not command:
             raise ValueError("Codex CLI command must be non-empty")
@@ -31,8 +34,11 @@ class CodexExecProvider(CodexProvider):
             raise ValueError("Codex thread journal root must be absolute")
         self._command = tuple(command)
         self._thread_journal_root = thread_journal_root
+        self._remote_app_server = remote_app_server
 
     def run_turn(self, request: CodexTurnRequest) -> CodexTurnResult:
+        if self._remote_app_server is not None:
+            return self._run_remote_turn(request)
         if request.output_schema is not None:
             raise CodexProviderError("Codex CLI provider does not support output schemas")
         thread_id = self._resolve_thread_id(request)
@@ -77,6 +83,46 @@ class CodexExecProvider(CodexProvider):
         if process.returncode != 0:
             raise CodexProviderError(f"Codex CLI exited with code {process.returncode}")
         return self._result(stdout, request, thread_id)
+
+    def _run_remote_turn(self, request: CodexTurnRequest) -> CodexTurnResult:
+        if request.output_schema is not None:
+            raise CodexProviderError("Codex CLI provider does not support output schemas")
+        prompt_digest = hashlib.sha256(request.prompt.encode("utf-8")).hexdigest()[:24]
+        request_id = request.request_id or f"autodev-engineering:{request.resume_key or 'turn'}:{prompt_digest}"
+        try:
+            result = self._remote_app_server.run_turn(
+                request_id=request_id,
+                prompt=request.prompt,
+                cwd=request.cwd.resolve(strict=True),
+                sandbox=request.sandbox.value,
+                thread_id=self._resolve_thread_id(request),
+                resume_key=request.resume_key,
+                model=request.model,
+                timeout_seconds=request.timeout_seconds,
+            )
+        except CodexBridgeError as exc:
+            if exc.outcome == "unknown":
+                raise CodexOutcomeUnknown(
+                    exc.request_id or request_id,
+                    f"remote Codex turn outcome is unknown: {exc}",
+                ) from exc
+            raise CodexProviderError(f"remote Codex turn failed: {exc}") from exc
+        self._record_thread(request.resume_key, result.thread_id)
+        events = tuple(
+            CodexEvent(
+                method=str(event["method"]),
+                params=(event.get("params") if isinstance(event.get("params"), Mapping) else {}),
+            )
+            for event in result.events
+            if isinstance(event.get("method"), str)
+        )
+        return CodexTurnResult(
+            thread_id=result.thread_id,
+            turn_id=result.turn_id,
+            status=result.status,
+            events=events,
+            agent_messages=result.agent_messages,
+        )
 
     def _result(
         self,

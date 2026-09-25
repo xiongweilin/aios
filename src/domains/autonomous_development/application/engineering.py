@@ -81,6 +81,7 @@ class EngineeringService:
                 sandbox=CodexSandbox.WORKSPACE_WRITE,
                 thread_id=thread_id,
                 resume_key=f"{cycle_id}:implementation:{attempt}",
+                request_id=f"autodev:{cycle_id}:implementation:{attempt}",
                 model=model,
             )
         )

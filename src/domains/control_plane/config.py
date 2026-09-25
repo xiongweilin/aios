@@ -6,6 +6,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 class ConfigurationError(RuntimeError):
@@ -52,6 +53,16 @@ def _configured_path(name: str, fallback: object = "") -> Path:
     return path.resolve()
 
 
+def _optional_configured_path(name: str, fallback: object = "") -> Path | None:
+    raw = _env_text(name, fallback)
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise ConfigurationError(f"{name} must be an absolute path")
+    return path.resolve()
+
+
 def _optional_config_path(explicit: Path | None) -> Path | None:
     if explicit is not None:
         return explicit.expanduser().resolve()
@@ -89,6 +100,9 @@ class ControlPlaneConfig:
     execution_model: str = "gpt-5.6-luna"
     codex_cli: Path | None = None
     gateway_base_url: str = ""
+    codex_app_server_url: str = ""
+    codex_app_server_token_file: Path | None = None
+    codex_host_path_map_file: Path | None = None
     codex_isolate_worktree: bool = True
     codex_disable_docker: bool = True
     codex_disable_ssh_credentials: bool = True
@@ -119,6 +133,18 @@ class ControlPlaneConfig:
     allowed_auto_projects: tuple[str, ...] = ()
     project_dirs: dict[str, str] = field(default_factory=dict)
     allowed_repo_roots: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.codex_app_server_url:
+            parsed = urlsplit(self.codex_app_server_url)
+            if parsed.scheme not in {"ws", "wss"} or not parsed.hostname or not parsed.port:
+                raise ConfigurationError(
+                    "CONTROL_PLANE_CODEX_APP_SERVER_URL must use ws(s)://host:port"
+                )
+            if self.codex_app_server_token_file is None or self.codex_host_path_map_file is None:
+                raise ConfigurationError(
+                    "remote Codex App Server requires token and host path map files"
+                )
 
     @property
     def model(self) -> str:
@@ -215,6 +241,18 @@ class ControlPlaneConfig:
             gateway_base_url=_env_text(
                 "CONTROL_PLANE_AGENT_BASE_URL",
                 model.get("gateway_base_url", base.gateway_base_url),
+            ),
+            codex_app_server_url=_env_text(
+                "CONTROL_PLANE_CODEX_APP_SERVER_URL",
+                model.get("codex_app_server_url", ""),
+            ),
+            codex_app_server_token_file=_optional_configured_path(
+                "CONTROL_PLANE_CODEX_APP_SERVER_TOKEN_FILE",
+                model.get("codex_app_server_token_file", ""),
+            ),
+            codex_host_path_map_file=_optional_configured_path(
+                "CONTROL_PLANE_CODEX_HOST_PATH_MAP_FILE",
+                model.get("codex_host_path_map_file", ""),
             ),
             codex_isolate_worktree=bool(model.get("isolate_worktree", base.codex_isolate_worktree)),
             codex_disable_docker=bool(model.get("disable_docker", base.codex_disable_docker)),

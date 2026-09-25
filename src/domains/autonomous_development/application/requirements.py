@@ -157,6 +157,7 @@ class RequirementAnalysisService:
                 cwd=repository_root,
                 sandbox=CodexSandbox.READ_ONLY,
                 resume_key=_analysis_resume_key(request.id, clarifications),
+                request_id=f"autodev:requirements:{request.id}:{len(clarifications)}",
                 output_schema=_REQUIREMENT_SCHEMA,
                 timeout_seconds=(
                     self._timeout_seconds if timeout_seconds is None else timeout_seconds

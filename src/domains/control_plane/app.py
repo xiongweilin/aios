@@ -34,6 +34,7 @@ from .alert_policy import (
 from .audit import inspect_session_fields, redact_value
 from .codex_boundary import CodexExecutionBoundary, ThreadIsolatedCodexProvider
 from .codex_provider import CodexProvider
+from integrations.codex_app_server import RemoteCodexAppServer
 from .config import ConfigurationError, ControlPlaneConfig
 from .domain_controller import ControllerStatus, PersonalController
 from .domain_store import DomainEvent, DomainJournal, new_id
@@ -136,6 +137,17 @@ def create_app(
 
     journal = DomainJournal(cfg.state_db)
     providers = ProviderRegistry()
+    remote_codex = None
+    if cfg.codex_app_server_url:
+        if cfg.codex_app_server_token_file is None or cfg.codex_host_path_map_file is None:
+            raise ConfigurationError("remote Codex App Server requires token and path-map files")
+        remote_codex = RemoteCodexAppServer(
+            url=cfg.codex_app_server_url,
+            token_file=cfg.codex_app_server_token_file,
+            path_map_file=cfg.codex_host_path_map_file,
+            journal_root=(cfg.agent_session_dir / "codex-bridge-journal").resolve(),
+            client_name="control-plane",
+        )
     providers.register(
         ThreadIsolatedCodexProvider(
             CodexProvider(
@@ -143,6 +155,7 @@ def create_app(
                 cli=cfg.codex_cli,
                 gateway_base_url=cfg.gateway_base_url,
                 execution_boundary=CodexExecutionBoundary(cfg),
+                remote_app_server=remote_codex,
             )
         )
     )

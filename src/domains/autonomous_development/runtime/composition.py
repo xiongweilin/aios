@@ -90,6 +90,7 @@ from autonomous_development.application.soak import PostPromotionSoakService
 from autonomous_development.application.source_promotion import SourcePromotionService
 from autonomous_development.application.target_registry import TargetRegistryService
 from autonomous_development.application.verification import VerificationService
+from integrations.codex_app_server import RemoteCodexAppServer
 from autonomous_development.domain.canary import CanaryGuardrails
 from autonomous_development.ports.deployment import DeploymentProvider
 from autonomous_development.ports.repository import RepositoryProvider
@@ -249,11 +250,29 @@ def compose_runtime(settings: RuntimeSettings) -> RuntimeComposition:
             engine.dispose()
             raise
 
+    remote_codex = None
+    if settings.codex_app_server_url:
+        if (
+            settings.codex_app_server_token_file is None
+            or settings.codex_host_path_map_file is None
+        ):
+            raise RuntimeConfigurationError(
+                "remote Codex App Server requires token and host path map files"
+            )
+        remote_codex = RemoteCodexAppServer(
+            url=settings.codex_app_server_url,
+            token_file=settings.codex_app_server_token_file,
+            path_map_file=settings.codex_host_path_map_file,
+            journal_root=settings.codex_thread_journal_root,
+            client_name="autonomous-development",
+        )
     codex = CodexAppServer(
         thread_journal_root=settings.codex_thread_journal_root,
+        remote_app_server=remote_codex,
     )
     engineering_codex = CodexExecProvider(
         thread_journal_root=settings.codex_thread_journal_root,
+        remote_app_server=remote_codex,
     )
     diagnosis = DiagnosisService(
         codex,
@@ -489,6 +508,7 @@ def compose_runtime(settings: RuntimeSettings) -> RuntimeComposition:
         traffic=traffic,
         operator_repository=operator_repository,
         operator_auth_configured=operator_authenticator.configured,
+        remote_codex=remote_codex,
     )
     metrics = CanaryMetricsRegistry()
     proxy_app = create_canary_proxy(

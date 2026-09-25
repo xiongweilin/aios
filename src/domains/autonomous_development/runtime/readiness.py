@@ -15,6 +15,7 @@ from autonomous_development.ports.process import CommandRequest, ProcessRunner
 from autonomous_development.ports.readiness import ReadinessCheck, ReadinessReport
 from autonomous_development.ports.target_contract import TargetContractLoader
 from autonomous_development.ports.traffic import TrafficRouteReader
+from integrations.codex_app_server import RemoteCodexAppServer
 
 from .config import RuntimeSettings
 
@@ -33,6 +34,7 @@ class RuntimeReadinessService:
         http_transport: httpx.BaseTransport | None = None,
         operator_repository: OperatorRepository | None = None,
         operator_auth_configured: bool = True,
+        remote_codex: RemoteCodexAppServer | None = None,
     ) -> None:
         self._settings = settings
         self._engine = engine
@@ -44,6 +46,7 @@ class RuntimeReadinessService:
         self._http_transport = http_transport
         self._operator_repository = operator_repository
         self._operator_auth_configured = operator_auth_configured
+        self._remote_codex = remote_codex
 
     def check(self) -> ReadinessReport:
         checks = [
@@ -51,7 +54,7 @@ class RuntimeReadinessService:
             self._python(),
             self._command("git", ("git", "--version")),
             self._command("uv", ("uv", "--version")),
-            self._command("codex", ("codex", "--version")),
+            self._codex(),
             self._command(
                 "docker-daemon",
                 ("docker", "version", "--format", "{{.Server.Version}}"),
@@ -70,6 +73,15 @@ class RuntimeReadinessService:
             ready=all(check.ready for check in checks),
             checks=tuple(checks),
         )
+
+    def _codex(self) -> ReadinessCheck:
+        if self._remote_codex is None:
+            return self._command("codex", ("codex", "--version"))
+        try:
+            version = self._remote_codex.health()
+        except Exception as exc:
+            return ReadinessCheck("codex", False, type(exc).__name__)
+        return ReadinessCheck("codex", True, f"remote App Server {version}")
 
     def _operator(self) -> ReadinessCheck:
         if not self._operator_auth_configured:

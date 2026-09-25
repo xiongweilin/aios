@@ -29,6 +29,7 @@ dependencies = [
   "sqlalchemy>=2.0.35,<3",
   "structlog>=24.4,<26",
   "uvicorn[standard]>=0.35,<1",
+  "websockets>=14,<18",
 ]
 
 [project.optional-dependencies]
@@ -54,6 +55,7 @@ aios-migrate = "aios.migrations:main"
 [tool.hatch.build.targets.wheel]
 only-include = [
   "src/aios",
+  "src/integrations",
   "src/semantic/semantic_language",
   "src/kernel/personal_world",
   "src/kernel/world_runtime",
@@ -64,6 +66,7 @@ only-include = [
 
 [tool.hatch.build.sources]
 "src/aios" = "aios"
+"src/integrations" = "integrations"
 "src/semantic/semantic_language" = "semantic_language"
 "src/kernel/personal_world" = "personal_world"
 "src/kernel/world_runtime" = "world_runtime"

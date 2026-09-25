@@ -79,3 +79,11 @@ def test_prometheus_adapter_rejects_non_loopback_endpoint(tmp_path: Path) -> Non
             {"errors": "up"},
             LocalEvidenceStore((tmp_path / "evidence").resolve()),
         )
+
+
+def test_prometheus_adapter_accepts_compose_service_endpoint(tmp_path: Path) -> None:
+    PrometheusTelemetryProvider(
+        "http://prometheus:9090",
+        {"health": "sum(up)"},
+        LocalEvidenceStore((tmp_path / "evidence").resolve()),
+    )

@@ -32,6 +32,8 @@ x-autodev-environment: &autodev-environment
   AUTODEV_API_HOST: ${AUTODEV_API_HOST:-0.0.0.0}
   AUTODEV_API_PORT: ${AUTODEV_API_PORT:-8765}
   AUTODEV_TELEMETRY_QUERIES: ${AUTODEV_TELEMETRY_QUERIES:-}
+  AUTODEV_PROMETHEUS_BASE_URL: ${AUTODEV_PROMETHEUS_BASE_URL:-http://prometheus:9090}
+  AUTODEV_OPERATOR_HMAC_SECRET_FILE: /run/secrets/operator-hmac
   AUTODEV_WORLD_RUNTIME_MODE: ${AUTODEV_WORLD_RUNTIME_MODE:-disabled}
   AUTODEV_PERSONAL_WORLD_MODE: ${AUTODEV_PERSONAL_WORLD_MODE:-disabled}
 
@@ -51,6 +53,23 @@ services:
       retries: 20
     volumes:
       - ${AIOS_HOST_POSTGRES_DATA_ROOT:?set AIOS_HOST_POSTGRES_DATA_ROOT}:${AIOS_CONTAINER_POSTGRES_DATA_ROOT}
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "127.0.0.1:19090:9090"
+    volumes:
+      - type: bind
+        source: ./config/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+        bind:
+          create_host_path: false
+      - prometheus_data:/prometheus
 
   database-init:
     <<: *aios-service
@@ -107,6 +126,9 @@ services:
       CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID: ${CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID:-}
       CONTROL_PLANE_AGENT_BASE_URL: ${CONTROL_PLANE_AGENT_BASE_URL:-}
       CONTROL_PLANE_AGENT_EXECUTABLE: ${CONTROL_PLANE_AGENT_EXECUTABLE:-}
+      CONTROL_PLANE_CODEX_APP_SERVER_URL: ${CONTROL_PLANE_CODEX_APP_SERVER_URL:-}
+      CONTROL_PLANE_CODEX_APP_SERVER_TOKEN_FILE: /run/secrets/codex-ws-token
+      CONTROL_PLANE_CODEX_HOST_PATH_MAP_FILE: /run/secrets/control-plane-path-map.json
       CONTROL_PLANE_PROMETHEUS_URL: ${CONTROL_PLANE_PROMETHEUS_URL:-}
       CONTROL_PLANE_CHEZMOI_SOURCE_DIR: ${CONTROL_PLANE_CHEZMOI_SOURCE_DIR:-}
       CONTROL_PLANE_ENVIRONMENT_CHECKS: ${CONTROL_PLANE_ENVIRONMENT_CHECKS:-false}
@@ -115,8 +137,22 @@ services:
       - "127.0.0.1:18083:18083"
     volumes:
       - ${CONTROL_PLANE_HOST_DATA_ROOT:?set CONTROL_PLANE_HOST_DATA_ROOT}:${CONTROL_PLANE_DATA_ROOT:?set CONTROL_PLANE_DATA_ROOT}
+      - type: bind
+        source: ${AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE:?set AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE}
+        target: /run/secrets/codex-ws-token
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CONTROL_PLANE_HOST_CODEX_PATH_MAP_FILE:?set CONTROL_PLANE_HOST_CODEX_PATH_MAP_FILE}
+        target: /run/secrets/control-plane-path-map.json
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       world-runtime:
+        condition: service_started
+      prometheus:
         condition: service_started
 
   administrative-migrate:
@@ -172,12 +208,39 @@ services:
     environment:
       <<: *autodev-environment
       DOCKER_HOST: unix://${AUTODEV_DOCKER_SOCKET:?set AUTODEV_DOCKER_SOCKET}
+      AUTODEV_CODEX_APP_SERVER_URL: ${AUTODEV_CODEX_APP_SERVER_URL:-}
+      AUTODEV_CODEX_APP_SERVER_TOKEN_FILE: /run/secrets/codex-ws-token
+      AUTODEV_CODEX_HOST_PATH_MAP_FILE: /run/secrets/autodev-path-map.json
+      AUTODEV_OPERATOR_HMAC_SECRET_FILE: /run/secrets/operator-hmac
     ports:
       - "127.0.0.1:18110:8765"
     volumes:
       - ${AUTODEV_HOST_STATE_ROOT:?set AUTODEV_HOST_STATE_ROOT}:${AUTODEV_STATE_ROOT}
       - ${AUTODEV_HOST_WORKSPACE_ROOT:?set AUTODEV_HOST_WORKSPACE_ROOT}:${AUTODEV_WORKSPACE_ROOT:?set AUTODEV_WORKSPACE_ROOT}
       - ${AUTODEV_HOST_DOCKER_SOCKET:?set AUTODEV_HOST_DOCKER_SOCKET}:${AUTODEV_DOCKER_SOCKET}
+      - type: bind
+        source: ${AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE:?set AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE}
+        target: /run/secrets/codex-ws-token
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AUTODEV_HOST_CODEX_PATH_MAP_FILE:?set AUTODEV_HOST_CODEX_PATH_MAP_FILE}
+        target: /run/secrets/autodev-path-map.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AIOS_HOST_OPERATOR_HMAC_SECRET_FILE:?set AIOS_HOST_OPERATOR_HMAC_SECRET_FILE}
+        target: /run/secrets/operator-hmac
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       autodev-migrate:
         condition: service_completed_successfully
+      prometheus:
+        condition: service_started
+
+volumes:
+  prometheus_data:
