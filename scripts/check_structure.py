@@ -20,6 +20,7 @@ REQUIRED_ROOTS = {
     "scripts",
 }
 SINGLETON_FILES = {
+    ".env.example",
     "pyproject.toml",
     "sonar-project.properties",
     "Dockerfile",
@@ -119,6 +120,30 @@ def main() -> int:
     if "profiles:" in compose_text:
         errors.append("AIOS runtime services must not depend on optional Compose profiles")
 
+    runtime_texts = {
+        "compose.yaml": compose_text,
+        "Dockerfile": (ROOT / "Dockerfile").read_text(encoding="utf-8"),
+    }
+    for source in (ROOT / "src").rglob("*.py"):
+        runtime_texts[source.relative_to(ROOT).as_posix()] = source.read_text(encoding="utf-8")
+
+    forbidden_literals = {
+        "/var/lib/aios",
+        "/workspace",
+        "/app/config",
+        "D:\\",
+        "C:\\",
+        "Path.home()",
+        'sqlite:///./',
+        'sqlite+pysqlite:///./',
+    }
+    for source_name, source_text in runtime_texts.items():
+        present = sorted(item for item in forbidden_literals if item in source_text)
+        if present:
+            errors.append(
+                f"hard-coded runtime path in {source_name}: " + ", ".join(present)
+            )
+
     forbidden_runtime_paths = []
     for path in ROOT.rglob("*"):
         if not path.is_file():
@@ -138,7 +163,7 @@ def main() -> int:
         print("\n".join(errors))
         return 1
 
-    print("AIOS structure OK: one project root, one source tree, one test tree, container-only runtime")
+    print("AIOS structure OK: unified project, container-only runtime, configurable paths")
     return 0
 
 
