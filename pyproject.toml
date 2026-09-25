@@ -52,7 +52,7 @@ aios-init-databases = "aios.database_init:main"
 aios-migrate = "aios.migrations:main"
 
 [tool.hatch.build.targets.wheel]
-packages = [
+only-include = [
   "src/aios",
   "src/semantic/semantic_language",
   "src/kernel/personal_world",
@@ -61,6 +61,15 @@ packages = [
   "src/domains/administrative_orchestrator",
   "src/domains/autonomous_development",
 ]
+
+[tool.hatch.build.sources]
+"src/aios" = "aios"
+"src/semantic/semantic_language" = "semantic_language"
+"src/kernel/personal_world" = "personal_world"
+"src/kernel/world_runtime" = "world_runtime"
+"src/domains/control_plane" = "control_plane"
+"src/domains/administrative_orchestrator" = "administrative_orchestrator"
+"src/domains/autonomous_development" = "autonomous_development"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
