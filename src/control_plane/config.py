@@ -112,6 +112,7 @@ class ControlPlaneConfig:
     chezmoi_source_dir: str = ""
     known_garbage_paths: tuple[str, ...] = ()
     garbage_quarantine_dir: str = ""
+    remote_sha_cache_path: Path | None = None
     automatic_handling_enabled: bool = False
     auto_maintenance_alertnames: tuple[str, ...] = ("ControlPlaneGarbageDetected",)
 
@@ -292,6 +293,17 @@ class ControlPlaneConfig:
             garbage_quarantine_dir=_env_text(
                 "CONTROL_PLANE_GARBAGE_QUARANTINE_DIR",
                 environment.get("garbage_quarantine_dir", base.garbage_quarantine_dir),
+            ),
+            remote_sha_cache_path=(
+                _configured_path(
+                    "CONTROL_PLANE_REMOTE_SHA_CACHE_PATH",
+                    environment.get("remote_sha_cache_path", ""),
+                )
+                if _env_text(
+                    "CONTROL_PLANE_REMOTE_SHA_CACHE_PATH",
+                    environment.get("remote_sha_cache_path", ""),
+                )
+                else None
             ),
             automatic_handling_enabled=_env_bool(
                 "CONTROL_PLANE_AUTOMATIC_HANDLING",
