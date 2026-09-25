@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from administrative_orchestrator.domain import FactAuthority, Principal
+from administrative_orchestrator.domain import FactAuthority
 from administrative_orchestrator.intake.artifacts import FilesystemArtifactStore
 from administrative_orchestrator.intake.interpretation import (
     InterpretationClient,
