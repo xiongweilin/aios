@@ -43,7 +43,9 @@ from personal_world.service import AdmissionError, PersonalWorldService
 
 
 def _service_from_environment() -> PersonalWorldService:
-    url = os.getenv("PERSONAL_WORLD_DATABASE_URL", "sqlite:///./personal-world.db")
+    url = os.getenv("PERSONAL_WORLD_DATABASE_URL", "").strip()
+    if not url:
+        raise RuntimeError("PERSONAL_WORLD_DATABASE_URL is required")
     engine = create_database_engine(url)
     store = SqlAlchemyPersonalWorldStore(engine)
     store.create_schema()
