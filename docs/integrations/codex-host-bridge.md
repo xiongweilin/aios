@@ -8,14 +8,16 @@ are not AIOS's source of truth.
 
 ```text
 AIOS Linux containers -> authenticated JSON-RPC/WebSocket -> host.docker.internal:18786
-                                                          -> Windows Codex App Server
-                                                          -> LLM Gateway endpoint from Windows Codex configuration
+                                                          -> Codex Desktop bundled CLI App Server
+                                                          -> LLM Gateway Agent entry (4101)
 ```
 
 The LLM Gateway provides model API routing for the Windows Codex process. It is
-not a CLI execution endpoint. Its configured model API endpoint is read by the
-Windows Codex process; the AIOS container reaches the App Server for execution
-and does not depend on the Gateway to own AIOS work state.
+not a CLI execution endpoint. The host start script reads the Gateway's
+`config/gateway.json` and applies the Agent entry URL as a process-local Codex
+override; it does not change the Desktop user's Codex configuration. The AIOS
+container reaches the App Server for execution and does not depend on the
+Gateway to own AIOS work state.
 
 ## Start and stop
 
@@ -27,8 +29,10 @@ docker compose --env-file .env.example up -d --build
 
 The script creates a dedicated transport capability token and read-only host
 path maps under the ignored `.aios-data/codex-bridge` directory, then starts
-the installed Codex CLI bound to Windows loopback only. It never prints or
-copies the Codex login credential. Docker Desktop reaches the listener through
+the Codex Desktop bundled `codex.exe` bound to Windows loopback only. The
+script reads `D:\agent\llm-gateway\config\gateway.json` by default; pass
+`-GatewayConfigPath` when that authoritative config is elsewhere. It never
+prints or copies the Codex login credential. Docker Desktop reaches the listener through
 `host.docker.internal`; no LAN listener or firewall rule is created.
 The Operator HMAC key is separately generated and persisted under the ignored
 `.aios-data/secrets` directory. Prometheus runs as a Compose-managed service;

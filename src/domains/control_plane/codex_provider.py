@@ -57,7 +57,7 @@ CODEX_SANDBOX_BY_CAPABILITY: Final[Mapping[str, SandboxProfile]] = MappingProxyT
 def _resolve_cli(explicit: str | Path | None) -> Path:
     if explicit:
         return Path(explicit)
-    found = shutil.which("codex.cmd") or shutil.which("codex")
+    found = shutil.which("codex")
     return Path(found) if found else Path("codex")
 
 
@@ -68,7 +68,7 @@ class CodexProvider:
         self,
         *,
         provider_id: str = "codex-primary",
-        model: str = "gpt-5.6-luna",
+        model: str = "gpt-6-luna",
         cli: str | Path | None = None,
         gateway_base_url: str | None = None,
         execution_boundary: ExecutionBoundary | None = None,

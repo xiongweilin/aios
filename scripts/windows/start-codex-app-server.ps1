@@ -3,6 +3,7 @@
 param(
     [ValidateRange(1024, 65535)]
     [int]$Port = 18786,
+    [string]$GatewayConfigPath = 'D:\agent\llm-gateway\config\gateway.json',
     [string]$WorkspaceRoot = '',
     [string]$AutodevStateRoot = '',
     [string]$ControlPlaneStateRoot = ''
@@ -12,6 +13,25 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$resolvedGatewayConfigPath = (Resolve-Path -LiteralPath $GatewayConfigPath -ErrorAction Stop).Path
+$gatewayConfig = Get-Content -LiteralPath $resolvedGatewayConfigPath -Raw | ConvertFrom-Json
+$gatewayHost = [string]$gatewayConfig.listen_host
+$gatewayAgentPort = [int]$gatewayConfig.ports.agent
+if ([string]::IsNullOrWhiteSpace($gatewayHost) -or $gatewayAgentPort -lt 1) {
+    throw "Gateway Agent endpoint is missing from $resolvedGatewayConfigPath"
+}
+$gatewayAgentBaseUrl = "http://${gatewayHost}:$gatewayAgentPort/v1"
+$desktopCliBinRoot = Join-Path $env:LOCALAPPDATA 'OpenAI\Codex\bin'
+$desktopCli = @(Get-ChildItem -LiteralPath $desktopCliBinRoot -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object { Join-Path $_.FullName 'codex.exe' } |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    ForEach-Object { Get-Item -LiteralPath $_ } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1)
+if ($desktopCli.Count -eq 0) {
+    throw "Codex Desktop bundled CLI was not found under $desktopCliBinRoot"
+}
+$codex = $desktopCli[0]
 $bridgeRoot = Join-Path $repositoryRoot '.aios-data\codex-bridge'
 $tokenPath = Join-Path $bridgeRoot 'ws-token'
 $pidPath = Join-Path $bridgeRoot 'app-server.pid'
@@ -72,8 +92,13 @@ if ($listeners.Count -gt 0) {
         [void][int]::TryParse((Get-Content -LiteralPath $pidPath -Raw).Trim(), [ref]$recordedPid)
     }
     if ($ownerIds.Count -eq 1 -and $ownerIds[0] -eq $recordedPid -and (Test-Ready)) {
-        Write-Output "Codex App Server already ready on loopback port $Port (pid=$recordedPid)."
-        exit 0
+        $recordedProcess = Get-Process -Id $recordedPid -ErrorAction SilentlyContinue
+        if ($null -ne $recordedProcess -and
+            [string]::Equals($recordedProcess.Path, $codex.FullName, [StringComparison]::OrdinalIgnoreCase)) {
+            Write-Output "Codex Desktop App Server already ready on loopback port $Port (pid=$recordedPid)."
+            exit 0
+        }
+        throw 'Recorded App Server is not using the Codex Desktop bundled CLI; stop it before switching executables.'
     }
     throw "Port $Port is already owned by an unverified process; no process was changed."
 }
@@ -96,19 +121,10 @@ if (-not (Test-Path -LiteralPath $tokenPath -PathType Leaf)) {
     }
 }
 
-$codex = Get-Command codex.cmd -CommandType Application -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if ($null -eq $codex) {
-    $codex = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-}
-if ($null -eq $codex) {
-    throw 'Codex CLI executable was not found on PATH.'
-}
-
 $startParameters = @{
-    FilePath = $codex.Source
+    FilePath = $codex.FullName
     ArgumentList = @(
+        '--config', "openai_base_url=$gatewayAgentBaseUrl",
         'app-server',
         '--listen', "ws://127.0.0.1:$Port",
         '--ws-auth', 'capability-token',
@@ -133,7 +149,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
         $ownerId = $owners[0]
         if (Test-Ready) {
             [IO.File]::WriteAllText($pidPath, [string]$ownerId, [Text.UTF8Encoding]::new($false))
-            Write-Output "Codex App Server ready on loopback port $Port (pid=$ownerId)."
+            Write-Output "Codex Desktop App Server ready on loopback port $Port (pid=$ownerId)."
             Write-Output 'Docker clients use host.docker.internal; the transport token remains in ignored local state.'
             exit 0
         }

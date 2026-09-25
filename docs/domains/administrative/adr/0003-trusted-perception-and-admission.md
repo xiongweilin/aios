@@ -141,7 +141,7 @@ effect.
 
 All source content is untrusted data, including prompt-injection text. The
 Model Gateway port is inference-only and must be configured explicitly; a
-development LiteLLM endpoint is not the public Administrative semantic
+development model-routing endpoint is not the public Administrative semantic
 contract and production configuration must not hard-code `127.0.0.1` or one
 provider.
 

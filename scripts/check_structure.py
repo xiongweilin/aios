@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 RETIRED_PROJECT_ROOTS = {
@@ -25,10 +26,35 @@ SINGLETON_FILES = {
     "Dockerfile",
     "compose.yaml",
 }
+ALLOWED_CONFIG_FILES = {"config/prometheus/prometheus.yml"}
+HOST_INTEGRATION_ENTRYPOINTS = {
+    "scripts/windows/prepare-autodev-operator-secret.ps1",
+    "scripts/windows/start-codex-app-server.ps1",
+    "scripts/windows/stop-codex-app-server.ps1",
+}
 
 
 def main() -> int:
     errors: list[str] = []
+    tracked_and_unignored = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+    repository_files = [
+        ROOT / relative.decode("utf-8")
+        for relative in tracked_and_unignored.split(b"\0")
+        if relative
+    ]
 
     for name in sorted(RETIRED_PROJECT_ROOTS):
         if (ROOT / name).exists():
@@ -38,15 +64,24 @@ def main() -> int:
         if not (ROOT / name).is_dir():
             errors.append(f"required unified root missing: {name}")
 
-    if (ROOT / "config").exists():
-        errors.append("component-local config root is forbidden; use root .env/.env.example")
+    config_files = {
+        path.relative_to(ROOT).as_posix()
+        for path in repository_files
+        if path.relative_to(ROOT).parts[0] == "config"
+    }
+    unexpected_config_files = config_files - ALLOWED_CONFIG_FILES
+    if unexpected_config_files:
+        errors.append(
+            "component-local config root is forbidden; use root .env/.env.example: "
+            + ", ".join(sorted(unexpected_config_files))
+        )
 
     for name in sorted(SINGLETON_FILES):
         if not (ROOT / name).is_file():
             errors.append(f"root-owned file missing: {name}")
 
     nested_singletons = []
-    for path in ROOT.rglob("*"):
+    for path in repository_files:
         if not path.is_file():
             continue
         relative = path.relative_to(ROOT)
@@ -184,7 +219,7 @@ def main() -> int:
         "src/autonomous_development/",
     }
     text_suffixes = {".py", ".md", ".toml", ".yaml", ".yml", ".json", ".txt"}
-    for path in ROOT.rglob("*"):
+    for path in repository_files:
         if not path.is_file() or path.suffix.lower() not in text_suffixes:
             continue
         if path == ROOT / "scripts" / "check_structure.py":
@@ -209,14 +244,16 @@ def main() -> int:
             )
 
     forbidden_runtime_paths = []
-    for path in ROOT.rglob("*"):
+    for path in repository_files:
         if not path.is_file():
             continue
         relative = path.relative_to(ROOT)
         if relative.parts[0] not in {"deploy", "scripts"}:
             continue
         if path.suffix.lower() in {".ps1", ".bat", ".cmd", ".service", ".timer"}:
-            forbidden_runtime_paths.append(relative.as_posix())
+            relative_path = relative.as_posix()
+            if relative_path not in HOST_INTEGRATION_ENTRYPOINTS:
+                forbidden_runtime_paths.append(relative_path)
     if forbidden_runtime_paths:
         errors.append(
             "native runtime/deployment entrypoints are forbidden: "

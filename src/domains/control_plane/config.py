@@ -30,7 +30,7 @@ def _env_text(name: str, fallback: object = "") -> str:
 def _resolve_codex_cli(explicit: str = "") -> Path | None:
     if explicit.strip():
         return Path(explicit).expanduser()
-    found = shutil.which("codex.cmd") or shutil.which("codex")
+    found = shutil.which("codex")
     return Path(found) if found else None
 
 
@@ -96,8 +96,8 @@ class ControlPlaneConfig:
     artifact_root: Path | None = None
     agent_session_dir: Path | None = None
 
-    diagnosis_model: str = "gpt-5.6-luna"
-    execution_model: str = "gpt-5.6-luna"
+    diagnosis_model: str = "gpt-6-luna"
+    execution_model: str = "gpt-6-luna"
     codex_cli: Path | None = None
     gateway_base_url: str = ""
     codex_app_server_url: str = ""

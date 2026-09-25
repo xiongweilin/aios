@@ -11,7 +11,7 @@ provenance, revisions, freshness, privacy classification, and context projection
 It deliberately does **not** own Decisions, Authorizations, Mandates, Responsibilities, Work/Runs,
 Effects, Outcomes, provider execution, domain lifecycles, agent routing, model routing, credentials,
 or model-private memory. Those belong to World Runtime, Domain Controllers, agent-router,
-LiteLLM/model infrastructure, secret stores, or ephemeral cognitive execution.
+provider/model-routing infrastructure, secret stores, or ephemeral cognitive execution.
 
 The central non-substitution rules are:
 

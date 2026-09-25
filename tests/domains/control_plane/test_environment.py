@@ -14,7 +14,7 @@ from control_plane.environment import EnvironmentInspectionProvider, evaluate_en
 def make_config(tmp_path: Path) -> ControlPlaneConfig:
     return ControlPlaneConfig(
         api_key="test-key",
-        codex_cli=tmp_path / "codex.cmd",
+        codex_cli=tmp_path / "codex",
         remote_sha_cache_path=(tmp_path / "remote-sha-cache.json").resolve(),
         docker_build_cache_max_bytes=1024,
         docker_expected_exited_containers=("sample-migration-1",),

@@ -78,8 +78,8 @@ async def test_manual_task_closes_only_after_work_and_revision(tmp_path: Path) -
             controller=harness.controller,
             bridge=harness.bridge,
             prompt="summarize the bounded issue",
-            diagnosis_model="gpt-5.6-luna",
-            execution_model="gpt-5.6-luna",
+            diagnosis_model="gpt-6-luna",
+            execution_model="gpt-6-luna",
         )
 
         final_state = await drive_policy(harness.controller, state.id, policy)

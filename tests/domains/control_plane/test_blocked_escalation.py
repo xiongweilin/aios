@@ -53,8 +53,8 @@ async def test_failed_diagnosis_waits_without_closure_or_work(tmp_path: Path) ->
             controller=harness.controller,
             bridge=harness.bridge,
             prompt="fix it",
-            diagnosis_model="gpt-5.6-luna",
-            execution_model="gpt-5.6-luna",
+            diagnosis_model="gpt-6-luna",
+            execution_model="gpt-6-luna",
             repo=str(tmp_path),
         )
 
