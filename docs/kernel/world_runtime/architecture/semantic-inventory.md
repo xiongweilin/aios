@@ -30,16 +30,12 @@ Rules:
 2. Projection state is derived state and does not become a second semantic authority.
 3. Runtime may preserve lineage for a Domain Outcome reference, but it does not manufacture or
    reinterpret the domain Outcome.
-4. Historical predecessor aliases are not retained after cutover unless an active consumer requires
-   them.
+Additional ownership rules:
 
-
-Additional 1.0 ownership rules:
-
-5. Runtime owns the generic Responsibility topology, not domain process graphs.
-6. StrategicOption evaluation is data/evidence, not Decision authority; Runtime
+4. Runtime owns the generic Responsibility topology, not domain process graphs.
+5. StrategicOption evaluation is data/evidence, not Decision authority; Runtime
    does not own a universal utility function.
-7. Qualification dependencies describe the basis for current use. A dependency
+6. Qualification dependencies describe the basis for current use. A dependency
    change creates review work rather than rewriting the historical subject.
 8. Personal facts, UI projections, model-routing policy, and reusable cognitive
    procedures remain outside the Runtime.
