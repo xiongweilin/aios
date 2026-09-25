@@ -53,6 +53,7 @@ def test_ensure_creates_then_reconciles_loopback_runtime(tmp_path: Path) -> None
     provider = DockerDeploymentProvider(
         runner,
         LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        command_cwd=tmp_path.resolve(),
     )
     runtime = provider.ensure(_spec())
     assert runtime.container_id == "container-id"
