@@ -22,10 +22,14 @@ class DockerDeploymentProvider(DeploymentProvider):
         runner: ProcessRunner,
         evidence: EvidenceStore,
         *,
+        command_cwd: Path,
         timeout_seconds: int = 120,
     ) -> None:
+        if not command_cwd.is_absolute():
+            raise ValueError("command_cwd must be absolute")
         self._runner = runner
         self._evidence = evidence
+        self._command_cwd = command_cwd.resolve()
         self._timeout_seconds = timeout_seconds
 
     def ensure(self, spec: DeploymentSpec) -> DeploymentRuntime:
@@ -54,7 +58,7 @@ class DockerDeploymentProvider(DeploymentProvider):
                     f"127.0.0.1::{spec.container_port}",
                     spec.image_digest,
                 ),
-                cwd=_cwd(),
+                cwd=self._command_cwd,
                 timeout_seconds=self._timeout_seconds,
             )
         )
@@ -86,7 +90,7 @@ class DockerDeploymentProvider(DeploymentProvider):
         result = self._runner.run(
             CommandRequest(
                 command=("docker", "rm", "--force", name),
-                cwd=_cwd(),
+                cwd=self._command_cwd,
                 timeout_seconds=self._timeout_seconds,
             )
         )
@@ -110,7 +114,7 @@ class DockerDeploymentProvider(DeploymentProvider):
                     '{{index .Config.Labels "autodev.target"}}',
                     name,
                 ),
-                cwd=_cwd(),
+                cwd=self._command_cwd,
                 timeout_seconds=self._timeout_seconds,
             )
         )
@@ -136,7 +140,7 @@ class DockerDeploymentProvider(DeploymentProvider):
         port = self._runner.run(
             CommandRequest(
                 command=("docker", "port", name, f"{spec.container_port}/tcp"),
-                cwd=_cwd(),
+                cwd=self._command_cwd,
                 timeout_seconds=self._timeout_seconds,
             )
         )
@@ -172,9 +176,6 @@ def _container_name(deployment_id: str) -> str:
         raise ValueError("deployment_id contains characters unsafe for Docker identity")
     return f"autodev-{deployment_id}"
 
-
-def _cwd() -> Path:
-    return Path.cwd().resolve()
 
 
 def _digest(value: str) -> str:
