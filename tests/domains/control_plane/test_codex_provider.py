@@ -171,7 +171,10 @@ async def test_invoke_survives_transcript_persistence_failure(
         return process
 
     monkeypatch.setattr(codex_provider.asyncio, "create_subprocess_exec", start)
-    result = await provider.invoke(_request(), _context())
+    result = await provider.invoke(
+        _request(parameters={"repo": str(tmp_path.resolve())}),
+        _context(),
+    )
 
     assert result.status == "succeeded"
 
@@ -187,7 +190,10 @@ async def test_invoke_timeout_kills_the_process(
         return process
 
     monkeypatch.setattr(codex_provider.asyncio, "create_subprocess_exec", start)
-    result = await CodexProvider(cli=tmp_path / "codex").invoke(_request(), _context())
+    result = await CodexProvider(cli=tmp_path / "codex").invoke(
+        _request(parameters={"repo": str(tmp_path.resolve())}),
+        _context(),
+    )
 
     assert result.status == "failed"
     assert result.error == {"type": "timeout", "message": "codex session timed out"}
@@ -203,7 +209,10 @@ async def test_invoke_reports_process_start_failure(
         raise OSError("spawn failed")
 
     monkeypatch.setattr(codex_provider.asyncio, "create_subprocess_exec", start)
-    result = await CodexProvider(cli=tmp_path / "codex").invoke(_request(), _context())
+    result = await CodexProvider(cli=tmp_path / "codex").invoke(
+        _request(parameters={"repo": str(tmp_path.resolve())}),
+        _context(),
+    )
 
     assert result.status == "failed"
     assert result.error == {"type": "process_start", "message": "spawn failed"}
@@ -218,7 +227,10 @@ async def test_invoke_reports_nonzero_exit(monkeypatch: pytest.MonkeyPatch, tmp_
         return process
 
     monkeypatch.setattr(codex_provider.asyncio, "create_subprocess_exec", start)
-    result = await CodexProvider(cli=tmp_path / "codex").invoke(_request(), _context())
+    result = await CodexProvider(cli=tmp_path / "codex").invoke(
+        _request(parameters={"repo": str(tmp_path.resolve())}),
+        _context(),
+    )
 
     assert result.status == "failed"
     assert result.error == {"type": "codex_exit", "exit_code": 3}
