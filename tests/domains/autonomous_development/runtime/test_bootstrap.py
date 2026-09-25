@@ -24,6 +24,8 @@ from autonomous_development.runtime import bootstrap
 from autonomous_development.runtime.bootstrap import bootstrap_runtime
 from autonomous_development.runtime.config import RuntimeSettings
 
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
 
 class FakeDeploymentProvider:
     def __init__(self, *args: object, **kwargs: object) -> None:
@@ -152,6 +154,10 @@ def _settings(tmp_path: Path) -> RuntimeSettings:
             f"sqlite:///{tmp_path / 'dbos.sqlite3'}"
         ),
         state_root=(tmp_path / "state").resolve(),
+        workspace_root=(tmp_path / "workspace").resolve(),
+        alembic_script_location=(
+            _REPO_ROOT / "migrations/domains/autonomous_development/alembic"
+        ).resolve(),
         telemetry_queries={"requests": "up"},
     )
 
