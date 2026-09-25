@@ -149,7 +149,7 @@ tests/domains/administrative/           domain tests
 scripts/domains/administrative/         operational helpers
 docs/domains/administrative/            domain documentation
 migrations/domains/administrative/      database migrations
-config/domains/administrative/          runtime examples
+.env.example                            runtime configuration inventory
 ```
 
 ## Stable identifiers
