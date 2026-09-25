@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aios"
+version = "0.1.0"
+description = "Headless container-native AI operating system runtime"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = { text = "MIT" }
+authors = [{ name = "Xiongwei Lin" }]
+dependencies = [
+  "alembic>=1.14,<2",
+  "dbos>=2.31,<3",
+  "fastapi>=0.116,<1",
+  "httpx>=0.28,<1",
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2",
+  "opentelemetry-instrumentation-fastapi>=0.51b0,<1",
+  "opentelemetry-instrumentation-httpx>=0.51b0,<1",
+  "opentelemetry-sdk>=1.30,<2",
+  "prometheus-client>=0.21,<1",
+  "psycopg[binary]>=3.2,<3.3.6",
+  "pydantic>=2.9,<3",
+  "pydantic-settings>=2.5,<3",
+  "PyJWT[crypto]>=2.9,<3",
+  "pypdf>=5,<7",
+  "sqlalchemy>=2.0.35,<3",
+  "structlog>=24.4,<26",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "hypothesis>=6.140,<7",
+  "import-linter>=2.1,<3",
+  "jsonschema>=4.23,<5",
+  "mypy>=1.13,<2",
+  "pytest>=9,<10",
+  "pytest-asyncio>=1,<2",
+  "pytest-cov>=6,<8",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+personal-world = "personal_world.api.app:run"
+world-runtime = "aios.runtime:run_world_runtime"
+control-plane = "control_plane.__main__:main"
+autonomous-development = "autonomous_development.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "src/aios",
+  "src/semantic_language",
+  "src/personal_world",
+  "src/world_runtime",
+  "src/control_plane",
+  "src/administrative_orchestrator",
+  "src/autonomous_development",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --import-mode=importlib"
+asyncio_mode = "auto"
+markers = [
+  "postgres: requires PostgreSQL",
+  "integration: requires external services",
+]
+pythonpath = [
+  "src",
+  "tests/semantic",
+  "tests/kernel/personal_world",
+  "tests/kernel/world_runtime",
+  "tests/domains/control_plane",
+  "tests/domains/administrative",
+  "tests/domains/autonomous_development",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/administrative_orchestrator/integrations/odoo_effects.py" = ["SIM114"]
+
+[tool.importlinter]
+root_packages = ["autonomous_development"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "autonomous-development domain is infrastructure-free"
+type = "forbidden"
+source_modules = ["autonomous_development.domain"]
+forbidden_modules = [
+  "autonomous_development.application",
+  "autonomous_development.ports",
+  "autonomous_development.adapters",
+  "autonomous_development.workflows",
+  "autonomous_development.api",
+  "autonomous_development.cli",
+  "autonomous_development.runtime",
+]
+
+[[tool.importlinter.contracts]]
+name = "autonomous-development ports do not depend on implementations"
+type = "forbidden"
+source_modules = ["autonomous_development.ports"]
+forbidden_modules = [
+  "autonomous_development.application",
+  "autonomous_development.adapters",
+  "autonomous_development.workflows",
+  "autonomous_development.api",
+  "autonomous_development.cli",
+  "autonomous_development.runtime",
+]

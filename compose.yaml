@@ -1,0 +1,95 @@
+name: aios
+
+x-aios-service: &aios-service
+  build: .
+  image: aios:local
+  restart: unless-stopped
+
+services:
+  personal-world:
+    <<: *aios-service
+    command: ["personal-world"]
+    environment:
+      PERSONAL_WORLD_HOST: 0.0.0.0
+      PERSONAL_WORLD_PORT: "8080"
+      PERSONAL_WORLD_DATABASE_URL: sqlite:////var/lib/aios/personal-world.db
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - personal-world-data:/var/lib/aios
+
+  world-runtime:
+    <<: *aios-service
+    command: ["world-runtime"]
+    environment:
+      WORLD_RUNTIME_HOST: 0.0.0.0
+      WORLD_RUNTIME_PORT: "8086"
+      WORLD_RUNTIME_SQLITE_PATH: /var/lib/aios/world-runtime.db
+      WORLD_RUNTIME_ROOT_PRINCIPAL: ${WORLD_RUNTIME_ROOT_PRINCIPAL:-human:owner}
+    ports:
+      - "127.0.0.1:18086:8086"
+    volumes:
+      - world-runtime-data:/var/lib/aios
+
+  control-plane:
+    <<: *aios-service
+    profiles: ["domains"]
+    command: ["control-plane", "--host", "0.0.0.0", "--port", "18083"]
+    environment:
+      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:?set CONTROL_PLANE_API_KEY}
+      CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN: ${CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN:-}
+      CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID: ${CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID:-}
+    ports:
+      - "127.0.0.1:18083:18083"
+    volumes:
+      - control-plane-data:/app/data
+    depends_on:
+      - world-runtime
+
+  administrative-api:
+    <<: *aios-service
+    profiles: ["domains"]
+    command: ["python", "-m", "uvicorn", "administrative_orchestrator.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      ADMIN_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
+      ADMIN_AUTH_MODE: development
+      ADMIN_WORLD_RUNTIME_MODE: disabled
+    ports:
+      - "127.0.0.1:18100:8000"
+    volumes:
+      - administrative-data:/var/lib/aios
+
+  administrative-worker:
+    <<: *aios-service
+    profiles: ["domains"]
+    command: ["python", "-m", "administrative_orchestrator.worker"]
+    environment:
+      ADMIN_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
+      ADMIN_WORKER_DATABASE_URL: sqlite+pysqlite:////var/lib/aios/administrative.db
+      ADMIN_WORLD_RUNTIME_MODE: disabled
+    volumes:
+      - administrative-data:/var/lib/aios
+
+  autonomous-development:
+    <<: *aios-service
+    profiles: ["domains"]
+    command: ["autonomous-development", "serve"]
+    environment:
+      AUTODEV_DATABASE_URL: ${AUTODEV_DATABASE_URL:-postgresql+psycopg://aios:aios@host.docker.internal:5432/autodev}
+      AUTODEV_DBOS_SYSTEM_DATABASE_URL: ${AUTODEV_DBOS_SYSTEM_DATABASE_URL:-postgresql+psycopg://aios:aios@host.docker.internal:5432/autodev_dbos}
+      AUTODEV_STATE_ROOT: /var/lib/aios
+      AUTODEV_API_HOST: 0.0.0.0
+      AUTODEV_API_PORT: "8765"
+      AUTODEV_WORLD_RUNTIME_MODE: disabled
+      AUTODEV_PERSONAL_WORLD_MODE: disabled
+    ports:
+      - "127.0.0.1:18110:8765"
+    volumes:
+      - autonomous-development-data:/var/lib/aios
+
+volumes:
+  personal-world-data:
+  world-runtime-data:
+  control-plane-data:
+  administrative-data:
+  autonomous-development-data:

@@ -1,31 +1,72 @@
 # AIOS
 
-[![SonarCloud Analysis](https://github.com/xiongweilin/aios/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/xiongweilin/aios/actions/workflows/sonarcloud.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=metratio_aios)
-[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=bugs)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=metratio_aios&metric=code_smells)](https://sonarcloud.io/dashboard?id=metratio_aios&branch=main)
+AIOS is one headless, container-native system.
 
-AIOS is the current monorepo for these consolidated source components:
+```text
+semantic
+  semantic_language
 
-| Component | Directory |
-| --- | --- |
-| Personal World | [`personal-world/`](personal-world/) |
-| World Runtime | [`world-runtime/`](world-runtime/) |
-| Semantic Language | [`semantic-language/`](semantic-language/) |
-| Control Plane | [`control-plane/`](control-plane/) |
-| Autonomous Development | [`autonomous-development/`](autonomous-development/) |
-| Administrative Orchestrator | [`administrative-orchestrator/`](administrative-orchestrator/) |
+kernel
+  personal_world
+  world_runtime
 
-These six components are sourced and analyzed within this monorepo.
+domains
+  control_plane
+  administrative_orchestrator
+  autonomous_development
+```
 
-Each component directory retains its own README and implementation documentation. The root repository is the Git owner for the consolidated source.
+The names above are internal semantic owners, not separate products or repositories.
 
-## Repository status
+## Repository layout
 
-No Windows installer or release workflow is currently provided.
-The monorepo contains component source and backend APIs; it does not ship a user interface.
+```text
+src/
+  aios/                         product composition
+  semantic_language/            cross-domain semantics
+  personal_world/               kernel: personal continuity
+  world_runtime/                kernel: agency continuity
+  control_plane/                domain: operations
+  administrative_orchestrator/  domain: administration
+  autonomous_development/       domain: software development
 
-## SonarCloud
+tests/
+  semantic/
+  kernel/
+  domains/
+  acceptance/
 
-The root [`sonar-project.properties`](sonar-project.properties) analyzes the six component `src/` and `tests/` trees as project `metratio_aios`. Analysis runs on pushes to `main` and pull requests.
+docs/
+  semantic/
+  kernel/
+  domains/
+
+contracts/
+migrations/
+config/
+scripts/
+deploy/
+```
+
+There is one Python project, one dependency graph, one source root and one test root.
+
+## Runtime
+
+AIOS has no UI. Services expose API/CLI boundaries and run as containers.
+
+```bash
+docker compose up -d personal-world world-runtime
+docker compose --profile domains up -d
+```
+
+Agent implementations, LLM providers, Prometheus and other external systems are integrations, not semantic owners.
+
+## Development
+
+```bash
+python -m pip install -e '.[dev]'
+pytest
+ruff check src tests
+```
+
+Component-specific semantics and contracts live under the corresponding `docs/` and `contracts/` paths.

@@ -1,0 +1,19 @@
+[server]
+host = "0.0.0.0"
+port = 18083
+
+[runtime]
+base_url = "http://world-runtime:8086"
+state_db = "/var/lib/aios/control-plane.db"
+artifact_root = "/var/lib/aios/artifacts"
+
+[model]
+gateway_base_url = "http://host.docker.internal:4101/v1"
+session_dir = "/var/lib/aios/agent-sessions"
+
+[monitoring]
+prometheus_url = "http://host.docker.internal:19090"
+notification_enabled = false
+
+[environment]
+enabled = false
