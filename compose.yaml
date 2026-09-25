@@ -43,6 +43,7 @@ services:
       - "127.0.0.1:18083:18083"
     volumes:
       - control-plane-data:/app/data
+      - ./config/domains/control_plane.container.toml:/app/control_plane.toml:ro
     depends_on:
       - world-runtime
 
