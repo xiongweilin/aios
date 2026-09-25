@@ -95,11 +95,50 @@ def main() -> int:
         if not (ROOT / "docs" / group).is_dir():
             errors.append(f"documentation ownership group missing: docs/{group}")
 
+    compose_text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+    required_services = {
+        "postgres",
+        "personal-world",
+        "world-runtime",
+        "control-plane",
+        "administrative-api",
+        "administrative-worker",
+        "autonomous-development",
+    }
+    missing_services = {
+        service
+        for service in required_services
+        if f"  {service}:\n" not in compose_text
+    }
+    if missing_services:
+        errors.append(
+            "container runtime service missing: " + ", ".join(sorted(missing_services))
+        )
+    if "host.docker.internal" in compose_text:
+        errors.append("host-local runtime dependency is forbidden in compose.yaml")
+    if "profiles:" in compose_text:
+        errors.append("AIOS runtime services must not depend on optional Compose profiles")
+
+    forbidden_runtime_paths = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(ROOT)
+        if relative.parts[0] not in {"deploy", "scripts"}:
+            continue
+        if path.suffix.lower() in {".ps1", ".bat", ".cmd", ".service", ".timer"}:
+            forbidden_runtime_paths.append(relative.as_posix())
+    if forbidden_runtime_paths:
+        errors.append(
+            "native runtime/deployment entrypoints are forbidden: "
+            + ", ".join(sorted(forbidden_runtime_paths))
+        )
+
     if errors:
         print("\n".join(errors))
         return 1
 
-    print("AIOS structure OK: one project root, one source tree, one test tree")
+    print("AIOS structure OK: one project root, one source tree, one test tree, container-only runtime")
     return 0
 
 
