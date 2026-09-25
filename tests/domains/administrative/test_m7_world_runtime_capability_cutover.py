@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import scripts.production_world_runtime_stack as stack
+import scripts.domains.administrative.production_world_runtime_stack as stack
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.integrations.runtime_capabilities import (
     WORLD_RUNTIME_EFFECT_CAPABILITIES,
