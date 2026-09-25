@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "aios"
 version = "0.1.0"
-description = "Headless container-native AI operating system runtime"
+description = "Headless container-only AI operating system runtime"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = { text = "MIT" }
