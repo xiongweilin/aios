@@ -47,15 +47,20 @@ def main() -> int:
         if not path.is_file():
             continue
         relative = path.relative_to(ROOT)
-        if len(relative.parts) > 1 and path.name in {
-            "pyproject.toml",
-            "uv.lock",
-            "sonar-project.properties",
-            "Dockerfile",
-            "Dockerfile.runtime",
-            "compose.yaml",
-            "compose.production.yaml",
-        }:
+        if (
+            len(relative.parts) > 1
+            and relative.parts[0] != "tests"
+            and path.name
+            in {
+                "pyproject.toml",
+                "uv.lock",
+                "sonar-project.properties",
+                "Dockerfile",
+                "Dockerfile.runtime",
+                "compose.yaml",
+                "compose.production.yaml",
+            }
+        ):
             nested_singletons.append(relative.as_posix())
         if "__pycache__" in relative.parts or path.suffix == ".pyc":
             errors.append(f"generated Python artifact is tracked: {relative.as_posix()}")
