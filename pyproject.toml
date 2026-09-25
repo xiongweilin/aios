@@ -68,15 +68,7 @@ markers = [
   "postgres: requires PostgreSQL",
   "integration: requires external services",
 ]
-pythonpath = [
-  "src",
-  "tests/semantic",
-  "tests/kernel/personal_world",
-  "tests/kernel/world_runtime",
-  "tests/domains/control_plane",
-  "tests/domains/administrative",
-  "tests/domains/autonomous_development",
-]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py312"
