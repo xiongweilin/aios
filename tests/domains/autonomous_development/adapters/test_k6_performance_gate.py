@@ -58,11 +58,16 @@ def candidate(tmp_path: Path) -> CandidateRevision:
     )
 
 
-def _gate(tmp_path: Path, runner: FakeK6Runner) -> K6PerformanceGate:
+def _gate(
+    tmp_path: Path,
+    runner: FakeK6Runner,
+    *,
+    base_url: str = "http://127.0.0.1:49155",
+) -> K6PerformanceGate:
     return K6PerformanceGate(
         runner=runner,
         evidence=LocalEvidenceStore((tmp_path / "evidence").resolve()),
-        base_url="http://127.0.0.1:49155",
+        base_url=base_url,
         script_path="tests/performance/smoke.js",
         required_threshold_metrics=("http_req_failed", "http_req_duration"),
         timeout_seconds=30,
@@ -99,3 +104,15 @@ def test_k6_gate_rejects_non_loopback_target(tmp_path: Path) -> None:
             required_threshold_metrics=("http_req_failed",),
             timeout_seconds=30,
         )
+
+
+def test_k6_gate_accepts_local_autodev_container_target(tmp_path: Path) -> None:
+    runner = FakeK6Runner()
+    check = _gate(
+        tmp_path,
+        runner,
+        base_url="http://autodev-deploy-1:8000",
+    ).evaluate(candidate(tmp_path))
+
+    assert check.status is VerificationStatus.PASSED
+    assert runner.requests[0].environment["TARGET_URL"] == "http://autodev-deploy-1:8000"

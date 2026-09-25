@@ -30,6 +30,7 @@ def test_runtime_settings_derive_state_paths(tmp_path: Path) -> None:
 def test_runtime_settings_allow_container_network_services(tmp_path: Path) -> None:
     configured = settings(
         tmp_path,
+        docker_network="aios_default",
         canary_proxy_base_url="http://candidate-proxy:8766",
         prometheus_base_url="http://prometheus:9090",
         world_runtime_base_url="http://world-runtime:8086",
@@ -38,6 +39,7 @@ def test_runtime_settings_allow_container_network_services(tmp_path: Path) -> No
 
     assert configured.prometheus_base_url == "http://prometheus:9090"
     assert configured.world_runtime_base_url == "http://world-runtime:8086"
+    assert configured.docker_network == "aios_default"
 
 
 def test_runtime_settings_reject_incomplete_service_urls(tmp_path: Path) -> None:

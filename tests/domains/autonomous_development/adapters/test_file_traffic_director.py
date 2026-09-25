@@ -79,5 +79,31 @@ def test_non_loopback_routes_are_rejected(tmp_path: Path) -> None:
         candidate_weight_percent=10,
         operation_id="op-1",
     )
-    with pytest.raises(ValueError, match="loopback"):
+    with pytest.raises(ValueError, match="loopback or local Autodev"):
+        traffic.apply(invalid)
+
+
+def test_autodev_container_routes_are_accepted_but_other_services_are_not(
+    tmp_path: Path,
+) -> None:
+    traffic = director(tmp_path)
+    local = TrafficSplit(
+        experiment_id="experiment-1",
+        stage_index=0,
+        control_base_url="http://autodev-deployment-1:8000",
+        candidate_base_url="http://autodev-deployment-2:8000",
+        candidate_weight_percent=10,
+        operation_id="op-local-targets",
+    )
+    traffic.apply(local)
+
+    invalid = TrafficSplit(
+        experiment_id="experiment-2",
+        stage_index=0,
+        control_base_url="http://world-runtime:8086",
+        candidate_base_url="http://autodev-deployment-2:8000",
+        candidate_weight_percent=10,
+        operation_id="op-other-service",
+    )
+    with pytest.raises(ValueError, match="loopback or local Autodev"):
         traffic.apply(invalid)

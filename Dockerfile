@@ -11,7 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR $AIOS_APP_ROOT
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl docker.io git \
+    && apt-get install -y --no-install-recommends ca-certificates curl docker-cli git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md LICENSE ./

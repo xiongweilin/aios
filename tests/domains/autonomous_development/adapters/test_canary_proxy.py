@@ -50,6 +50,36 @@ def route(weight: int = 10, *, with_attribution: bool = False) -> TrafficRouteSn
 
 
 @pytest.mark.asyncio
+async def test_proxy_accepts_only_local_autodev_container_routes() -> None:
+    internal_route = TrafficRouteSnapshot(
+        experiment_id="experiment-1",
+        stage_index=0,
+        control_base_url="http://autodev-deployment-1:8000",
+        candidate_base_url="http://autodev-deployment-2:8000",
+        candidate_weight_percent=0,
+        operation_id="canary:experiment-1:stage:0",
+        generation=1,
+        evidence_ref="traffic:1",
+    )
+
+    async def upstream(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"ok", request=request)
+
+    app = create_canary_proxy(
+        FakeRouteReader(internal_route),
+        CanaryMetricsRegistry(),
+        upstream_transport=httpx.MockTransport(upstream),
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://proxy.local",
+    ) as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_proxy_routes_weighted_sessions_and_records_metrics() -> None:
     async def upstream(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"ok", request=request)

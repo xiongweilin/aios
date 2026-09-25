@@ -4,7 +4,6 @@ import hashlib
 import secrets
 import time
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, Request, Response
@@ -12,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from autonomous_development.domain.models import RequestAttribution
 from autonomous_development.ports.persistence import RequestAttributionRepository
+from autonomous_development.ports.deployment import is_local_deployment_url
 from autonomous_development.ports.traffic import TrafficRouteReader, TrafficRouteSnapshot
 
 from .metrics import Arm, CanaryMetricsRegistry
@@ -86,8 +86,10 @@ def create_canary_proxy(
         route = routes.read_current()
         if route is None:
             return JSONResponse(status_code=503, content={"detail": "no active traffic route"})
-        _require_loopback(route.control_base_url)
-        _require_loopback(route.candidate_base_url)
+        if not is_local_deployment_url(route.control_base_url):
+            return JSONResponse(status_code=503, content={"detail": "invalid control deployment URL"})
+        if not is_local_deployment_url(route.candidate_base_url):
+            return JSONResponse(status_code=503, content={"detail": "invalid candidate deployment URL"})
 
         session_id = _session_id(request)
         arm = selector.choose(route, session_id)
@@ -225,9 +227,3 @@ def _session_id(request: Request) -> str:
         if normalized and len(normalized) <= 128:
             return normalized
     return secrets.token_urlsafe(18)
-
-
-def _require_loopback(base_url: str) -> None:
-    parsed = urlsplit(base_url)
-    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError("V1 canary proxy only forwards to local HTTP loopback")

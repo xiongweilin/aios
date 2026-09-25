@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -9,9 +10,16 @@ from autonomous_development.ports.process import CommandRequest, CommandResult
 
 
 class FakeDockerRunner:
-    def __init__(self, *, existing: bool = False, wrong_image: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        existing: bool = False,
+        wrong_image: bool = False,
+        networks: dict[str, object] | None = None,
+    ) -> None:
         self.existing = existing
         self.wrong_image = wrong_image
+        self.networks = networks or {"aios_default": {}}
         self.created = existing
         self.requests: list[CommandRequest] = []
 
@@ -24,7 +32,7 @@ class FakeDockerRunner:
             image = "sha256:" + ("f" if self.wrong_image else "a") * 64
             return CommandResult(
                 0,
-                f"container-id|{image}|deploy-1|target-1\n",
+                f"container-id|{image}|deploy-1|target-1|{json.dumps(self.networks)}\n",
                 "",
             )
         if command[:2] == ("docker", "run"):
@@ -70,6 +78,38 @@ def test_repeated_ensure_reuses_matching_deployment(tmp_path: Path) -> None:
     )
     provider.ensure(_spec())
     assert not any(request.command[:2] == ("docker", "run") for request in runner.requests)
+
+
+def test_configured_network_is_used_for_container_to_container_readiness(
+    tmp_path: Path,
+) -> None:
+    runner = FakeDockerRunner()
+    provider = DockerDeploymentProvider(
+        runner,
+        LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        command_cwd=tmp_path.resolve(),
+        docker_network="aios_default",
+    )
+
+    runtime = provider.ensure(_spec())
+
+    run_request = next(
+        request for request in runner.requests if request.command[:2] == ("docker", "run")
+    )
+    assert run_request.command[run_request.command.index("--network") + 1] == "aios_default"
+    assert runtime.base_url == "http://autodev-deploy-1:8000"
+
+
+def test_existing_deployment_must_be_on_configured_network(tmp_path: Path) -> None:
+    provider = DockerDeploymentProvider(
+        FakeDockerRunner(existing=True, networks={"other-network": {}}),
+        LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        command_cwd=tmp_path.resolve(),
+        docker_network="aios_default",
+    )
+
+    with pytest.raises(DeploymentProviderError, match="configured Docker network"):
+        provider.ensure(_spec())
 
 
 def test_identity_conflict_fails_closed(tmp_path: Path) -> None:

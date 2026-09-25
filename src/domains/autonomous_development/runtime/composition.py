@@ -347,6 +347,7 @@ def compose_runtime(settings: RuntimeSettings) -> RuntimeComposition:
         runner,
         evidence_store,
         command_cwd=settings.workspace_root,
+        docker_network=settings.docker_network or None,
     )
     if world_runtime is not None:
         deployment_provider = RuntimeBoundDeploymentProvider(

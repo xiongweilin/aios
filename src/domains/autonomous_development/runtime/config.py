@@ -20,6 +20,7 @@ class RuntimeSettings(BaseSettings):
     dbos_system_database_url: SecretStr
     state_root: Path
     workspace_root: Path
+    docker_network: str | None = None
     alembic_script_location: Path | None = None
     operator_hmac_secret_file: Path | None = None
     operator_hmac_ttl_seconds: int = Field(default=300, ge=30, le=3600)

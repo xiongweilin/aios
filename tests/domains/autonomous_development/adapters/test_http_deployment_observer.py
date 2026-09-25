@@ -51,18 +51,52 @@ def test_observer_requires_independent_health_and_readiness(tmp_path: Path) -> N
     assert calls == 4
 
 
-def test_observer_rejects_non_loopback_runtime(tmp_path: Path) -> None:
+def test_observer_accepts_matching_autodev_container_endpoint(tmp_path: Path) -> None:
     observer = HttpDeploymentObserver(
         LocalEvidenceStore((tmp_path / "evidence").resolve()),
         transport=httpx.MockTransport(lambda request: httpx.Response(200, request=request)),
     )
-    with pytest.raises(ValueError, match="loopback"):
+    deployment = observer.wait_ready(
+        _spec(),
+        DeploymentRuntime(
+            deployment_id="deploy-1",
+            container_id="container-1",
+            base_url="http://autodev-deploy-1:8000",
+            evidence_ref="effect:1",
+        ),
+        health_path="/health",
+        readiness_path="/ready",
+        timeout_seconds=1,
+    )
+    assert deployment.state is DeploymentState.READY
+
+
+def test_observer_rejects_unrelated_host_and_deployment_identity(tmp_path: Path) -> None:
+    observer = HttpDeploymentObserver(
+        LocalEvidenceStore((tmp_path / "evidence").resolve()),
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, request=request)),
+    )
+    with pytest.raises(ValueError, match="local deployment endpoint"):
         observer.wait_ready(
             _spec(),
             DeploymentRuntime(
                 deployment_id="deploy-1",
                 container_id="container-1",
                 base_url="http://example.com",
+                evidence_ref="effect:1",
+            ),
+            health_path="/health",
+            readiness_path="/ready",
+            timeout_seconds=1,
+        )
+
+    with pytest.raises(ValueError, match="local deployment endpoint"):
+        observer.wait_ready(
+            _spec(),
+            DeploymentRuntime(
+                deployment_id="deploy-1",
+                container_id="container-1",
+                base_url="http://autodev-other:8000",
                 evidence_ref="effect:1",
             ),
             health_path="/health",

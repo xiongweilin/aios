@@ -81,5 +81,8 @@ Development.
 
 Autonomous Development runs only as the `autonomous-development` service in the root AIOS Compose
 topology. It receives a workspace through `/workspace` and uses the mounted Docker socket to build,
-inspect and manage sibling target containers. No native Autodev service or host Python process is a
-supported runtime path.
+inspect and manage sibling target containers. Target containers join `AUTODEV_DOCKER_NETWORK` so
+readiness, performance checks and product traffic use container DNS. Only deterministic
+`autodev-<deployment-id>` HTTP names and loopback URLs are accepted as local deployment targets;
+their separately published ports remain bound to host loopback. No native Autodev service or host
+Python process is a supported runtime path.

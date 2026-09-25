@@ -10,10 +10,10 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 from uuid import uuid4
 
 from autonomous_development.ports.evidence import EvidenceStore
+from autonomous_development.ports.deployment import is_local_deployment_url
 from autonomous_development.ports.traffic import (
     TrafficDirector,
     TrafficRouteSnapshot,
@@ -36,8 +36,8 @@ class AtomicFileTrafficDirector(TrafficDirector):
         (self._root / "operations").mkdir(parents=True, exist_ok=True)
 
     def apply(self, split: TrafficSplit) -> TrafficRouteState:
-        _require_loopback(split.control_base_url)
-        _require_loopback(split.candidate_base_url)
+        _require_deployment_target(split.control_base_url)
+        _require_deployment_target(split.candidate_base_url)
         with self._lock():
             receipt_path = self._receipt_path(split.operation_id)
             if receipt_path.exists():
@@ -221,10 +221,9 @@ def _safe_evidence_name(operation_id: str) -> str:
     return hashlib.sha256(operation_id.encode("utf-8")).hexdigest()
 
 
-def _require_loopback(base_url: str) -> None:
-    parsed = urlsplit(base_url)
-    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError("V1 traffic routing is restricted to local HTTP loopback")
+def _require_deployment_target(base_url: str) -> None:
+    if not is_local_deployment_url(base_url):
+        raise ValueError("V1 traffic routing is restricted to loopback or local Autodev deployments")
 
 
 

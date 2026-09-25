@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -23,13 +24,17 @@ class DockerDeploymentProvider(DeploymentProvider):
         evidence: EvidenceStore,
         *,
         command_cwd: Path,
+        docker_network: str | None = None,
         timeout_seconds: int = 120,
     ) -> None:
         if not command_cwd.is_absolute():
             raise ValueError("command_cwd must be absolute")
+        if docker_network is not None and not _SAFE_ID.fullmatch(docker_network):
+            raise ValueError("docker_network contains characters unsafe for Docker identity")
         self._runner = runner
         self._evidence = evidence
         self._command_cwd = command_cwd.resolve()
+        self._docker_network = docker_network
         self._timeout_seconds = timeout_seconds
 
     def ensure(self, spec: DeploymentSpec) -> DeploymentRuntime:
@@ -38,26 +43,33 @@ class DockerDeploymentProvider(DeploymentProvider):
         if existing is not None:
             return existing
 
+        command = [
+            "docker",
+            "run",
+            "--detach",
+            "--pull",
+            "never",
+            "--restart",
+            "no",
+            "--name",
+            name,
+            "--label",
+            f"autodev.deployment={spec.deployment_id}",
+            "--label",
+            f"autodev.target={spec.target_id}",
+        ]
+        if self._docker_network is not None:
+            command.extend(("--network", self._docker_network))
+        command.extend(
+            (
+                "--publish",
+                f"127.0.0.1::{spec.container_port}",
+                spec.image_digest,
+            )
+        )
         result = self._runner.run(
             CommandRequest(
-                command=(
-                    "docker",
-                    "run",
-                    "--detach",
-                    "--pull",
-                    "never",
-                    "--restart",
-                    "no",
-                    "--name",
-                    name,
-                    "--label",
-                    f"autodev.deployment={spec.deployment_id}",
-                    "--label",
-                    f"autodev.target={spec.target_id}",
-                    "--publish",
-                    f"127.0.0.1::{spec.container_port}",
-                    spec.image_digest,
-                ),
+                command=tuple(command),
                 cwd=self._command_cwd,
                 timeout_seconds=self._timeout_seconds,
             )
@@ -111,7 +123,7 @@ class DockerDeploymentProvider(DeploymentProvider):
                     "inspect",
                     "--format",
                     '{{.Id}}|{{.Image}}|{{index .Config.Labels "autodev.deployment"}}|'
-                    '{{index .Config.Labels "autodev.target"}}',
+                    '{{index .Config.Labels "autodev.target"}}|{{json .NetworkSettings.Networks}}',
                     name,
                 ),
                 cwd=self._command_cwd,
@@ -124,10 +136,14 @@ class DockerDeploymentProvider(DeploymentProvider):
                 return None
             raise DeploymentProviderError("Docker inspect failed while reconciling deployment")
 
-        fields = inspected.stdout.strip().split("|")
-        if len(fields) != 4:
+        fields = inspected.stdout.strip().split("|", 4)
+        if len(fields) != 5:
             raise DeploymentProviderError("Docker inspect returned an unexpected identity shape")
-        container_id, image_digest, deployment_id, target_id = fields
+        container_id, image_digest, deployment_id, target_id, raw_networks = fields
+        try:
+            networks = json.loads(raw_networks)
+        except json.JSONDecodeError as exc:
+            raise DeploymentProviderError("Docker inspect returned invalid network state") from exc
         if (
             image_digest != spec.image_digest
             or deployment_id != spec.deployment_id
@@ -135,6 +151,10 @@ class DockerDeploymentProvider(DeploymentProvider):
         ):
             raise DeploymentProviderError(
                 "existing deployment identity conflicts with requested artifact or target"
+            )
+        if self._docker_network is not None and self._docker_network not in networks:
+            raise DeploymentProviderError(
+                "existing deployment is not attached to the configured Docker network"
             )
 
         port = self._runner.run(
@@ -161,12 +181,17 @@ class DockerDeploymentProvider(DeploymentProvider):
                 "container_id": container_id,
                 "image_digest": image_digest,
                 "loopback_port": int(host_port),
+                "docker_network": self._docker_network,
             },
         )
         return DeploymentRuntime(
             deployment_id=spec.deployment_id,
             container_id=container_id,
-            base_url=f"http://127.0.0.1:{host_port}",
+            base_url=(
+                f"http://{name}:{spec.container_port}"
+                if self._docker_network is not None
+                else f"http://127.0.0.1:{host_port}"
+            ),
             evidence_ref=ref,
         )
 
