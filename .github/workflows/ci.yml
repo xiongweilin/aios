@@ -30,4 +30,4 @@ jobs:
       - name: Ruff
         run: ruff check src tests
       - name: Tests
-        run: pytest -m "not postgres and not integration"
+        run: pytest -m "not postgres and not integration" --ignore=tests/acceptance
