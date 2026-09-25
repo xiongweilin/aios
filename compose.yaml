@@ -1,85 +1,116 @@
 name: aios
 
 x-aios-service: &aios-service
-  build: .
+  build:
+    context: .
+    args:
+      AIOS_APP_ROOT: ${AIOS_CONTAINER_APP_ROOT:?set AIOS_CONTAINER_APP_ROOT}
   image: aios:local
   restart: unless-stopped
 
 x-administrative-environment: &administrative-environment
-  ADMIN_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative
-  ADMIN_WORKER_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative
-  ADMIN_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/administrative_dbos
-  ADMIN_RUNTIME_PROFILE: development
-  ADMIN_AUTH_MODE: development
-  ADMIN_WORLD_RUNTIME_MODE: disabled
-  ADMIN_AUTO_CREATE_SCHEMA: "false"
-  ADMIN_INTAKE_ARTIFACT_ROOT: /var/lib/aios/intake-artifacts
+  ADMIN_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER:?set AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD:?set AIOS_POSTGRES_PASSWORD}@postgres:5432/administrative
+  ADMIN_WORKER_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/administrative
+  ADMIN_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/administrative_dbos
+  ADMIN_ALEMBIC_SCRIPT_LOCATION: ${ADMIN_ALEMBIC_SCRIPT_LOCATION:?set ADMIN_ALEMBIC_SCRIPT_LOCATION}
+  ADMIN_RUNTIME_PROFILE: ${ADMIN_RUNTIME_PROFILE:-development}
+  ADMIN_AUTH_MODE: ${ADMIN_AUTH_MODE:-development}
+  ADMIN_WORLD_RUNTIME_MODE: ${ADMIN_WORLD_RUNTIME_MODE:-disabled}
+  ADMIN_AUTO_CREATE_SCHEMA: ${ADMIN_AUTO_CREATE_SCHEMA:-false}
+  ADMIN_INTAKE_ARTIFACT_ROOT: ${ADMIN_INTAKE_ARTIFACT_ROOT:?set ADMIN_INTAKE_ARTIFACT_ROOT}
   ADMIN_INTAKE_MODEL_URL: ${ADMIN_INTAKE_MODEL_URL:-}
   ADMIN_INTAKE_MODEL_API_KEY: ${ADMIN_INTAKE_MODEL_API_KEY:-}
   ADMIN_INTAKE_MODEL_NAME: ${ADMIN_INTAKE_MODEL_NAME:-}
 
 x-autodev-environment: &autodev-environment
-  AUTODEV_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/autodev
-  AUTODEV_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://aios:aios-internal@postgres:5432/autodev_dbos
-  AUTODEV_STATE_ROOT: /var/lib/aios
-  AUTODEV_API_HOST: 0.0.0.0
-  AUTODEV_API_PORT: "8765"
-  AUTODEV_WORLD_RUNTIME_MODE: disabled
-  AUTODEV_PERSONAL_WORLD_MODE: disabled
+  AUTODEV_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/autodev
+  AUTODEV_DBOS_SYSTEM_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/autodev_dbos
+  AUTODEV_ALEMBIC_SCRIPT_LOCATION: ${AUTODEV_ALEMBIC_SCRIPT_LOCATION:?set AUTODEV_ALEMBIC_SCRIPT_LOCATION}
+  AUTODEV_STATE_ROOT: ${AUTODEV_STATE_ROOT:?set AUTODEV_STATE_ROOT}
+  AUTODEV_API_HOST: ${AUTODEV_API_HOST:-0.0.0.0}
+  AUTODEV_API_PORT: ${AUTODEV_API_PORT:-8765}
+  AUTODEV_WORLD_RUNTIME_MODE: ${AUTODEV_WORLD_RUNTIME_MODE:-disabled}
+  AUTODEV_PERSONAL_WORLD_MODE: ${AUTODEV_PERSONAL_WORLD_MODE:-disabled}
 
 services:
   postgres:
     image: postgres:17-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_USER: aios
-      POSTGRES_PASSWORD: aios-internal
+      POSTGRES_USER: ${AIOS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIOS_POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
+      PGDATA: ${AIOS_CONTAINER_POSTGRES_DATA_ROOT:?set AIOS_CONTAINER_POSTGRES_DATA_ROOT}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aios -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 20
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./deploy/postgres/init-databases.sql:/docker-entrypoint-initdb.d/10-aios-databases.sql:ro
+      - ${AIOS_HOST_POSTGRES_DATA_ROOT:?set AIOS_HOST_POSTGRES_DATA_ROOT}:${AIOS_CONTAINER_POSTGRES_DATA_ROOT}
+
+  database-init:
+    <<: *aios-service
+    restart: "no"
+    command: ["aios-init-databases"]
+    environment:
+      AIOS_POSTGRES_ADMIN_DSN: postgresql://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/postgres
+      AIOS_POSTGRES_DATABASES: ${AIOS_POSTGRES_DATABASES:?set AIOS_POSTGRES_DATABASES}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   personal-world:
     <<: *aios-service
     command: ["personal-world"]
     environment:
-      PERSONAL_WORLD_HOST: 0.0.0.0
-      PERSONAL_WORLD_PORT: "8080"
-      PERSONAL_WORLD_DATABASE_URL: sqlite:////var/lib/aios/personal-world.db
+      PERSONAL_WORLD_HOST: ${PERSONAL_WORLD_HOST:-0.0.0.0}
+      PERSONAL_WORLD_PORT: ${PERSONAL_WORLD_PORT:-8080}
+      PERSONAL_WORLD_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/personal_world
     ports:
       - "127.0.0.1:18080:8080"
-    volumes:
-      - personal-world-data:/var/lib/aios
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
 
   world-runtime:
     <<: *aios-service
     command: ["world-runtime"]
     environment:
-      WORLD_RUNTIME_HOST: 0.0.0.0
-      WORLD_RUNTIME_PORT: "8086"
-      WORLD_RUNTIME_SQLITE_PATH: /var/lib/aios/world-runtime.db
+      WORLD_RUNTIME_HOST: ${WORLD_RUNTIME_HOST:-0.0.0.0}
+      WORLD_RUNTIME_PORT: ${WORLD_RUNTIME_PORT:-8086}
+      WORLD_RUNTIME_POSTGRES_DSN: postgresql://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/world_runtime
+      WORLD_RUNTIME_POSTGRES_SCHEMA: ${WORLD_RUNTIME_POSTGRES_SCHEMA:-public}
       WORLD_RUNTIME_ROOT_PRINCIPAL: ${WORLD_RUNTIME_ROOT_PRINCIPAL:-human:owner}
     ports:
       - "127.0.0.1:18086:8086"
-    volumes:
-      - world-runtime-data:/var/lib/aios
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
 
   control-plane:
     <<: *aios-service
-    command: ["control-plane", "--config", "/app/config/domains/control_plane.container.toml", "--host", "0.0.0.0", "--port", "18083"]
+    command: ["control-plane", "--host", "0.0.0.0", "--port", "18083"]
     environment:
-      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:-local-aios}
+      CONTROL_PLANE_API_KEY: ${CONTROL_PLANE_API_KEY:?set CONTROL_PLANE_API_KEY}
+      CONTROL_PLANE_STATE_DB: ${CONTROL_PLANE_STATE_DB:?set CONTROL_PLANE_STATE_DB}
+      CONTROL_PLANE_ARTIFACT_ROOT: ${CONTROL_PLANE_ARTIFACT_ROOT:?set CONTROL_PLANE_ARTIFACT_ROOT}
+      CONTROL_PLANE_AGENT_SESSION_DIR: ${CONTROL_PLANE_AGENT_SESSION_DIR:?set CONTROL_PLANE_AGENT_SESSION_DIR}
+      CONTROL_PLANE_AGENT_WORKTREE_ROOT: ${CONTROL_PLANE_AGENT_WORKTREE_ROOT:?set CONTROL_PLANE_AGENT_WORKTREE_ROOT}
+      CONTROL_PLANE_GARBAGE_QUARANTINE_DIR: ${CONTROL_PLANE_GARBAGE_QUARANTINE_DIR:-}
+      CONTROL_PLANE_WORLD_RUNTIME_BASE_URL: ${CONTROL_PLANE_WORLD_RUNTIME_BASE_URL:-http://world-runtime:8086}
       CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN: ${CONTROL_PLANE_WORLD_RUNTIME_BEARER_TOKEN:-}
       CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID: ${CONTROL_PLANE_WORLD_RUNTIME_DELEGATION_ID:-}
+      CONTROL_PLANE_AGENT_BASE_URL: ${CONTROL_PLANE_AGENT_BASE_URL:-}
+      CONTROL_PLANE_AGENT_EXECUTABLE: ${CONTROL_PLANE_AGENT_EXECUTABLE:-}
+      CONTROL_PLANE_PROMETHEUS_URL: ${CONTROL_PLANE_PROMETHEUS_URL:-}
+      CONTROL_PLANE_CHEZMOI_SOURCE_DIR: ${CONTROL_PLANE_CHEZMOI_SOURCE_DIR:-}
+      CONTROL_PLANE_ENVIRONMENT_CHECKS: ${CONTROL_PLANE_ENVIRONMENT_CHECKS:-false}
+      CONTROL_PLANE_NOTIFICATIONS: ${CONTROL_PLANE_NOTIFICATIONS:-false}
     ports:
       - "127.0.0.1:18083:18083"
     volumes:
-      - control-plane-data:/var/lib/aios
+      - ${CONTROL_PLANE_HOST_DATA_ROOT:?set CONTROL_PLANE_HOST_DATA_ROOT}:${CONTROL_PLANE_DATA_ROOT:?set CONTROL_PLANE_DATA_ROOT}
     depends_on:
       world-runtime:
         condition: service_started
@@ -87,13 +118,13 @@ services:
   administrative-migrate:
     <<: *aios-service
     restart: "no"
-    command:
-      ["alembic", "-c", "config/domains/administrative/alembic.ini", "upgrade", "head"]
+    command: ["aios-migrate"]
     environment:
       <<: *administrative-environment
+      AIOS_MIGRATION_COMPONENT: administrative
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
 
   administrative-api:
     <<: *aios-service
@@ -104,7 +135,7 @@ services:
     ports:
       - "127.0.0.1:18100:8000"
     volumes:
-      - administrative-data:/var/lib/aios
+      - ${ADMIN_HOST_ARTIFACT_ROOT:?set ADMIN_HOST_ARTIFACT_ROOT}:${ADMIN_INTAKE_ARTIFACT_ROOT}
     depends_on:
       administrative-migrate:
         condition: service_completed_successfully
@@ -115,7 +146,7 @@ services:
     environment:
       <<: *administrative-environment
     volumes:
-      - administrative-data:/var/lib/aios
+      - ${ADMIN_HOST_ARTIFACT_ROOT}:${ADMIN_INTAKE_ARTIFACT_ROOT}
     depends_on:
       administrative-migrate:
         condition: service_completed_successfully
@@ -123,33 +154,26 @@ services:
   autodev-migrate:
     <<: *aios-service
     restart: "no"
-    command:
-      ["alembic", "-c", "config/domains/autonomous_development/alembic.ini", "upgrade", "head"]
+    command: ["aios-migrate"]
     environment:
       <<: *autodev-environment
+      AIOS_MIGRATION_COMPONENT: autonomous-development
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
 
   autonomous-development:
     <<: *aios-service
     command: ["autonomous-development", "serve"]
     environment:
       <<: *autodev-environment
+      DOCKER_HOST: unix://${AUTODEV_DOCKER_SOCKET:?set AUTODEV_DOCKER_SOCKET}
     ports:
       - "127.0.0.1:18110:8765"
     volumes:
-      - autonomous-development-data:/var/lib/aios
-      - ${AUTODEV_WORKSPACE_PATH:-.}:/workspace
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${AUTODEV_HOST_STATE_ROOT:?set AUTODEV_HOST_STATE_ROOT}:${AUTODEV_STATE_ROOT}
+      - ${AUTODEV_HOST_WORKSPACE_ROOT:?set AUTODEV_HOST_WORKSPACE_ROOT}:${AUTODEV_WORKSPACE_ROOT:?set AUTODEV_WORKSPACE_ROOT}
+      - ${AUTODEV_HOST_DOCKER_SOCKET:?set AUTODEV_HOST_DOCKER_SOCKET}:${AUTODEV_DOCKER_SOCKET}
     depends_on:
       autodev-migrate:
         condition: service_completed_successfully
-
-volumes:
-  postgres-data:
-  personal-world-data:
-  world-runtime-data:
-  control-plane-data:
-  administrative-data:
-  autonomous-development-data:
