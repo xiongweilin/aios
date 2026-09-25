@@ -121,8 +121,13 @@ class CodexExecutionBoundary:
     """
 
     def __init__(self, config: ControlPlaneConfig) -> None:
+        if config.agent_session_dir is None:
+            raise RuntimeError("CONTROL_PLANE_AGENT_SESSION_DIR is required")
+        if config.codex_worktree_root is None:
+            raise RuntimeError("CONTROL_PLANE_AGENT_WORKTREE_ROOT is required")
         self.config = config
-        self.session_dir = Path(config.agent_session_dir)
+        self.session_dir = config.agent_session_dir
+        self.worktree_root = config.codex_worktree_root
         self._managed_auto_repos: set[Path] = set()
 
     @staticmethod
@@ -152,7 +157,7 @@ class CodexExecutionBoundary:
         return proc.returncode == 0 and not (proc.stdout or b"").strip()
 
     def _candidate_worktree(self, repo: Path) -> tuple[Path, Path]:
-        root = self.config.codex_worktree_root
+        root = self.worktree_root
         root.mkdir(parents=True, exist_ok=True)
         worktree = root / f"candidate-{uuid.uuid4().hex}"
         proc = subprocess.run(
@@ -253,7 +258,7 @@ class CodexExecutionBoundary:
 
     def prepare(self, repo: str, sandbox: Sandbox) -> _PreparedBoundary:
         source = Path(repo).resolve()
-        support_dir = self.config.codex_worktree_root.parent / f".codex-boundary-{uuid.uuid4().hex}"
+        support_dir = self.worktree_root.parent / f".codex-boundary-{uuid.uuid4().hex}"
         support_dir.mkdir(parents=True, exist_ok=True)
         pair: tuple[Path, Path] | None = None
         try:
