@@ -1,10 +1,7 @@
 # world-runtime
 
-> Component of the [AIOS monorepo](../README.md) at `world-runtime/`; this directory is not an independent GitHub repository.
+> AIOS kernel component. Source: `src/world_runtime/`. Runtime: root `compose.yaml`.
 
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-1.1.0-6f42c1)
 
 Persistent semantic runtime for long-lived agency.
 
@@ -15,6 +12,11 @@ receive bounded semantic assignments.
 World Runtime 1.1.0 hardens the stable governed-agency kernel with Runtime Protocol 4.0. Protocol 4.0 keeps the 1.0 agency model intact while separating authenticated representation from delegated transition authority, making terminal Work/Run state authoritative for fresh execution, and binding provider-result reads to the owning principal/actor.
 
 The 1.0 boundary is intentionally narrow: Runtime stores and governs generic durable agency state. It does not become a Personal World, model router, universal business-process engine, or Domain Controller.
+
+## Container runtime
+
+World Runtime has no native host service path. It runs as the `world-runtime` service in the root
+AIOS Compose topology, with durable state mounted inside the container runtime boundary.
 
 ## Ownership
 
