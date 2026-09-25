@@ -292,9 +292,7 @@ def test_candidate_intake_modules_do_not_call_formal_authority_or_kernel_symbols
 
 def test_production_worker_uses_provider_neutral_intake_configuration() -> None:
     compose = (_REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
-    production_env = (
-        _REPOSITORY_ROOT / "config/domains/administrative/.env.production.example"
-    ).read_text(encoding="utf-8")
+    production_env = (_REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
     worker_block = compose.split("  administrative-worker:\n", maxsplit=1)[1].split(
         "\n  autodev-migrate:", maxsplit=1
     )[0]
