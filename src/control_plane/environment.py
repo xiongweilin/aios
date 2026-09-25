@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .config import PROJECT_ROOT, ControlPlaneConfig
+from .config import ControlPlaneConfig
 from .provider_protocol import (
     CapabilityRequest,
     CapabilityResult,
@@ -38,13 +38,14 @@ from .provider_protocol import (
 _log = logging.getLogger(__name__)
 
 REMOTE_SHA_CACHE_TTL_SECONDS = 15 * 60
-REMOTE_SHA_CACHE_PATH = PROJECT_ROOT / "data" / "remote-sha-cache.json"
 _REMOTE_REFRESH_MIN_INTERVAL_SECONDS = 60.0
 
 
-def _load_remote_cache() -> dict[str, Any]:
+def _load_remote_cache(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
     try:
-        raw = REMOTE_SHA_CACHE_PATH.read_bytes()
+        raw = path.read_bytes()
     except OSError:
         return {}
     try:
@@ -375,9 +376,11 @@ def evaluate_environment(
 
     provider = dict(provider_health or {}).get("codex-primary")
     provider_available = provider.get("available") if isinstance(provider, dict) else None
-    cli = Path(config.codex_cli)
-    resolved_cli = shutil.which(str(cli)) or (str(cli) if cli.is_file() else "")
-    cli_text = str(resolved_cli or cli)
+    cli = config.codex_cli
+    resolved_cli = ""
+    if cli is not None:
+        resolved_cli = shutil.which(str(cli)) or (str(cli) if cli.is_file() else "")
+    cli_text = str(resolved_cli or cli or "")
     legacy_path = any(
         token in cli_text.lower()
         for token in ("opencodex", "open-codex", "old-codex", "legacy-codex")
@@ -392,7 +395,7 @@ def evaluate_environment(
                 metadata={"cli": cli_text, "provider_available": False},
             )
         ]
-    elif legacy_path or (not resolved_cli and not cli.is_file()):
+    elif legacy_path or not resolved_cli:
         observations = [
             _problem(
                 "codex_primary",
@@ -750,7 +753,7 @@ class EnvironmentInspectionProvider:
         sync_subjects: list[dict[str, str]] = []
         checked = 0
         git = shutil.which("git.exe") or shutil.which("git")
-        remote_cache = _load_remote_cache()
+        remote_cache = _load_remote_cache(self.config.remote_sha_cache_path)
         stale_remote_paths: list[str] = []
 
         def project_for_path(raw_path: str) -> str:
@@ -758,8 +761,9 @@ class EnvironmentInspectionProvider:
             for project, configured in self.config.project_dirs.items():
                 if candidate == Path(configured).resolve(strict=False):
                     return project
-            if candidate == Path(self.config.chezmoi_source_dir).resolve(strict=False):
-                return "chezmoi"
+            if self.config.chezmoi_source_dir:
+                if candidate == Path(self.config.chezmoi_source_dir).resolve(strict=False):
+                    return "chezmoi"
             return ""
 
         def subject_for_path(raw_path: str) -> dict[str, str]:
@@ -836,22 +840,23 @@ class EnvironmentInspectionProvider:
                 subject["status"] = "ok"
                 subject["reason"] = ""
 
-        chezmoi = shutil.which("chezmoi.exe") or shutil.which("chezmoi")
         chezmoi_path = self.config.chezmoi_source_dir
-        chezmoi_subject = subject_for_path(chezmoi_path)
-        if chezmoi:
-            verify = self._run_bounded_command(
-                [chezmoi, "verify", "--skip-secrets", "--no-tty", "--source", chezmoi_path],
-                timeout=min(self.config.environment_probe_timeout_seconds, 10),
-            )
-            if verify.returncode != 0:
-                chezmoi_subject["chezmoi_verify"] = "failed"
-                record_sync_failure(chezmoi_path, "chezmoi_verify_failed")
+        if chezmoi_path:
+            chezmoi = shutil.which("chezmoi.exe") or shutil.which("chezmoi")
+            chezmoi_subject = subject_for_path(chezmoi_path)
+            if chezmoi:
+                verify = self._run_bounded_command(
+                    [chezmoi, "verify", "--skip-secrets", "--no-tty", "--source", chezmoi_path],
+                    timeout=min(self.config.environment_probe_timeout_seconds, 10),
+                )
+                if verify.returncode != 0:
+                    chezmoi_subject["chezmoi_verify"] = "failed"
+                    record_sync_failure(chezmoi_path, "chezmoi_verify_failed")
+                else:
+                    chezmoi_subject["chezmoi_verify"] = "ok"
             else:
-                chezmoi_subject["chezmoi_verify"] = "ok"
-        else:
-            chezmoi_subject["chezmoi_verify"] = "unavailable"
-            record_sync_failure(chezmoi_path, "chezmoi_unavailable")
+                chezmoi_subject["chezmoi_verify"] = "unavailable"
+                record_sync_failure(chezmoi_path, "chezmoi_unavailable")
 
         if stale_remote_paths:
             self._spawn_remote_refresh(stale_remote_paths)
@@ -892,7 +897,7 @@ class EnvironmentInspectionProvider:
 
         def _work() -> None:
             try:
-                cache = _load_remote_cache()
+                cache = _load_remote_cache(self.config.remote_sha_cache_path)
             except Exception:
                 cache = {}
             entries = cache if isinstance(cache, dict) else {}
@@ -910,14 +915,17 @@ class EnvironmentInspectionProvider:
                         entries[raw_path] = {"sha": sha[:40], "checked_at": time.time()}
                 except Exception as exc:
                     _log.warning("remote refresh failed for %s: %s", raw_path, str(exc)[:200])
+            cache_path = self.config.remote_sha_cache_path
+            if cache_path is None:
+                return
             try:
-                REMOTE_SHA_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-                tmp_path = REMOTE_SHA_CACHE_PATH.with_suffix(".json.tmp")
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                tmp_path = cache_path.with_suffix(".json.tmp")
                 tmp_path.write_text(
                     json.dumps({"version": 1, "entries": entries}, ensure_ascii=False),
                     encoding="utf-8",
                 )
-                os.replace(tmp_path, REMOTE_SHA_CACHE_PATH)
+                os.replace(tmp_path, cache_path)
             except Exception as exc:
                 _log.warning("remote cache write failed: %s", str(exc)[:200])
 
