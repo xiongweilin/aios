@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import tomllib
+from importlib.resources import files
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 
@@ -11,16 +11,13 @@ CATALOG_VERSION = "world-runtime-contracts-v10"
 CATALOG_OWNER = "world-runtime/contracts"
 
 
-def _catalog_path() -> Path:
-    path = Path(__file__).with_name("catalog.toml")
-    if not path.is_file():
-        raise FileNotFoundError("World Runtime canonical contract catalog is unavailable")
-    return path
+def _contracts_root():
+    return files(__package__)
 
 
 @lru_cache(maxsize=1)
 def contract_catalog() -> dict[str, Any]:
-    with _catalog_path().open("rb") as handle:
+    with _contracts_root().joinpath("catalog.toml").open("rb") as handle:
         value = tomllib.load(handle)
     if value.get("catalog_version") != CATALOG_VERSION:
         raise ValueError("World Runtime contract catalog version mismatch")
@@ -47,15 +44,16 @@ def contract_schema(name: str) -> dict[str, Any]:
     path_value = descriptor.get("schema_path")
     if not path_value:
         raise KeyError(f"World Runtime contract has no canonical schema: {name}")
-    path = Path(__file__).parent / str(path_value)
-    if not path.is_file():
-        raise FileNotFoundError(f"canonical schema is unavailable for {name}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    resource = _contracts_root().joinpath(str(path_value))
+    try:
+        return json.loads(resource.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"canonical schema is unavailable for {name}") from exc
 
 
 def domain_conformance_vectors() -> dict[str, Any]:
-    path = Path(__file__).parent / "domain" / "vectors-v3.json"
-    value = json.loads(path.read_text(encoding="utf-8"))
+    resource = _contracts_root().joinpath("domain", "vectors-v3.json")
+    value = json.loads(resource.read_text(encoding="utf-8"))
     if value.get("suite_version") != "domain-controller-protocol-v3":
         raise ValueError("Domain Controller conformance suite version mismatch")
     return value
