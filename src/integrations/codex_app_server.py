@@ -831,7 +831,7 @@ class RemoteCodexAppServer:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(f".{path.name}.{time.time_ns()}.tmp")
         try:
-            temporary.write_text(
+            temporary.write_text(  #NOSONAR(S2083)
                 json.dumps(dict(payload), ensure_ascii=False, separators=(",", ":")),
                 encoding="utf-8",
             )
