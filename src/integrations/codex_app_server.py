@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import posixpath
 import re
 import time
@@ -788,13 +789,16 @@ class RemoteCodexAppServer:
     def _journal_path(self, request_id: str) -> Path:
         if not _SAFE_REQUEST_ID.fullmatch(request_id):
             raise ValueError("Codex request id contains unsupported characters")
-        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        safe_request_id = os.path.basename(request_id)
+        if safe_request_id != request_id:
+            raise ValueError("Codex request id must be a filename component")
+        digest = hashlib.sha256(safe_request_id.encode("utf-8")).hexdigest()
         journal_root = self._journal_root.resolve()
         journal_directory = (journal_root / "remote-requests").resolve()
-        if journal_directory.parent != journal_root:
+        if not journal_directory.is_relative_to(journal_root):
             raise ValueError("Codex request journal directory escapes its configured root")
         path = (journal_directory / f"{digest}.json").resolve()
-        if path.parent != journal_directory:
+        if not path.is_relative_to(journal_directory):
             raise ValueError("Codex request journal path escapes its configured directory")
         return path
 
