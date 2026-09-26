@@ -214,7 +214,7 @@ class RemoteCodexAppServer:
 
         deadline = time.monotonic() + timeout_seconds
         self._write_journal(
-            journal_path,
+            request_id,
             {
                 "version": 1,
                 "requestId": request_id,
@@ -278,7 +278,7 @@ class RemoteCodexAppServer:
                     if resumed_id != current_thread_id:
                         raise CodexBridgeError("Codex resumed a different thread")
                 self._write_journal(
-                    journal_path,
+                    request_id,
                     {
                         "version": 1,
                         "requestId": request_id,
@@ -302,7 +302,7 @@ class RemoteCodexAppServer:
                 if output_schema is not None:
                     params["outputSchema"] = dict(output_schema)
                 self._write_journal(
-                    journal_path,
+                    request_id,
                     {
                         "version": 1,
                         "requestId": request_id,
@@ -328,7 +328,7 @@ class RemoteCodexAppServer:
                 turn = _mapping(turn_result.get("turn"), "turn")
                 turn_id = _string(turn.get("id"), "turn.id")
                 self._write_journal(
-                    journal_path,
+                    request_id,
                     {
                         "version": 1,
                         "requestId": request_id,
@@ -358,7 +358,7 @@ class RemoteCodexAppServer:
                 tuple(agent_messages),
             )
             self._write_journal(
-                journal_path,
+                request_id,
                 {
                     "version": 1,
                     "requestId": request_id,
@@ -389,7 +389,7 @@ class RemoteCodexAppServer:
         except CodexBridgeError as exc:
             if dispatched:
                 self._write_journal(
-                    journal_path,
+                    request_id,
                     {
                         "version": 1,
                         "requestId": request_id,
@@ -405,7 +405,7 @@ class RemoteCodexAppServer:
         except (ConnectionClosed, TimeoutError, OSError, WebSocketException, ValueError) as exc:
             outcome: Literal["not_started", "unknown"] = "unknown" if dispatched else "not_started"
             self._write_journal(
-                journal_path,
+                request_id,
                 {
                     "version": 1,
                     "requestId": request_id,
@@ -522,7 +522,7 @@ class RemoteCodexAppServer:
                     outcome="unknown",
                 )
             self._write_journal(
-                journal_path,
+                request_id,
                 {
                     "version": 1,
                     "requestId": request_id,
@@ -786,8 +786,17 @@ class RemoteCodexAppServer:
         return parsed
 
     def _journal_path(self, request_id: str) -> Path:
+        if not _SAFE_REQUEST_ID.fullmatch(request_id):
+            raise ValueError("Codex request id contains unsupported characters")
         digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
-        return self._journal_root / "remote-requests" / f"{digest}.json"
+        journal_root = self._journal_root.resolve()
+        journal_directory = (journal_root / "remote-requests").resolve()
+        if journal_directory.parent != journal_root:
+            raise ValueError("Codex request journal directory escapes its configured root")
+        path = (journal_directory / f"{digest}.json").resolve()
+        if path.parent != journal_directory:
+            raise ValueError("Codex request journal path escapes its configured directory")
+        return path
 
     def _read_journal(
         self,
@@ -813,7 +822,8 @@ class RemoteCodexAppServer:
             )
         return payload
 
-    def _write_journal(self, path: Path, payload: Mapping[str, object]) -> None:
+    def _write_journal(self, request_id: str, payload: Mapping[str, object]) -> None:
+        path = self._journal_path(request_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(f".{path.name}.{time.time_ns()}.tmp")
         try:

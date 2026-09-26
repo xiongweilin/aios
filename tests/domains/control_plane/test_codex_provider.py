@@ -8,6 +8,7 @@ import pytest
 import control_plane.codex_provider as codex_provider
 from control_plane.codex_provider import CodexProvider, _resolve_cli
 from control_plane.provider_protocol import CapabilityRequest, InvocationContext
+from integrations.codex_app_server import CodexBridgeError, RemoteCodexTurn
 
 
 def _request(**overrides: Any) -> CapabilityRequest:
@@ -75,6 +76,27 @@ class _ExecutionBoundary:
         return text.replace("secret", "[redacted]")
 
 
+class _RemoteAppServer:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.request: dict[str, Any] | None = None
+
+    def run_turn(self, **request: Any) -> RemoteCodexTurn:
+        self.request = request
+        if self.error is not None:
+            raise self.error
+        return RemoteCodexTurn(
+            request_id=str(request["request_id"]),
+            thread_id="remote-thread",
+            turn_id="remote-turn",
+            status="completed",
+            server_version="test-version",
+            events=(),
+            agent_messages=("remote-secret-result",),
+            result_sha256="synthetic-result-digest",
+        )
+
+
 def test_resolve_cli_prefers_explicit_path(tmp_path: Path) -> None:
     explicit = tmp_path / "codex"
     assert _resolve_cli(explicit) == explicit
@@ -132,6 +154,83 @@ async def test_invoke_requires_a_prompt(tmp_path: Path) -> None:
 
     assert result.status == "failed"
     assert result.error == {"type": "invalid_request", "message": "prompt required"}
+
+
+@pytest.mark.asyncio
+async def test_invoke_requires_an_absolute_repo_for_remote_execution(tmp_path: Path) -> None:
+    remote = _RemoteAppServer()
+    provider = CodexProvider(cli=tmp_path / "codex", remote_app_server=remote)
+
+    result = await provider.invoke(_request(parameters={"repo": "relative"}), _context())
+
+    assert result.error == {"type": "invalid_request", "message": "repo path must be absolute"}
+    assert remote.request is None
+
+
+@pytest.mark.asyncio
+async def test_remote_invoke_persists_redacted_transcript_and_cleans_boundary(
+    tmp_path: Path,
+) -> None:
+    boundary = _ExecutionBoundary(tmp_path / "remote-sessions")
+    remote = _RemoteAppServer()
+    provider = CodexProvider(
+        cli=tmp_path / "codex",
+        model="gpt-6-luna",
+        execution_boundary=boundary,
+        remote_app_server=remote,
+    )
+
+    result = await provider.invoke(
+        _request(parameters={"repo": str(tmp_path.resolve()), "model": "gpt-6-luna"}),
+        _context(),
+    )
+
+    assert result.status == "succeeded"
+    assert result.metadata["transport"] == "codex-app-server-v1"
+    assert result.metadata["thread_id"] == "remote-thread"
+    assert remote.request is not None
+    assert remote.request["cwd"] == tmp_path.resolve()
+    assert remote.request["sandbox"] == "read-only"
+    assert remote.request["model"] == "gpt-6-luna"
+    assert boundary.cleanup_calls == [True]
+    transcript = (boundary.session_dir / "request-codex-1.jsonl").read_text(encoding="utf-8")
+    assert "remote-[redacted]-result" in transcript
+    assert "remote_request_id" in transcript
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure", "expected_type", "retryable"),
+    [
+        (CodexBridgeError("ambiguous", outcome="unknown"), "outcome_unknown", False),
+        (CodexBridgeError("not sent", outcome="not_started"), "remote_codex", True),
+        (OSError("disconnected"), "remote_codex_io", None),
+    ],
+)
+async def test_remote_invoke_maps_transport_failures_and_cleans_boundary(
+    tmp_path: Path,
+    failure: Exception,
+    expected_type: str,
+    retryable: bool | None,
+) -> None:
+    boundary = _ExecutionBoundary(tmp_path / "remote-sessions")
+    remote = _RemoteAppServer(error=failure)
+    provider = CodexProvider(
+        cli=tmp_path / "codex",
+        execution_boundary=boundary,
+        remote_app_server=remote,
+    )
+
+    result = await provider.invoke(
+        _request(parameters={"repo": str(tmp_path.resolve())}),
+        _context(),
+    )
+
+    assert result.status == "failed"
+    assert result.error["type"] == expected_type
+    if retryable is not None:
+        assert result.error["retryable"] is retryable
+    assert boundary.cleanup_calls == [True]
 
 
 @pytest.mark.asyncio

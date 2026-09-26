@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 from websockets.sync.server import ServerConnection, serve
 
-from integrations.codex_app_server import CodexBridgeError, RemoteCodexAppServer
+from integrations.codex_app_server import (
+    CodexBridgeError,
+    HostPathMapper,
+    RemoteCodexAppServer,
+)
 
 
 class FakeAppServer:
@@ -16,11 +20,22 @@ class FakeAppServer:
         *,
         lose_turn_result: bool = False,
         user_agent_initialize: bool = False,
+        retain_lost_turn: bool = False,
+        allowed_profiles: tuple[str, ...] = (":read-only", ":workspace"),
+        terminal_status: str = "completed",
+        server_request_method: str | None = None,
+        fail_method: str | None = None,
     ) -> None:
         self.lose_turn_result = lose_turn_result
         self.user_agent_initialize = user_agent_initialize
+        self.retain_lost_turn = retain_lost_turn
+        self.allowed_profiles = allowed_profiles
+        self.terminal_status = terminal_status
+        self.server_request_method = server_request_method
+        self.fail_method = fail_method
         self.messages: list[dict[str, object]] = []
         self.turns: list[dict[str, object]] = []
+        self.server_responses: list[dict[str, object]] = []
         self._lock = threading.Lock()
 
         def process_request(
@@ -53,6 +68,21 @@ class FakeAppServer:
             with self._lock:
                 self.messages.append(dict(message))
 
+            if self.fail_method is not None and method == self.fail_method:
+                connection.send(
+                    json.dumps(
+                        {
+                            "id": message["id"],
+                            "error": {"code": -32000, "message": "configured failure"},
+                        }
+                    )
+                )
+                continue
+            if method is None and message.get("id") == "server-request-1":
+                with self._lock:
+                    self.server_responses.append(dict(message))
+                continue
+
             if method == "initialize":
                 result = (
                     {
@@ -78,8 +108,8 @@ class FakeAppServer:
                             "id": message["id"],
                             "result": {
                                 "data": [
-                                    {"id": ":read-only", "allowed": True},
-                                    {"id": ":workspace", "allowed": True},
+                                    {"id": profile, "allowed": True}
+                                    for profile in self.allowed_profiles
                                 ]
                             },
                         }
@@ -104,7 +134,7 @@ class FakeAppServer:
                 prompt = params["input"][0]["text"]
                 turn = {
                     "id": "turn-test",
-                    "status": "completed",
+                    "status": self.terminal_status,
                     "items": [
                         {
                             "type": "userMessage",
@@ -113,9 +143,26 @@ class FakeAppServer:
                         {"type": "agentMessage", "text": "verified-result"},
                     ],
                 }
-                if not self.lose_turn_result:
+                if not self.lose_turn_result or self.retain_lost_turn:
                     with self._lock:
                         self.turns.append(turn)
+                if self.server_request_method is not None:
+                    server_request_params: dict[str, object] = {}
+                    if self.server_request_method == "item/fileChange/requestApproval":
+                        server_request_params["grantRoot"] = message["params"]["cwd"]
+                    elif self.server_request_method == "item/commandExecution/requestApproval":
+                        server_request_params["cwd"] = str(
+                            PureWindowsPath(message["params"]["cwd"]).parent / "outside"
+                        )
+                    connection.send(
+                        json.dumps(
+                            {
+                                "id": "server-request-1",
+                                "method": self.server_request_method,
+                                "params": server_request_params,
+                            }
+                        )
+                    )
                 connection.send(
                     json.dumps(
                         {
@@ -142,7 +189,7 @@ class FakeAppServer:
                         {
                             "method": "turn/completed",
                             "params": {
-                                "turn": {"id": "turn-test", "status": "completed"}
+                                "turn": {"id": "turn-test", "status": self.terminal_status}
                             },
                         }
                     )
@@ -321,5 +368,182 @@ def test_path_mapper_rejects_unmounted_container_worktree(tmp_path: Path) -> Non
                 model=None,
                 timeout_seconds=1,
             )
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ([], "must use version 1"),
+        ({"version": 1, "roots": {}}, "roots must be a list"),
+        ({"version": 1, "roots": ["/workspace"]}, "root must be an object"),
+        ({"version": 1, "roots": [{}]}, "require string paths"),
+        (
+            {"version": 1, "roots": [{"containerRoot": "workspace", "hostRoot": "/host"}]},
+            "container roots must be absolute",
+        ),
+        (
+            {"version": 1, "roots": [{"containerRoot": "/workspace", "hostRoot": "host"}]},
+            "host roots must be absolute",
+        ),
+    ],
+)
+def test_path_mapper_rejects_malformed_map_entries(
+    tmp_path: Path,
+    payload: object,
+    message: str,
+) -> None:
+    mapping = tmp_path / "path-map.json"
+    mapping.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        HostPathMapper.from_file(mapping)
+
+
+def test_request_id_is_validated_before_journal_path_is_created(tmp_path: Path) -> None:
+    server = FakeAppServer()
+    try:
+        client = _client(tmp_path, server)
+        with pytest.raises(ValueError, match="unsupported characters"):
+            client._journal_path("../outside")
+        with pytest.raises(ValueError, match="unsupported characters"):
+            client.run_turn(
+                request_id="../outside",
+                prompt="must not dispatch",
+                cwd="/workspace",
+                sandbox="read-only",
+                thread_id=None,
+                resume_key=None,
+                model=None,
+                timeout_seconds=1,
+            )
+
+        assert not (tmp_path / "outside.json").exists()
+        assert server.messages == []
+    finally:
+        server.close()
+
+
+def test_remote_turn_reconciles_a_lost_reply_without_redispatch(tmp_path: Path) -> None:
+    server = FakeAppServer(lose_turn_result=True, retain_lost_turn=True)
+    try:
+        client = _client(tmp_path, server)
+        kwargs = {
+            "request_id": "autodev:reconcile-lost-reply",
+            "prompt": "reconcile this turn",
+            "cwd": "/workspace",
+            "sandbox": "workspace-write",
+            "thread_id": None,
+            "resume_key": None,
+            "model": None,
+            "timeout_seconds": 2,
+        }
+        with pytest.raises(CodexBridgeError) as lost:
+            client.run_turn(**kwargs)
+        recovered = client.run_turn(**kwargs)
+
+        assert lost.value.outcome == "unknown"
+        assert recovered.completed
+        assert recovered.agent_messages == ("verified-result",)
+        assert sum(message.get("method") == "turn/start" for message in server.messages) == 1
+    finally:
+        server.close()
+
+
+def test_missing_permission_profile_prevents_turn_dispatch(tmp_path: Path) -> None:
+    server = FakeAppServer(allowed_profiles=(":read-only",))
+    try:
+        with pytest.raises(CodexBridgeError) as error:
+            _client(tmp_path, server).run_turn(
+                request_id="autodev:workspace-write-denied",
+                prompt="do not dispatch",
+                cwd="/workspace",
+                sandbox="workspace-write",
+                thread_id=None,
+                resume_key=None,
+                model=None,
+                timeout_seconds=2,
+            )
+
+        assert error.value.outcome == "not_started"
+        assert not any(message.get("method") == "turn/start" for message in server.messages)
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize(
+    ("method", "sandbox", "expected"),
+    [
+        ("item/fileChange/requestApproval", "workspace-write", "accept"),
+        ("item/fileChange/requestApproval", "read-only", "decline"),
+        ("item/commandExecution/requestApproval", "workspace-write", "decline"),
+    ],
+)
+def test_server_approval_requests_are_bounded_to_the_workspace(
+    tmp_path: Path,
+    method: str,
+    sandbox: str,
+    expected: str,
+) -> None:
+    server = FakeAppServer(server_request_method=method)
+    try:
+        result = _client(tmp_path, server).run_turn(
+            request_id=f"autodev:approval:{sandbox}:{expected}",
+            prompt="exercise server approval",
+            cwd="/workspace",
+            sandbox=sandbox,
+            thread_id=None,
+            resume_key=None,
+            model=None,
+            timeout_seconds=2,
+        )
+
+        assert result.completed
+        assert server.server_responses[0]["result"]["decision"] == expected
+    finally:
+        server.close()
+
+
+def test_remote_rpc_error_is_reported_before_dispatch(tmp_path: Path) -> None:
+    server = FakeAppServer(fail_method="thread/start")
+    try:
+        with pytest.raises(CodexBridgeError, match="Codex RPC failed"):
+            _client(tmp_path, server).run_turn(
+                request_id="autodev:thread-start-error",
+                prompt="do not dispatch",
+                cwd="/workspace",
+                sandbox="read-only",
+                thread_id=None,
+                resume_key=None,
+                model=None,
+                timeout_seconds=2,
+            )
+
+        assert not any(message.get("method") == "turn/start" for message in server.messages)
+    finally:
+        server.close()
+
+
+def test_failed_remote_turn_is_journaled_and_not_replayed(tmp_path: Path) -> None:
+    server = FakeAppServer(terminal_status="failed")
+    try:
+        client = _client(tmp_path, server)
+        kwargs = {
+            "request_id": "autodev:failed-turn",
+            "prompt": "return a failure",
+            "cwd": "/workspace",
+            "sandbox": "read-only",
+            "thread_id": None,
+            "resume_key": "failed-turn",
+            "model": None,
+            "timeout_seconds": 2,
+        }
+        with pytest.raises(CodexBridgeError) as error:
+            client.run_turn(**kwargs)
+        assert error.value.outcome == "failed"
+        with pytest.raises(CodexBridgeError, match="prior Codex request failed"):
+            client.run_turn(**kwargs)
+        assert sum(message.get("method") == "turn/start" for message in server.messages) == 1
     finally:
         server.close()

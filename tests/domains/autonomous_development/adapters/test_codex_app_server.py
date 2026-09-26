@@ -8,10 +8,12 @@ import pytest
 
 from autonomous_development.adapters.codex_app_server.client import CodexAppServer
 from autonomous_development.ports.codex import (
+    CodexOutcomeUnknown,
     CodexProviderError,
     CodexSandbox,
     CodexTurnRequest,
 )
+from integrations.codex_app_server import CodexBridgeError, RemoteCodexTurn
 
 
 def write_fake_server(
@@ -178,3 +180,54 @@ def test_app_server_timeout_is_wall_clock_bounded(tmp_path: Path) -> None:
         )
 
     assert time.monotonic() - started < 4
+
+
+class _RemoteAppServer:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.kwargs: dict[str, object] | None = None
+
+    def run_turn(self, **kwargs: object) -> RemoteCodexTurn:
+        self.kwargs = kwargs
+        if self.error is not None:
+            raise self.error
+        return RemoteCodexTurn(
+            request_id=str(kwargs["request_id"]),
+            thread_id="remote-thread",
+            turn_id="remote-turn",
+            status="completed",
+            server_version="test-version",
+            events=({"method": "turn/completed", "params": {}},),
+            agent_messages=("remote result",),
+            result_sha256="synthetic-digest",
+        )
+
+
+def test_app_server_adapter_maps_remote_result_and_persists_thread(tmp_path: Path) -> None:
+    remote = _RemoteAppServer()
+    provider = CodexAppServer(
+        thread_journal_root=(tmp_path / "journal").resolve(),
+        remote_app_server=remote,
+    )
+
+    result = provider.run_turn(request(tmp_path.resolve()))
+
+    assert result.completed
+    assert result.thread_id == "remote-thread"
+    assert result.agent_messages == ("remote result",)
+    assert result.events[0].method == "turn/completed"
+    assert remote.kwargs is not None
+    assert remote.kwargs["cwd"] == tmp_path.resolve()
+    assert len(tuple((tmp_path / "journal").glob("*.json"))) == 1
+
+
+def test_app_server_adapter_preserves_unknown_remote_outcome(tmp_path: Path) -> None:
+    remote = _RemoteAppServer(
+        CodexBridgeError("connection lost", outcome="unknown")
+    )
+    provider = CodexAppServer(remote_app_server=remote)
+
+    with pytest.raises(CodexOutcomeUnknown, match="outcome is unknown") as error:
+        provider.run_turn(request(tmp_path.resolve()))
+
+    assert error.value.request_id.startswith("autodev:")

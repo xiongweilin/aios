@@ -9,6 +9,7 @@ import logging
 import shutil
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Final, Literal, Protocol
@@ -40,6 +41,15 @@ class ExecutionBoundary(Protocol):
 
     def prepare(self, repo: str, sandbox: SandboxProfile) -> PreparedExecutionBoundary: ...
     def redact_transcript(self, text: str) -> str: ...
+
+
+@dataclass(frozen=True)
+class _PreparedCodexInvocation:
+    prompt: str
+    sandbox: SandboxProfile
+    cwd: Path
+    boundary: PreparedExecutionBoundary | None
+    model: str
 
 
 CODEX_SANDBOX_BY_CAPABILITY: Final[Mapping[str, SandboxProfile]] = MappingProxyType(
@@ -134,40 +144,17 @@ class CodexProvider:
     async def invoke(
         self, request: CapabilityRequest, context: InvocationContext
     ) -> CapabilityResult:
+        prepared = self._prepare_invocation(request)
+        if isinstance(prepared, CapabilityResult):
+            return prepared
         if self._remote_app_server is not None:
-            return await self._invoke_remote(request, context)
-        prompt = request.instruction or str(request.parameters.get("prompt", "") or "")
-        if not prompt:
-            return CapabilityResult(
-                request_id=request.id,
-                provider_id=self.descriptor.id,
-                status="failed",
-                error={"type": "invalid_request", "message": "prompt required"},
-            )
-        sandbox = CODEX_SANDBOX_BY_CAPABILITY.get(request.capability, "read-only")
-        repo = str(request.parameters.get("repo", "") or "").strip()
-        if not repo:
-            return CapabilityResult(
-                request_id=request.id,
-                provider_id=self.descriptor.id,
-                status="failed",
-                error={"type": "invalid_request", "message": "explicit repo path required"},
-            )
-        cwd = Path(repo).expanduser()
-        if not cwd.is_absolute():
-            return CapabilityResult(
-                request_id=request.id,
-                provider_id=self.descriptor.id,
-                status="failed",
-                error={"type": "invalid_request", "message": "repo path must be absolute"},
-            )
-        cwd = cwd.resolve()
-        boundary = None
-        if self._execution_boundary is not None:
-            boundary = self._execution_boundary.prepare(str(cwd), sandbox)
-            cwd = boundary.cwd
+            return await self._invoke_remote(request, context, prepared)
+        prompt = prepared.prompt
+        sandbox = prepared.sandbox
+        cwd = prepared.cwd
+        boundary = prepared.boundary
+        model = prepared.model
         env = dict(boundary.env) if boundary is not None else None
-        model = str(request.parameters.get("model", self._model))
         argv = [
             str(self._cli),
             "exec",
@@ -251,11 +238,10 @@ class CodexProvider:
             },
         )
 
-    async def _invoke_remote(
+    def _prepare_invocation(
         self,
         request: CapabilityRequest,
-        context: InvocationContext,
-    ) -> CapabilityResult:
+    ) -> _PreparedCodexInvocation | CapabilityResult:
         prompt = request.instruction or str(request.parameters.get("prompt", "") or "")
         if not prompt:
             return CapabilityResult(
@@ -286,10 +272,29 @@ class CodexProvider:
         if self._execution_boundary is not None:
             boundary = self._execution_boundary.prepare(str(cwd), sandbox)
             cwd = boundary.cwd
+        model = str(request.parameters.get("model", self._model))
+        return _PreparedCodexInvocation(
+            prompt=prompt,
+            sandbox=sandbox,
+            cwd=cwd,
+            boundary=boundary,
+            model=model,
+        )
+
+    async def _invoke_remote(
+        self,
+        request: CapabilityRequest,
+        context: InvocationContext,
+        prepared: _PreparedCodexInvocation,
+    ) -> CapabilityResult:
+        prompt = prepared.prompt
+        sandbox = prepared.sandbox
+        cwd = prepared.cwd
+        boundary = prepared.boundary
         request_id = "control-plane-" + hashlib.sha256(
             request.id.encode("utf-8")
         ).hexdigest()
-        model = str(request.parameters.get("model", self._model))
+        model = prepared.model
         started = time.monotonic()
         try:
             result = await asyncio.to_thread(

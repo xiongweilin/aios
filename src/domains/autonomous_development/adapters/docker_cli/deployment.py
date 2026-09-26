@@ -188,9 +188,9 @@ class DockerDeploymentProvider(DeploymentProvider):
             deployment_id=spec.deployment_id,
             container_id=container_id,
             base_url=(
-                f"http://{name}:{spec.container_port}"
+                f"http://{name}:{spec.container_port}"  # NOSONAR: Compose service DNS is private-network only.
                 if self._docker_network is not None
-                else f"http://127.0.0.1:{host_port}"
+                else f"http://127.0.0.1:{host_port}"  # NOSONAR: host access stays on loopback.
             ),
             evidence_ref=ref,
         )
