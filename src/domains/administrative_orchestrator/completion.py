@@ -92,8 +92,8 @@ def assess_onboarding_completion(
 ) -> CompletionAssessment:
     """Compatibility wrapper around assess_administrative_completion."""
     if isinstance(requirement_or_effects, list):
-        # Keep historical unit tests and immutable records readable while new
-        # writes use obligation-backed completion.
+        # 保持历史 unit test 和 immutable record 可读，同时新的
+        # 写入使用 obligation-backed completion。
         legacy_effects = requirement_or_effects
         legacy_outcomes = effects_or_outcomes
         assert all(isinstance(item, ConfirmedOutcome) for item in legacy_outcomes)
