@@ -96,7 +96,7 @@ def create_app(service: PersonalWorldService | None = None) -> FastAPI:
             return require_subject(runtime.store.get_observation(object_id).subject_id)
         if object_type == "claim":
             return require_subject(runtime.store.get_claim(object_id).subject_id)
-        # Sources may be shared provenance within the one-root store and have no subject_id.
+        # Source 可以作为 one-root store 内共享的 provenance，因此可以没有 subject_id。
 
     def require_bundle_subjects(bundle: PersonalWorldBundle) -> None:
         if root_subject is None:
