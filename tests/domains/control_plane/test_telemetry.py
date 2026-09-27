@@ -22,5 +22,5 @@ def test_configure_telemetry_instruments_once(monkeypatch) -> None:
     app = FastAPI()
 
     assert telemetry.configure_telemetry(app) is True
-    # A second call must stay idempotent instead of stacking another provider.
+    # 第二次调用必须保持幂等，不能再叠加一个 provider。
     assert telemetry.configure_telemetry(app) is True
