@@ -198,8 +198,8 @@ class TransactionRepository:
     def append_assessment(
         self, assessment: TransactionQualificationAssessment
     ) -> TransactionQualificationAssessment:
-        # Import lazily because persistence registers this repository while
-        # messaging is importing its persistence dependency.
+        # 使用 lazy import，因为 persistence 会在
+        # messaging 导入其 persistence dependency 时注册此 repository。
         from .messaging import emit_outbox
 
         with self.store.sessions.begin() as db:
