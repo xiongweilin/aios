@@ -133,7 +133,7 @@ def drive_meeting_commitment_case_step(case_id: str) -> dict[str, Any]:
         if commitment.responsibility_ref:
             try:
                 commitment = service.discharge_responsibility(UUID(case_id))
-            except Exception as exc:  # fail closed; Kernel owns retry/reconciliation
+            except Exception as exc:  # fail closed；retry/reconciliation 由 Kernel 持有
                 return {
                     "case_id": case_id,
                     "status": case.status.value,
