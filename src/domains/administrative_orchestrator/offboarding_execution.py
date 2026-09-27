@@ -127,11 +127,11 @@ class OffboardingExecutionEngine(OnboardingExecutionEngine):
             case.case_id, case.authority_epoch
         )
         if existing_obligation_set is not None:
-            # Planning can partially fulfill Administrative domain-state
-            # obligations before a later Kernel Work admission fails. Reuse
-            # the immutable set for this authority epoch on replay; deriving
-            # from the already-mutated authority graph would produce a
-            # different set and incorrectly block recovery.
+            # Planning 可能在后续 Kernel Work admission 失败前，已经部分满足
+            # Administrative domain-state obligation。Replay 时应复用
+            # 当前 authority epoch 的 immutable set；如果根据已经变化的 authority graph
+            # 重新 derive，会产生不同的 set，
+            # 并错误阻止 recovery。
             obligation_set = existing_obligation_set
             transfers = tuple(
                 self.transfers.list_for_case(case.case_id, case.authority_epoch)
