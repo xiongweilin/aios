@@ -336,10 +336,10 @@ class OperatorService:
                 )
             )
         if self._runtime is not None:
-            # The Runtime owns generic durable agency, so the Responsibility and
-            # DomainAssignment must exist before this cycle can change reality. A
-            # requirement-driven cycle carries no product evidence window, so the
-            # assignment states the objective and its acceptance criteria only.
+            # Runtime 持有 generic durable agency，因此必须先存在 Responsibility 和
+            # DomainAssignment，cycle 才能改变现实。
+            # requirement-driven cycle 不携带 product evidence window，因此
+            # assignment 只声明 objective 及其 acceptance criteria。
             self._runtime.ensure_assignment(
                 cycle=cycle,
                 target=target,
