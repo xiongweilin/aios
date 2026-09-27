@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     auto_create_schema: bool = True
 
     intake_artifact_root: str = ""
-    # Outbound communication uses a provider-neutral transport contract.
+    # Outbound communication 使用 provider-neutral transport contract。
     communication_gateway_base_url: str = ""
     communication_transport_secret: SecretStr | None = None
     communication_transport_secret_file: str = ""
@@ -41,16 +41,16 @@ class Settings(BaseSettings):
     intake_model_version: str = "configured"
     intake_model_profile_ref: str = "candidate-intake-v1"
     intake_model_schema_ref: str = "candidate-interpretation-v1"
-    # Optional advisory-only investigation adapter.  A blank URL keeps the
-    # Administrative deployment available while investigation remains
-    # fail-closed and records the advisory failure.
+    # 可选的仅 advisory investigation adapter。URL 为空时仍保持
+    # Administrative deployment 可用，同时 investigation 保持
+    # fail-closed，并记录 advisory failure。
     investigation_client_url: str = ""
     investigation_client_timeout_seconds: float = 10.0
     investigation_client_api_key: SecretStr | None = None
     investigation_client_api_key_file: str = ""
     investigation_model_url: str = ""
-    # Direct model routing, when enabled, has its own credential owner. It is
-    # never populated from the advisory-service credential above.
+    # 启用 direct model routing 时，它拥有独立的 credential owner，
+    # 绝不能从上面的 advisory-service credential 填充。
     investigation_model_api_key: SecretStr | None = None
     investigation_model_api_key_file: str = ""
     investigation_model_protocol: Literal["openai-chat", "openai-responses"] = "openai-chat"
@@ -87,8 +87,8 @@ class Settings(BaseSettings):
 
     runtime_profile: Literal["test", "development", "governed", "staging", "production"] = "development"
 
-    # The Administrative domain keeps business truth and verification. World Runtime
-    # owns generic persistent responsibility, authorization and physical invocation.
+    # Administrative domain 持有 business truth 和 verification。World Runtime
+    # 持有通用 persistent responsibility、authorization 和 physical invocation。
     world_runtime_mode: Literal["disabled", "cutover"] = "disabled"
     world_runtime_base_url: str = "http://127.0.0.1:8020"
     world_runtime_timeout_seconds: float = 3.0
@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     world_runtime_bearer_token: SecretStr | None = None
     world_runtime_delegation_id: str = ""
 
-    # Authentication. `jwt` is retained only for compatibility/test fixtures;
-    # the production profile requires OIDC/JWKS and asymmetric verification.
+    # Authentication：`jwt` 只为 compatibility/test fixture 保留；
+    # production profile 要求 OIDC/JWKS 和 asymmetric verification。
     auth_mode: Literal["development", "jwt", "oidc"] = "jwt"
     jwt_secret: str | None = None
     jwt_issuer: str = "administrative-orchestrator"
@@ -106,9 +106,9 @@ class Settings(BaseSettings):
     oidc_issuer: str = ""
     oidc_audience: str = "administrative-orchestrator"
     oidc_allowed_algorithms: str = "RS256,ES256"
-    # Optional service-network endpoints for an externally issued OIDC token.
-    # The issuer remains the authoritative external identity provider URL;
-    # these endpoints only avoid a broken container-to-host backchannel.
+    # 为外部签发的 OIDC token 提供可选 service-network endpoint。
+    # issuer 仍是 authoritative external identity provider URL；
+    # 这些 endpoint 只用于规避失效的 container-to-host backchannel。
     oidc_metadata_url: str = ""
     oidc_jwks_url: str = ""
     oidc_jwks_cache_ttl_seconds: int = 300
@@ -116,9 +116,9 @@ class Settings(BaseSettings):
     oidc_http_timeout_seconds: float = 5.0
     oidc_allow_insecure_http: bool = False
 
-    # Authoritative read adapters. Credentials are referenced by environment
-    # variable name and resolved only inside connector processes; secret values
-    # are never persisted in domain or Kernel records.
+    # Authoritative read adapter。Credential 只通过 environment
+    # variable name 引用，并只在 connector process 内解析；secret value
+    # 绝不持久化到 domain 或 Kernel record。
     hris_source_kind: Literal["disabled", "odoo"] = "disabled"
     odoo_base_url: str = ""
     odoo_database: str = ""
@@ -169,11 +169,11 @@ class Settings(BaseSettings):
     connector_timeout_seconds: float = 10.0
     authoritative_fact_max_age_seconds: int = 300
 
-    # Compatibility switch for tests/development. Governed/production profiles
-    # always force authority enforcement on.
+    # 测试/开发用 compatibility switch。Governed/production profile
+    # 始终强制开启 authority enforcement。
     authority_enforcement_enabled: bool = False
 
-    # One-shot bootstrap input used only by the foundation bootstrap command.
+    # 只供 foundation bootstrap command 使用的一次性 bootstrap input。
     bootstrap_authority_json: str = ""
 
     @property
