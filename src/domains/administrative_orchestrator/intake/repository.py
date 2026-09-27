@@ -488,8 +488,8 @@ class IntakeRepository:
         while a process crash after commit still leaves the event available to
         the existing bounded outbox relay.
         """
-        # Import lazily because persistence.py registers this repository while
-        # messaging.py is importing the shared SQLAlchemy Base.
+        # 使用 lazy import，因为 persistence.py 会在
+        # messaging.py 导入共享 SQLAlchemy Base 时注册此 repository。
         from ..messaging import OutboxEventRow, emit_outbox
 
         if receipt.verification_status.value != "verified":
