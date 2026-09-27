@@ -547,7 +547,7 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-# Short aliases keep the boundary easy to discover without duplicating models.
+# 短 alias 让边界更容易发现，同时避免复制 model。
 ParsedDocument = DocumentExtraction
 EvidenceDraft = DocumentEvidenceDraft
 FactDraft = DocumentFactDraft
