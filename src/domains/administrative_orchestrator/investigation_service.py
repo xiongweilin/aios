@@ -133,8 +133,8 @@ class InvestigationService:
             if obligation_set is not None:
                 obligation_refs = tuple(str(item.obligation_id) for item in obligation_set.obligations)
         except OperationalError:
-            # Missing historical/optional obligation tables must not prevent a
-            # read-only investigation request from being recorded.
+            # 缺失历史/可选 obligation table 时，不应阻止
+            # read-only investigation request 被记录。
             obligation_refs = ()
         commitment = self.commitments.get_commitment(case.case_id)
         commitment_refs = (str(commitment.commitment_id),) if commitment is not None else ()
