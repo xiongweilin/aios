@@ -427,8 +427,8 @@ class CommitmentCommunicationCoordinator:
             state = CommunicationDeliveryState.PERMANENT_FAILED
             error_code = "WORLD_RUNTIME_EXECUTION_FAILED"
         elif result.status.value == "succeeded":
-            # Runtime provider success proves execution acceptance, not human delivery.
-            # An independent Administrative read-back may promote this later.
+            # Runtime provider success 只证明 execution acceptance，不证明 human delivery。
+            # 后续必须由独立的 Administrative read-back 才能提升该结论。
             state = CommunicationDeliveryState.TRANSPORT_ACCEPTED
             error_code = None
             provider_message_ref = result.provider_ref
