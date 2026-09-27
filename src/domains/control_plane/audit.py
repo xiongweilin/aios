@@ -60,7 +60,7 @@ def redact_args(args: list[str]) -> list[str]:
             continue
         if _key_is_sensitive(arg):
             if ":" in arg:
-                # "key: value"-style argument already carries its own value
+                # `key: value` 形式的 argument 已经携带自己的 value
                 redacted.append(REDACTED)
             else:
                 redacted.append(arg)
