@@ -119,9 +119,9 @@ class WorldRuntimeDevelopmentBridge:
             },
         )
         assignment_ref = self.assignment_ref(cycle.id)
-        # A requirement-driven cycle has no product evidence window yet; the Runtime
-        # still needs the Responsibility and DomainAssignment before the cycle may
-        # change reality, so the evidence reference is omitted rather than invented.
+        # requirement-driven cycle 此时还没有 product evidence window；Runtime
+        # 仍要求先建立 Responsibility 和 DomainAssignment，cycle 才能
+        # 改变现实，因此省略 evidence reference，而不是凭空构造。
         evidence_requirement: dict[str, object] = {
             "kind": "development-acceptance",
             "criteria": list(objective.acceptance_criteria),
