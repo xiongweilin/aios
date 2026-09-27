@@ -17,9 +17,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-# Historical compatibility only. Before this migration the runtime repository
-# reconstructed tuple order with these operation priorities because no ordinal
-# was persisted. New runtime code never interprets operation names for order.
+# 仅用于历史兼容。在该 migration 之前，runtime repository
+# 因为没有持久化 ordinal，只能按这些 operation priority 重建 tuple order。
+# 新 runtime code 不再根据 operation name 解释顺序。
 _LEGACY_OPERATION_ORDER = {
     "purchase_order.create_draft": 0,
     "purchase_order.confirm": 1,
