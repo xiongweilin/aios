@@ -25,10 +25,10 @@ def upgrade() -> None:
         "administrative_execution_authorization",
         sa.Column("approval_satisfaction_id", sa.Uuid(), nullable=True),
     )
-    # The original schema required every authorization to point at one Decision.
-    # Governed multi-party execution instead points at ApprovalSatisfaction, so
-    # the legacy decision basis must become nullable. batch_alter_table keeps
-    # the migration portable across the SQLite smoke test and PostgreSQL.
+    # 原始 schema 要求每个 authorization 都指向一个 Decision。
+    # 受治理的多方 execution 改为指向 ApprovalSatisfaction，因此
+    # legacy decision basis 必须允许为空。batch_alter_table 可以让
+    # migration 同时适用于 SQLite smoke test 和 PostgreSQL。
     with op.batch_alter_table("administrative_execution_authorization") as batch_op:
         batch_op.alter_column(
             "decision_id",
@@ -38,9 +38,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Upgrade/downgrade smoke runs on an empty schema. Deployments containing
-    # approval-backed authorization rows must migrate/retire those rows before
-    # intentionally downgrading to the decision-only schema.
+    # Upgrade/downgrade smoke 在空 schema 上运行。包含
+    # approval-backed authorization row 的 deployment 必须先迁移/退役这些 row，
+    # 再有意 downgrade 到 decision-only schema。
     with op.batch_alter_table("administrative_execution_authorization") as batch_op:
         batch_op.alter_column(
             "decision_id",
