@@ -53,8 +53,8 @@ class RealityObservation(UtcModel):
     digest: str | None = None
     observed_at: datetime = Field(default_factory=utcnow)
     error_class: str | None = None
-    # Compatibility input/output for existing sandbox fixtures. Runtime
-    # semantics must use availability/presence/freshness instead.
+    # 现有 sandbox fixture 的 compatibility input/output。Runtime
+    # semantics 必须改用 availability/presence/freshness。
     found: bool | None = None
 
     @model_validator(mode="before")
