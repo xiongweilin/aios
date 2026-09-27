@@ -85,8 +85,8 @@ _governance = GovernanceRepository(_store)
 _obligations = ObligationRepository(_store)
 _authenticator = Authenticator(_store, _settings)
 if _settings.auto_create_schema:
-    # UoW and repositories above intentionally import/register all domain row
-    # models before metadata creation.
+    # 上面的 UoW 和 repository 会有意 import/register 所有 domain row
+    # model，然后再创建 metadata。
     _store.init_schema()
 
 
@@ -111,8 +111,8 @@ class ReplaceOnboardingFacts(BaseModel):
     requested_systems: tuple[str, ...] = ()
     requires_privileged_access: bool = False
     attestation_ref: str | None = Field(default=None, max_length=1000)
-    # Compatibility only. Caller-supplied source labels are never trusted as
-    # authoritative provenance.
+    # 仅用于兼容。绝不把调用方提供的 source label 信任为
+    # authoritative provenance。
     source: str | None = None
 
 
