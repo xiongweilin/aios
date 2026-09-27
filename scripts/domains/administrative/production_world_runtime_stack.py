@@ -109,10 +109,10 @@ class ProductionEffectProvider:
         context: InvocationContext,
     ) -> CapabilityResult:
         del context
-        # World Runtime carries the governed subject identity into the frozen intent.
-        # Keep it separate from business payload fields such as employee_ref;
-        # financial transactions may legitimately have a transaction subject
-        # while targeting an existing employee record.
+        # World Runtime 会把受治理的 subject identity 带入冻结后的 intent。
+        # 它应与 employee_ref 等业务 payload field 保持分离；
+        # financial transaction 可以合法拥有 transaction subject，
+        # 同时仍以已有 employee record 为目标。
         subject_ref = request.parameters.get("subject_ref")
         if not isinstance(subject_ref, str) or not subject_ref:
             subject_ref = request.parameters.get("employee_ref")
