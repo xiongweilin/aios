@@ -17,7 +17,7 @@ from .effect_provider import (
 class VerificationDisposition(StrEnum):
     VERIFIED = "verified"
     ABSENT = "absent"
-    NOT_FOUND = "absent"  # compatibility alias
+    NOT_FOUND = "absent"  # compatibility alias（兼容别名）
     MISMATCH = "mismatch"
     UNAVAILABLE = "unavailable"
     UNKNOWN = "unknown"
