@@ -77,8 +77,8 @@ def test_oidc_verifies_asymmetric_token_and_ignores_authority_claims() -> None:
     claims = verifier.verify(_token(private, "kid-1"))
     assert claims["sub"] == "external:alice"
     assert claims["groups"] == ["hr-admin"]
-    # The verifier returns identity claims only; no Administrative role is
-    # materialized by OIDC verification itself.
+    # Verifier 只返回 identity claim；OIDC verification 本身
+    # 不会 materialize 任何 Administrative role。
     assert "decision_role" not in claims
 
 
