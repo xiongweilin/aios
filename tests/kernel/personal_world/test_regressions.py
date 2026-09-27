@@ -91,6 +91,6 @@ def test_partial_record_erasure_must_not_destroy_other_provenance(tmp_path) -> N
         )
     )
 
-    # A scoped record erasure must not silently remove raw provenance, because other
-    # personal record kinds may still reference it.
+    # Scoped record erasure 不能静默删除 raw provenance，因为其他
+    # personal record kind 仍可能引用它。
     assert store.get_source(shared.id).id == shared.id
