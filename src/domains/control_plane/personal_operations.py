@@ -174,8 +174,8 @@ class PersonalOperationsProvider:
         del request_id
 
     async def reconcile(self, request_id: str) -> CapabilityResult | None:
-        # No profile-local durable effect ledger is retained. World Runtime must
-        # preserve ambiguous effects as unknown rather than inventing certainty.
+        # 不保留 profile-local durable effect ledger。World Runtime 必须
+        # 把 ambiguous effect 保持为 unknown，而不是凭空制造确定性。
         del request_id
         return None
 
