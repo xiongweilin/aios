@@ -243,8 +243,8 @@ def test_soak_regression_restores_baseline_traffic_and_serving_release(
     )
     assert decision.kind is SoakDecisionKind.ROLLBACK
 
-    # Simulate a crash after the serving pointer was durably restored but before
-    # source/container/cycle effects completed. Applying the same rollback must reconcile.
+    # 模拟 crash：serving pointer 已 durable restore，但
+    # source/container/cycle effect 尚未完成。再次应用同一 rollback 必须执行 reconcile。
     catalog.set_serving(
         "target-1",
         "release-0",
