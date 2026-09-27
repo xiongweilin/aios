@@ -363,8 +363,8 @@ def test_promotion_is_idempotent_per_candidate_and_request() -> None:
         intent="onboard employee:1",
     )
     case_id = uuid4()
-    # The existing M5 schema requires the request row before a promotion FK
-    # can be persisted; use the store's normal request/case writer below.
+    # 现有 M5 schema 要求先存在 request row，promotion FK
+    # 才能持久化；下面使用 store 的正常 request/case writer。
     from administrative_orchestrator.domain import AdministrativeCase
 
     store.create_case(
