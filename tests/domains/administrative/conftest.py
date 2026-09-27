@@ -42,9 +42,9 @@ def _bounded_dbos_destroy(monkeypatch):
 
         result = original_destroy(*args, **kwargs)
         if executor is not None:
-            # DBOS.destroy() has already issued shutdown(wait=False). Calling
-            # shutdown again with wait=True is supported by ThreadPoolExecutor
-            # and drains any recv/check future before the owning test drops DBs.
+            # DBOS.destroy() 已经执行 shutdown(wait=False)。再次调用
+            # wait=True 的 shutdown 受到 ThreadPoolExecutor 支持，
+            # 会在所属测试删除 DB 前清空所有 recv/check future。
             executor.shutdown(wait=True, cancel_futures=True)
         return result
 
