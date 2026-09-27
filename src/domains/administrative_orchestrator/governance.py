@@ -221,7 +221,7 @@ class GovernanceRepository:
 
         try:
             current_policy = PolicyRepository(self.store).resolve_current(basis.policy_ref.policy_id)
-        except Exception as exc:  # fail closed on any policy-plane ambiguity
+        except Exception as exc:  # 遇到任何 policy-plane ambiguity 都 fail closed
             reasons.append(f"current policy cannot be resolved: {exc}")
         else:
             if current_policy.policy_ref != basis.policy_ref:
