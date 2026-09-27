@@ -42,9 +42,9 @@ class OnboardingPolicyDefinition(BaseModel):
     base_effects: tuple[AuthorizedEffectTemplate, ...]
 
 
-# Employee lifecycle termination facts. Termination status and effective time
-# are authoritative HR facts; a request or model extraction may only ever be a
-# claim about them.
+# Employee lifecycle termination fact。Termination status 与 effective time
+# 是 authoritative HR fact；request 或 model extraction 最多只能是
+# 关于它们的 claim。
 class OffboardingFacts(BaseModel):
     employee_ref: str
     termination_status: str | None = None
@@ -212,7 +212,7 @@ class OnboardingPolicy:
 
 
 class OffboardingPolicy:
-    # Deterministic evaluator for the employee-offboarding lifecycle.
+    # employee-offboarding lifecycle 的 deterministic evaluator。
 
     def __init__(
         self,
