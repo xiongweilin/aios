@@ -18,8 +18,8 @@ from .commitment_models import (
     SpeakerPrincipalResolution,
 )
 
-# Import row modules for their declarative metadata registration.  M9 tables
-# refer to M6 intake artifacts and the generic effect ledger.
+# 导入 row module 以完成 declarative metadata 注册。M9 table
+# 会引用 M6 intake artifact 和通用 effect ledger。
 from .persistence import Base, SqlStore
 
 
