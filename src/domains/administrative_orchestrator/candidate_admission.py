@@ -89,9 +89,9 @@ class CandidateAdministrativeAdmissionService:
                 f"{self.case_kind} promotion requires a non-blank subject_ref"
             )
 
-        # Validate the candidate facts against the case kind contract before
-        # any promotion/request/case row exists so a rejected candidate leaves
-        # no partial state behind.
+        # 在任何 promotion/request/case row 创建之前，先按照 case kind contract
+        # 验证 candidate facts，确保被拒绝的 candidate 不会留下
+        # 任何 partial state。
         facts = self._candidate_facts(candidate, subject_ref=subject_ref)
 
         promotion = self.promotions.promote(
