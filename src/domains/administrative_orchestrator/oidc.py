@@ -104,8 +104,8 @@ class OidcVerifier:
         if key is not None:
             return key
 
-        # Key rotation: force one refresh on an unknown kid. Failure or a second
-        # miss is fail-closed; no stale/unknown key is accepted.
+        # Key rotation：遇到 unknown kid 时强制刷新一次。刷新失败或第二次
+        # 仍未命中时 fail-closed；绝不接受 stale/unknown key。
         self._refresh_jwks()
         assert self._jwks is not None
         key = self._jwks.keys.get(key_id)
