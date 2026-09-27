@@ -68,9 +68,9 @@ def _merge_authoritative_facts(
             continue
         value = record.value[key]
         if value is None:
-            # An authoritative source that reports no value for a field must
-            # not erase a human-admitted claim for that field. The claim stays
-            # the effective value until an authoritative value exists.
+            # authoritative source 对某个 field 报告无值时，绝不能
+            # 擦除该 field 已由 human admit 的 claim。在 authoritative value
+            # 出现之前，该 claim 继续作为 effective value。
             continue
         facts[key] = value
         assertions[key] = FactAssertion(
@@ -88,8 +88,8 @@ def _merge_authoritative_facts(
     return FactSnapshot(
         source=source,
         owner=owner,
-        # Conservative compatibility aggregate: mixed snapshots are never
-        # globally promoted above their least-authoritative constituent.
+        # 保守的 compatibility aggregate：mixed snapshot 绝不会
+        # 被整体提升到高于其中最低 authority constituent 的级别。
         authority=FactAuthority.CLAIM,
         source_ref=record.source_ref,
         source_version=record.source_version,
