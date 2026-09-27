@@ -51,9 +51,9 @@ from .responsibility_discharge import AdministrativeResponsibilityDischargeServi
 app = FastAPI(title="Administrative Operations API", version="0.3.0")
 _runtime: OperationsRuntime = build_operations_runtime()
 
-# Compatibility aliases for existing tests, operational probes, and local
-# tooling. Ownership and construction live in operations.runtime; these names
-# remain mutable because the pre-refactor module was an established test seam.
+# 为现有 test、operational probe 和 local
+# tooling 保留 compatibility alias。Ownership 与 construction 位于 operations.runtime；这些名称
+# 保持可变，因为重构前的 module 已是既有 test seam。
 _settings = _runtime.settings
 _store = _runtime.store
 _authority = _runtime.authority
@@ -187,8 +187,8 @@ def _require_intake_review(actor) -> None:
     _require(actor, AdministrativePermission.INTAKE_REVIEW)
 
 
-# Preserve helper names previously defined by operations_api.py without
-# keeping their implementation in the HTTP composition root.
+# 保留 operations_api.py 之前定义的 helper name，同时
+# 不把其 implementation 留在 HTTP composition root。
 _case_completion_assessment = _projection.case_completion_assessment
 _dedupe_json_records = _projection.dedupe_json_records
 _termination_snapshot = _projection.termination_snapshot
@@ -270,8 +270,8 @@ def _endpoint(router, path: str, method: str):
     raise RuntimeError(f"operations route {method} {path!r} is unavailable")
 
 
-# The old module exposed its route functions directly. Bind those names from
-# the source APIRouters before FastAPI copies their route registrations.
+# 旧 module 会直接暴露 route function。在 FastAPI 复制 route registration 前，
+# 从 source APIRouter 绑定这些名称。
 healthz = _endpoint(_case_router, "/healthz", "GET")
 case_queue = _endpoint(_case_router, "/v1/operations/cases", "GET")
 case_detail = _endpoint(_case_router, "/v1/operations/cases/{case_id}", "GET")
