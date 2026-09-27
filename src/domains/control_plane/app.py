@@ -283,9 +283,9 @@ def create_app(
         }
 
     async def settle_personal_state(state: Any) -> Any:
-        # A failed or invalid diagnosis is durable controller state, not a
-        # valid diagnosis. Never manufacture a CognitiveClosure or blocked
-        # Work merely to give that failure an id.
+        # Failed/invalid diagnosis 是 durable controller state，不是
+        # valid diagnosis。绝不能为了给 failure 一个 id 而凭空创建 CognitiveClosure 或 blocked
+        # Work。
         if state.status is ControllerStatus.WAITING:
             settle_waiting_execution_claims(bridge, bridge.work_for_state(state))
         return state
@@ -321,8 +321,8 @@ def create_app(
             snapshot = await environment_provider.refresh()
             profile_metrics.set_environment_snapshot(snapshot)
         except Exception:
-            # The next scheduled scrape retries the read-only probe. A probe
-            # failure must never affect HTTP liveness or alert ingestion.
+            # 下一次 scheduled scrape 会重试 read-only probe。Probe
+            # failure 绝不能影响 HTTP liveness 或 alert ingestion。
             return
 
     def schedule_environment_refresh() -> None:
