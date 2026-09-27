@@ -9,8 +9,8 @@ and optional container facts.
 
 from __future__ import annotations
 
-# Probe commands and Chinese escalation text are intentionally kept readable;
-# their long lines are bounded and contain no secret values.
+# Probe command 与中文 escalation text 刻意保持可读；
+# 这些长行有明确边界，且不包含 secret value。
 # ruff: noqa: E501, RUF001
 import asyncio
 import json
@@ -708,8 +708,8 @@ class EnvironmentInspectionProvider:
         try:
             stdout, stderr = process.communicate(timeout=max(0.1, timeout))
         except subprocess.TimeoutExpired as exc:
-            # Stop only the probe process itself.  A recursive tree kill could
-            # terminate an unrelated or still-useful child process.
+            # 只停止 probe process 本身。递归结束整个 process tree 可能会
+            # 终止无关或仍有用途的 child process。
             with suppress(OSError):
                 process.kill()
             with suppress(subprocess.TimeoutExpired):
@@ -830,9 +830,9 @@ class EnvironmentInspectionProvider:
             )
             head_text = head.stdout.decode("utf-8", errors="replace").strip()
             subject["head_sha"] = head_text[:40]
-            # Remote SHAs come from the background-refreshed cache, never from
-            # a blocking ls-remote in the hot path. A stale or missing entry is
-            # reported as unknown (honestly unverifiable), not as a mismatch.
+            # Remote SHA 来自后台刷新的 cache，绝不在
+            # hot path 中执行阻塞式 ls-remote。Stale 或 missing entry
+            # 应报告为 unknown（如实表示不可验证），而不是 mismatch。
             remote_sha = _cached_remote_sha(remote_cache, raw_path)
             subject["remote_sha"] = remote_sha[:40]
             if head.returncode != 0 or not head_text:
@@ -842,10 +842,10 @@ class EnvironmentInspectionProvider:
                 subject["reason"] = "remote_cache_stale"
                 stale_remote_paths.append(raw_path)
             elif head_text != remote_sha:
-                # 2026-09-21: cached remote SHA may lag a fresh local push.
-                # Schedule an immediate re-verification so a sustained
-                # mismatch is confirmed against the live remote instead of
-                # the stale cache entry.
+                # 2026-09-21：cache 中的 remote SHA 可能落后于刚完成的 local push。
+                # 立即安排 re-verification，使持续存在的
+                # mismatch 能对 live remote 重新确认，而不是
+                # 依赖 stale cache entry。
                 record_sync_failure(raw_path, "local_head_or_origin_main_mismatch")
                 stale_remote_paths.append(raw_path)
             else:
