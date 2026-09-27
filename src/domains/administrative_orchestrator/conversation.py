@@ -267,7 +267,7 @@ class ConversationService:
         tenant_ref: str | None = None,
         at: datetime | None = None,
     ) -> ResolvedProviderIdentity:
-        del displayed_sender  # Display text is evidence, never an authority key.
+        del displayed_sender  # Display text 只是 evidence，绝不是 authority key。
         self._validate_provider_context(conversation_ref, provider=provider, tenant_ref=tenant_ref)
         external_subject = external_subject.strip()
         if not external_subject:
