@@ -41,8 +41,8 @@ class AdministrativeUnitOfWork:
         self.store = store
         self.authority = AuthorityRepository(store)
         self.governance = GovernanceRepository(store)
-        # Keep obligation row models registered wherever the UoW is imported,
-        # including direct Base.metadata.create_all integration-test paths.
+        # 无论 UoW 从何处 import，都保持 obligation row model 已注册，
+        # 包括直接调用 Base.metadata.create_all 的 integration-test path。
         self.obligations = ObligationRepository(store)
 
     def create_case(
