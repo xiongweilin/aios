@@ -27,8 +27,8 @@ from ..policy_plane import PolicyRepository
 from ..transaction_repository import TransactionRepository
 from ..unit_of_work import AdministrativeUnitOfWork
 
-# Importing these mapped rows before optional schema creation preserves the
-# legacy Operations process metadata-registration behavior.
+# 在 optional schema 创建前导入这些 mapped row，以保持
+# legacy Operations process 的 metadata-registration 行为。
 _CONVERSATION_SCHEMA = (ConversationRow, ConversationMessageRow)
 
 
