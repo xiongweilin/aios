@@ -267,8 +267,8 @@ class AuthorityLifecycleRepository:
                 value = getattr(row, field)
                 payload[field] = str(value) if isinstance(value, UUID) else value
             payload["valid_from"] = valid_from.isoformat()
-            # The event records the resulting window, which the monotonic guard
-            # may have kept earlier than the requested time.
+            # Event 记录最终得到的 window；monotonic guard
+            # 可能会保留一个比请求时间更早的值。
             payload["valid_until"] = normalize_datetime(row.valid_until).isoformat()
             event = AuthorityLifecycleEvent(
                 event_id=uuid5(
