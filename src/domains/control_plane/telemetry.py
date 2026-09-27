@@ -19,9 +19,9 @@ def configure_telemetry(app: FastAPI, service_name: str = "control-plane") -> bo
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
     if not endpoint:
         return False
-    # OTEL_EXPORTER_OTLP_ENDPOINT is a base URL by spec, but the explicit
-    # exporter constructor does not append the signal path the way the SDK's
-    # env-var handling does.
+    # 按规范，OTEL_EXPORTER_OTLP_ENDPOINT 是 base URL，但显式
+    # exporter constructor 不会像 SDK 的
+    # env-var handling 那样自动追加 signal path。
     endpoint = endpoint.rstrip("/")
     if not endpoint.endswith("/v1/traces"):
         endpoint = f"{endpoint}/v1/traces"
