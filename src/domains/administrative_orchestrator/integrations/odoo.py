@@ -119,8 +119,8 @@ class OdooHRFactSource:
         if self.termination_status_field in termination_fields:
             raw_status = row.get(self.termination_status_field)
             status = str(raw_status).strip().lower() if raw_status else ""
-            # An empty termination field is the authoritative statement that no
-            # termination is scheduled for this employee.
+            # 空 termination field 是 authoritative statement，表示该员工
+            # 当前没有安排 termination。
             value["termination_status"] = status or "active"
         if self.termination_effective_at_field in termination_fields:
             value["termination_effective_at"] = (
@@ -229,8 +229,8 @@ class OdooHRFactSource:
         try:
             result = self._execute_kw(model, "fields_get", [[], ["string"]])
         except OdooSourceError:
-            # A reader without field introspection still keeps the base read
-            # path working; optional facts then simply stay absent.
+            # 即使 reader 不支持 field introspection，仍保持基础 read
+            # path 可用；optional fact 只需保持 absent。
             self._available_fields_cache[model] = set()
             return set()
         available = set(result) if isinstance(result, dict) else set()
