@@ -226,9 +226,9 @@ class RequirementAnalysisService:
         )
         if existing is None:
             return self._repository.add_analysis(analysis)
-        # A human clarification entered the requirement, so replace the earlier
-        # analysis with one derived from the clarified requirement instead of
-        # replaying a conclusion the human has already contested.
+        # Human clarification 已进入 requirement，因此替换之前的
+        # analysis，改为从澄清后的 requirement 重新 derive，避免
+        # replay 一个 human 已经明确质疑过的结论。
         return self._repository.replace_analysis(analysis)
 
     def _clarifications(self, request_id: str) -> tuple[tuple[str, str], ...]:
