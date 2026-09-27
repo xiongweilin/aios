@@ -86,9 +86,9 @@ class ThreadIsolatedCodexProvider:
         request: CapabilityRequest,
         context: InvocationContext,
     ) -> CapabilityResult:
-        # Promote an optional profile timeout carried in semantic parameters
-        # into the provider-level deadline. This is profile behavior, not a
-        # second Runtime contract.
+        # 把 semantic parameter 中携带的 optional profile timeout
+        # 提升为 provider-level deadline。这属于 profile behavior，不是
+        # 第二套 Runtime contract。
         if request.timeout_seconds is None:
             raw_timeout = request.parameters.get("timeout_seconds")
             try:
