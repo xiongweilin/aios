@@ -69,10 +69,10 @@ def restore_world_runtime_state(backup: Path, destination: Path, *, force: bool 
         try:
             os.replace(temporary, destination)
         except PermissionError:
-            # Windows cannot atomically replace a file that another SQLite
-            # handle still has open.  A forced restore is explicitly allowed
-            # to overwrite that target, so fall back to SQLite's own backup
-            # semantics while preserving the temporary validation step.
+            # Windows 无法原子替换仍被另一个 SQLite
+            # handle 打开的文件。Forced restore 被明确允许
+            # 覆盖该 target，因此回退到 SQLite 自身的 backup
+            # semantics，同时保留临时 validation step。
             if not force or not destination_existed:
                 raise
             _sqlite_backup(backup, destination)
