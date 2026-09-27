@@ -101,8 +101,8 @@ class AlertContext:
             if isinstance(parsed, Mapping):
                 return cls.from_raw(parsed)
 
-        # Legacy queued events stored verification labels separately.  Keep
-        # those labels bounded while making the result the same canonical type.
+        # Legacy queued event 会单独保存 verification label。保持
+        # 这些 label 有边界，同时让 result 使用同一个 canonical type。
         return cls.from_raw(
             {
                 "status": "firing",
