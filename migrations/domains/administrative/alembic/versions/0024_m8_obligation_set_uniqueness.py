@@ -15,8 +15,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # A unique index works on both PostgreSQL and SQLite, and deliberately
-    # fails the migration if historical data already contains a conflict.
+    # unique index 同时适用于 PostgreSQL 和 SQLite，并且会在
+    # 历史数据已经存在冲突时刻意让 migration 失败。
     op.create_index(
         "uq_admin_obligation_set_case_epoch",
         "administrative_obligation_set",
