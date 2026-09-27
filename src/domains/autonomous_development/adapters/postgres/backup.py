@@ -12,8 +12,8 @@ _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 _CONTAINER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _OPERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 
-# Stage transfer files inside the database container's private home directory.
-# A world-writable directory such as /tmp is unsafe for fixed-name files.
+# 将 transfer file 暂存到 database container 的 private home directory。
+# 对 fixed-name file 而言，/tmp 这类 world-writable directory 不安全。
 _CONTAINER_STAGING_ROOT = "/var/lib/postgresql"
 
 
