@@ -199,9 +199,9 @@ class SqlStore:
         self.sessions = sessionmaker(bind=self.engine, expire_on_commit=False, future=True)
 
     def init_schema(self) -> None:
-        # Import optional domain row modules before metadata creation so a
-        # direct in-memory/test store gets the same table topology as the
-        # application entrypoints.
+        # 在 metadata 创建前导入 optional domain row module，使
+        # 直接 in-memory/test store 获得与
+        # application entrypoint 相同的 table topology。
         from . import investigation_repository as _investigation_repository  # noqa: F401
 
         Base.metadata.create_all(self.engine)
@@ -592,10 +592,10 @@ class SqlStore:
         )
 
 
-# Register Intake Plane tables in the shared metadata without moving the
-# already-stable M0-M5 persistence definitions out of this module. The import
-# occurs after Base and SqlStore are fully initialized, so intake/repository.py
-# can safely reuse the existing database/session boundary.
+# 在 shared metadata 中注册 Intake Plane table，同时不移动
+# 本 module 中已经稳定的 M0-M5 persistence definition。Import
+# 发生在 Base 和 SqlStore 完全初始化之后，因此 intake/repository.py
+# 可以安全复用现有 database/session boundary。
 from . import transaction_repository as _transaction_repository  # noqa: E402, F401
 from .intake import document_repository as _document_repository  # noqa: E402, F401
 from .intake import repository as _intake_repository  # noqa: E402, F401
