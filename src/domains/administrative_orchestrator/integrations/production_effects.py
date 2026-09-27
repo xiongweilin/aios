@@ -36,8 +36,8 @@ from .odoo_effects import _many2one_id as _many2one_id
 from .odoo_effects import _odoo_numeric_ref as _odoo_numeric_ref
 from .odoo_effects import _required_odoo_numeric_ref as _required_odoo_numeric_ref
 
-# Compatibility import surface. Provider-specific implementations live in the
-# bounded modules above; existing callers may continue importing from here.
+# Compatibility import surface。Provider-specific implementation 位于
+# 上面的 bounded module；现有 caller 可以继续从这里 import。
 
 __all__ = [
     "AdministrativeCommunicationEffectConnection",
