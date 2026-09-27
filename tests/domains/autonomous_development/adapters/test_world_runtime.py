@@ -477,7 +477,7 @@ def test_requirement_driven_assignment_omits_the_evidence_window_reference() -> 
         transport=httpx.MockTransport(handler),
     )
 
-    # A requirement-driven cycle has no product evidence window yet.
+    # Requirement-driven cycle 目前还没有 product evidence window。
     bridge.ensure_assignment(
         cycle=_cycle(),
         target=_target(),
@@ -493,7 +493,7 @@ def test_requirement_driven_assignment_omits_the_evidence_window_reference() -> 
     assert isinstance(payload, dict)
     assert "evidence_window_ref" not in payload
 
-    # An evidence-driven cycle still carries the immutable window reference.
+    # Evidence-driven cycle 仍携带 immutable window reference。
     calls.clear()
     window = _window()
     bridge.ensure_assignment(
