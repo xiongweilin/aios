@@ -16,8 +16,8 @@ def _assert_decision_qualified_current(
     )
     qualification = ledger.project_get("decision.qualification", decision_id)
     if qualification is None:
-        # Decisions recorded before institutional continuity are historical active
-        # decisions unless supersession lineage says otherwise.
+        # 在 institutional continuity 引入前记录的 Decision，历史上视为 active，
+        # 除非 supersession lineage 明确说明相反。
         return
     status = str(qualification[0].get("status", "active"))
     if status != "active":
