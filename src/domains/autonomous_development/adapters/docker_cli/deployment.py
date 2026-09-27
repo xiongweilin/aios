@@ -88,8 +88,8 @@ class DockerDeploymentProvider(DeploymentProvider):
             },
         )
 
-        # A non-zero return or lost/ambiguous acknowledgement is never retried
-        # blindly. Re-read Docker reality using the deterministic container name.
+        # 非零返回或丢失/ambiguous acknowledgement 绝不能
+        # 盲目重试。应使用 deterministic container name 重新读取 Docker reality。
         reconciled = self._inspect(spec, name, effect_evidence_ref=evidence_ref)
         if reconciled is not None:
             return reconciled
