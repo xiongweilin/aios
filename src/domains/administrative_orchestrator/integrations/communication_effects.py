@@ -150,8 +150,8 @@ class AdministrativeCommunicationEffectConnector:
             )
 
     async def reconcile(self, request_ref: str) -> ConnectorResult | None:
-        # A lost writer ACK is reconciled by the durable Gateway event id. The
-        # Kernel request ref alone cannot be used to invent a new send.
+        # 丢失的 writer ACK 通过 durable Gateway event id 做 reconciliation。
+        # 不能只凭 Kernel request ref 就发明一次新的 send。
         del request_ref
         return None
 
