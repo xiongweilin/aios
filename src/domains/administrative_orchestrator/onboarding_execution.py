@@ -63,10 +63,10 @@ class OnboardingExecutionEngine:
         try:
             return self._verified_executor.run(case_id)
         except FinancialQualificationPending:
-            # Qualification is an expected asynchronous prerequisite. Keep
-            # the authorization intact and let the durable workflow wait;
-            # the qualification repository emits a case_changed wake-up
-            # when the evidence is committed.
+            # Qualification 是预期的异步 prerequisite。保留
+            # authorization 不变，让 durable workflow 等待；
+            # qualification repository 在 evidence 提交后发出
+            # case_changed wake-up。
             return self._require_case(case_id)
 
     def _plan_current_effects(self, case: AdministrativeCase) -> None:
@@ -265,8 +265,8 @@ class OnboardingExecutionEngine:
             return (0, "", "", str(effect.effect_id))
         if effect.operation == "purchase_order.confirm":
             return (1, "", "", str(effect.effect_id))
-        # Preserve the caller's established order for onboarding/offboarding;
-        # only procurement draft/confirm has a new dependency order.
+        # 保持 caller 已建立的 onboarding/offboarding 顺序；
+        # 只有 procurement draft/confirm 使用新的 dependency order。
         return (2, "", "", "")
 
     def _verify_all(
