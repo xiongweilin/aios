@@ -58,8 +58,8 @@ class CandidateProjectionService:
                 CandidateFactAssertion(
                     fact_key=fact_key,
                     value=raw_fact.get("value"),
-                    # Never copy an authority-like model field. Candidate
-                    # projection always starts at the least privileged value.
+                    # 绝不复制类似 authority 的 model field。Candidate
+                    # projection 始终从最低 privilege value 开始。
                     authority=CandidateAuthority.CLAIM,
                     interpretation_ref=interpretation.interpretation_id,
                     source_refs=source_refs,
