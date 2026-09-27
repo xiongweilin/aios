@@ -19,8 +19,8 @@ from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily
 from .environment import CHECK_NAMES, EnvironmentSnapshot
 
 _REPAIR_KINDS = frozenset(
-    # The blocked kind is retained only so historical journal projections do
-    # not disappear when the no-closure diagnosis semantics are deployed.
+    # 保留 blocked kind 只是为了防止 historical journal projection 在
+    # no-closure diagnosis semantics 部署后消失。
     {"personal-incident-repair", "personal-incident-repair-blocked"}
 )
 _REPAIR_STATUS_LABELS = ("active", "waiting", "blocked", "closed", "failed", "interrupted")
@@ -103,13 +103,13 @@ class ControlPlaneMetricsCollector:
             return [], 1
 
     def _candidates(self) -> tuple[int, int]:
-        # World Runtime does not expose a legacy Knowledge namespace. Candidate
-        # metrics will be added when cognition publishes a canonical projection.
+        # World Runtime 不暴露 legacy Knowledge namespace。等 cognition 发布
+        # canonical projection 后再加入 candidate metric。
         return 0, 0
 
     def _resource_pool(self) -> tuple[int, int, int]:
-        # ResourcePool was a predecessor-runtime admission object. World Runtime V1
-        # intentionally does not preserve it as a compatibility contract.
+        # ResourcePool 是 predecessor-runtime admission object。World Runtime V1
+        # 刻意不把它保留为 compatibility contract。
         return 0, 0, 0
 
     def _today_calls(self) -> tuple[int, int]:
@@ -212,8 +212,8 @@ class ControlPlaneMetricsCollector:
         )
         available_metric.add_metric(["api_calls"], available_api_calls)
         yield available_metric
-        # Compatibility alias for existing consumers.  In v2 this is resource
-        # pool capacity, not a daily Agent budget.
+        # 面向现有 consumer 的 compatibility alias。在 v2 中它表示 resource
+        # pool capacity，而不是 daily Agent budget。
         budget_metric = GaugeMetricFamily(
             "control_plane_budget_remaining",
             "Compatibility alias for available personal-control-plane api_calls",
@@ -239,8 +239,8 @@ class ControlPlaneMetricsCollector:
         retry_metric.add_metric([], retry_failures)
         yield retry_metric
 
-        # This is updated only by a successful /ready request; zero means that
-        # no readiness proof has been observed since this process started.
+        # 只有成功的 /ready request 才会更新此值；0 表示
+        # 本进程启动后尚未观察到 readiness proof。
         ready_metric = GaugeMetricFamily(
             "control_plane_health_last_ready",
             "Unix timestamp of the last successful control-plane /ready probe",
