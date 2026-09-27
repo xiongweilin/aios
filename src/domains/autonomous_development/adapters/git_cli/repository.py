@@ -431,11 +431,11 @@ class GitCliRepository(RepositoryProvider):
             == 0
         ):
             self._run(root, "branch", "-D", branch)
-        # An unregistered directory cannot affect Git safety. Some external
-        # sandbox/test runners may leave an inaccessible cache directory; do
-        # not let that residue prevent the durable workflow from reaching its
-        # terminal state. The next isolated cleanup can remove it when the
-        # runner releases its handle.
+        # 未注册目录不会影响 Git safety。某些 external
+        # sandbox/test runner 可能留下无法访问的 cache directory；不要
+        # 让这些残留阻止 durable workflow 到达
+        # terminal state。等 runner 释放 handle 后，下一次 isolated cleanup
+        # 可以将其删除。
 
     def _worktree_registered(self, repository_root: Path, path: Path) -> bool:
         output = self._run(repository_root, "worktree", "list", "--porcelain")
