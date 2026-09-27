@@ -143,7 +143,7 @@ def caller(
                 detail="invalid service credentials",
             )
     else:
-        # Explicit local-only mode. Production is rejected by _auth_mode.
+        # 显式 local-only 模式。Production 会被 _auth_mode 拒绝。
         pass
 
     return Caller(service_identity=x_service_identity, purpose=x_purpose)
