@@ -66,8 +66,8 @@ class VerifiedObligationExecutor:
 
         effects = owner.repository.list_effects(case.case_id, case.authority_epoch)
         if not effects:
-            # Preserve the historical message while the public execution
-            # engines retain their existing compatibility surface.
+            # 保留 historical message，同时让 public execution
+            # engine 保持现有 compatibility surface。
             raise TransitionError("authorized onboarding case has no planned effects")
 
         obligation_set = owner.obligations.get_current(case.case_id, case.authority_epoch)
@@ -217,8 +217,8 @@ class VerifiedObligationExecutor:
                     saw_unknown = True
                     continue
                 if effect.status == EffectStatus.OUTCOME_UNKNOWN:
-                    # Even authoritative ABSENT is not permission to blindly
-                    # repeat an effect whose prior provider outcome was unknown.
+                    # 即使是 authoritative ABSENT，也不代表可以盲目
+                    # 重复 prior provider outcome 为 unknown 的 effect。
                     saw_unknown = True
                     continue
 
