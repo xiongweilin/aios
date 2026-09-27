@@ -355,9 +355,9 @@ def test_replay_reuses_frozen_obligations_after_partial_domain_planning() -> Non
     assert first is not None
     assert len(first.obligations) > 4
 
-    # Domain-state fulfillment has already changed the authority graph. A
-    # retry must keep the immutable obligation set for this authority epoch
-    # instead of deriving a smaller set from the mutated graph.
+    # Domain-state fulfillment 已经改变 authority graph。Retry
+    # 必须保留当前 authority epoch 的 immutable obligation set，
+    # 不能从已变更的 graph 重新 derive 一个更小的 set。
     engine._plan_current_effects(case)
 
     replayed = ObligationRepository(store).get_current(
