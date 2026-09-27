@@ -164,8 +164,8 @@ class InvestigationRepository:
                 row.updated_at = utcnow()
                 budget_error = "investigation model-call budget exhausted"
             else:
-                # Reserve both budgets before the external call. A crash or
-                # timeout after invocation must not make retries unbounded.
+                # 在 external call 前先预留两种 budget。Invocation 后发生 crash 或
+                # timeout 时，绝不能让 retry 变成无界。
                 row.rounds_used += 1
                 row.model_calls_used += 1
                 row.status = InvestigationStatus.RUNNING.value
