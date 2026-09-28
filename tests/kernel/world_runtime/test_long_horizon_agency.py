@@ -49,16 +49,16 @@ def _build_long_horizon_state(runtime: WorldRuntime) -> str:
             id="responsibility:parent",
             principal=PRINCIPAL,
             subject="Deliver the durable outcome",
-        ),
-        domain="coordination",
+            domain="coordination",
+        )
     )
     runtime.responsibility.create(
         Responsibility(
             id="responsibility:child",
             principal=PRINCIPAL,
             subject="Complete the required domain work",
-        ),
-        domain="development",
+            domain="development",
+        )
     )
     _decision(
         runtime,
