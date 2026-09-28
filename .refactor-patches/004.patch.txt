@@ -140,4 +140,4 @@
 +    return _failed_result(
 +               'DuplicateExternalRequestIdentity',
 +               f'multiple Keycloak users share the {operation} request_ref',
-+         
++        
