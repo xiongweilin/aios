@@ -45,12 +45,7 @@ from .ledger import LedgerEvent, SemanticLedger, SQLiteLedger
 from .lineage import Revision, RevisionLineageService
 from .memory import Experience, MemoryService
 from .ontology import OntologyRegistry, SemanticTypeDefinition
-from .qualification import (
-    QualificationDependency,
-    QualificationService,
-    ReviewObligation,
-    RevalidationAssessment,
-)
+from .qualification import QualificationBinding, QualificationService, ReviewCase
 from .recovery import (
     RecoveryDisposition,
     RecoveryDispositionKind,
@@ -82,7 +77,7 @@ __all__ = [
     "InvestigationBudget", "InvestigationCandidate", "InvestigationClosureReadiness",
     "InvocationContext", "LedgerEvent", "MemoryService", "OntologyRegistry",
     "Mandate", "Revision", "RevisionLineageService", "SemanticTypeDefinition",
-    "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "QualificationDependency", "QualificationService", "ReviewObligation", "RevalidationAssessment", "RecoveryDisposition",
+    "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "QualificationBinding", "QualificationService", "ReviewCase", "RecoveryDisposition",
     "RecoveryDispositionKind", "RecoveryResolution", "RecoveryResolutionStatus",
     "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger", "SearchBudget",
     "StrategicIssue", "StrategicPortfolio", "StrategicPortfolioService", "PortfolioProposal", "ResourceAllocation", "ResourceBudgetLine", "StrategyAssessment", "StrategyService", "BUNDLE_VERSION", "BundleValidation",
