@@ -21,6 +21,7 @@ from .commitment_models import (
 # 导入 row module 以完成 declarative metadata 注册。M9 table
 # 会引用 M6 intake artifact 和通用 effect ledger。
 from .persistence import Base, SqlStore
+from .persistence_mapping import model_from_row, model_values
 
 
 class CommitmentConflict(RuntimeError):
@@ -303,7 +304,7 @@ class CommitmentRepository:
             if row.version != commitment.version:
                 raise CommitmentConflict("commitment version changed")
             updated = commitment.model_copy(update={"version": commitment.version + 1})
-            for key, value in self._commitment_values(updated).items():
+            for key, value in model_values(updated, exclude={"commitment_id", "candidate_ref", "case_id"}).items():
                 setattr(row, key, value)
             db.flush()
             return self._commitment_from_row(row)
@@ -434,7 +435,7 @@ class CommitmentRepository:
             row = db.get(CommunicationEffectRow, communication.communication_event_id)
             if row is None:
                 raise KeyError(f"communication event {communication.communication_event_id} not found")
-            for key, value in self._communication_values(communication).items():
+            for key, value in model_values(communication, exclude={"communication_event_id"}).items():
                 setattr(row, key, value)
             db.flush()
             return self._communication_from_row(row)
@@ -442,236 +443,68 @@ class CommitmentRepository:
     @staticmethod
     def _candidate_row(item: CandidateCommitment) -> CandidateCommitmentRow:
         return CandidateCommitmentRow(
-            candidate_commitment_id=item.candidate_commitment_id,
-            source_artifact_ref=item.source_artifact_ref,
-            interpretation_ref=item.interpretation_ref,
-            evidence_span_refs_json=[str(value) for value in item.evidence_span_refs],
-            candidate_committer_identity=item.candidate_committer_identity,
-            candidate_action=item.candidate_action,
-            candidate_due_text=item.candidate_due_text,
-            candidate_due_at=item.candidate_due_at,
-            candidate_scope_ref=item.candidate_scope_ref,
-            candidate_beneficiary=item.candidate_beneficiary,
-            classification=item.classification.value,
-            status=item.status.value,
-            created_at=item.created_at,
-            superseded_by=item.superseded_by,
+            **model_values(
+                item,
+                rename={"evidence_span_refs": "evidence_span_refs_json"},
+                json_fields={"evidence_span_refs"},
+            )
         )
 
     @staticmethod
     def _candidate_from_row(row: CandidateCommitmentRow) -> CandidateCommitment:
-        return CandidateCommitment(
-            candidate_commitment_id=row.candidate_commitment_id,
-            source_artifact_ref=row.source_artifact_ref,
-            interpretation_ref=row.interpretation_ref,
-            evidence_span_refs=tuple(UUID(value) for value in row.evidence_span_refs_json),
-            candidate_committer_identity=row.candidate_committer_identity,
-            candidate_action=row.candidate_action,
-            candidate_due_text=row.candidate_due_text,
-            candidate_due_at=row.candidate_due_at,
-            candidate_scope_ref=row.candidate_scope_ref,
-            candidate_beneficiary=row.candidate_beneficiary,
-            classification=row.classification,
-            status=row.status,
-            created_at=row.created_at,
-            superseded_by=row.superseded_by,
+        return model_from_row(
+            CandidateCommitment,
+            row,
+            evidence_span_refs=row.evidence_span_refs_json,
         )
 
     @staticmethod
     def _resolution_row(item: SpeakerPrincipalResolution) -> SpeakerPrincipalResolutionRow:
         return SpeakerPrincipalResolutionRow(
-            resolution_id=item.resolution_id,
-            candidate_ref=item.candidate_ref,
-            source_speaker_identity=item.source_speaker_identity,
-            resolved_principal_id=item.resolved_principal_id,
-            provider=item.provider,
-            external_subject=item.external_subject,
-            basis_json=dict(item.basis),
-            resolver_type=item.resolver_type,
-            resolved_at=item.resolved_at,
+            **model_values(item, rename={"basis": "basis_json"}, json_fields={"basis"})
         )
 
     @staticmethod
     def _resolution_from_row(row: SpeakerPrincipalResolutionRow) -> SpeakerPrincipalResolution:
-        return SpeakerPrincipalResolution(
-            resolution_id=row.resolution_id,
-            candidate_ref=row.candidate_ref,
-            source_speaker_identity=row.source_speaker_identity,
-            resolved_principal_id=row.resolved_principal_id,
-            provider=row.provider,
-            external_subject=row.external_subject,
-            basis=dict(row.basis_json),
-            resolver_type=row.resolver_type,
-            resolved_at=row.resolved_at,
-        )
+        return model_from_row(SpeakerPrincipalResolution, row, basis=row.basis_json)
 
     @staticmethod
-    def _commitment_values(item: CommitmentRecord) -> dict[str, Any]:
-        return {
-            "authority_epoch": item.authority_epoch,
-            "committer_principal_id": item.committer_principal_id,
-            "committer_external_subject": item.committer_external_subject,
-            "commitment_action": item.commitment_action,
-            "due_at": item.due_at,
-            "due_time_basis": item.due_time_basis,
-            "scope_ref": item.scope_ref,
-            "beneficiary_principal_id": item.beneficiary_principal_id,
-            "fulfillment_kind": item.fulfillment_kind.value,
-            "state": item.state.value,
-            "version": item.version,
-            "responsibility_ref": item.responsibility_ref,
-            "responsibility_version": item.responsibility_version,
-            "responsibility_admission_ref": item.responsibility_admission_ref,
-            "responsibility_assessment_ref": item.responsibility_assessment_ref,
-            "responsibility_proposal_ref": item.responsibility_proposal_ref,
-            "responsibility_discharge_assessment_ref": item.responsibility_discharge_assessment_ref,
-            "responsibility_discharge_decision_ref": item.responsibility_discharge_decision_ref,
-            "responsibility_transition_ref": item.responsibility_transition_ref,
-            "created_at": item.created_at,
-            "updated_at": item.updated_at,
-            "was_overdue": item.was_overdue,
-        }
-
-    @classmethod
-    def _commitment_row(cls, item: CommitmentRecord) -> CommitmentRow:
-        return CommitmentRow(
-            commitment_id=item.commitment_id,
-            candidate_ref=item.candidate_ref,
-            case_id=item.case_id,
-            **cls._commitment_values(item),
-        )
+    def _commitment_row(item: CommitmentRecord) -> CommitmentRow:
+        return CommitmentRow(**model_values(item))
 
     @staticmethod
     def _commitment_from_row(row: CommitmentRow) -> CommitmentRecord:
-        return CommitmentRecord(
-            commitment_id=row.commitment_id,
-            candidate_ref=row.candidate_ref,
-            case_id=row.case_id,
-            authority_epoch=row.authority_epoch,
-            committer_principal_id=row.committer_principal_id,
-            committer_external_subject=row.committer_external_subject,
-            commitment_action=row.commitment_action,
-            due_at=row.due_at,
-            due_time_basis=row.due_time_basis,
-            scope_ref=row.scope_ref,
-            beneficiary_principal_id=row.beneficiary_principal_id,
-            fulfillment_kind=row.fulfillment_kind,
-            state=row.state,
-            version=row.version,
-            responsibility_ref=row.responsibility_ref,
-            responsibility_version=row.responsibility_version,
-            responsibility_admission_ref=row.responsibility_admission_ref,
-            responsibility_assessment_ref=row.responsibility_assessment_ref,
-            responsibility_proposal_ref=row.responsibility_proposal_ref,
-            responsibility_discharge_assessment_ref=row.responsibility_discharge_assessment_ref,
-            responsibility_discharge_decision_ref=row.responsibility_discharge_decision_ref,
-            responsibility_transition_ref=row.responsibility_transition_ref,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-            was_overdue=row.was_overdue,
-        )
+        return model_from_row(CommitmentRecord, row)
 
     @staticmethod
-    def _attestation_row(item: CommitmentFulfillmentAttestation) -> CommitmentFulfillmentAttestationRow:
+    def _attestation_row(
+        item: CommitmentFulfillmentAttestation,
+    ) -> CommitmentFulfillmentAttestationRow:
         return CommitmentFulfillmentAttestationRow(
-            attestation_id=item.attestation_id,
-            case_id=item.case_id,
-            authority_epoch=item.authority_epoch,
-            commitment_version=item.commitment_version,
-            principal_id=item.principal_id,
-            disposition=item.disposition,
-            basis_json=dict(item.basis),
-            attested_at=item.attested_at,
+            **model_values(item, rename={"basis": "basis_json"}, json_fields={"basis"})
         )
 
     @staticmethod
-    def _attestation_from_row(row: CommitmentFulfillmentAttestationRow) -> CommitmentFulfillmentAttestation:
-        return CommitmentFulfillmentAttestation(
-            attestation_id=row.attestation_id,
-            case_id=row.case_id,
-            authority_epoch=row.authority_epoch,
-            commitment_version=row.commitment_version,
-            principal_id=row.principal_id,
-            disposition=row.disposition,
-            basis=dict(row.basis_json),
-            attested_at=row.attested_at,
-        )
+    def _attestation_from_row(
+        row: CommitmentFulfillmentAttestationRow,
+    ) -> CommitmentFulfillmentAttestation:
+        return model_from_row(CommitmentFulfillmentAttestation, row, basis=row.basis_json)
 
     @staticmethod
     def _draft_row(item: CommunicationDraftRecord) -> CommunicationDraftRow:
-        return CommunicationDraftRow(
-            draft_id=item.draft_id,
-            case_id=item.case_id,
-            authority_epoch=item.authority_epoch,
-            channel=item.channel,
-            recipient_principal_id=item.recipient_principal_id,
-            recipient_external_subject=item.recipient_external_subject,
-            content_storage_ref=item.content_storage_ref,
-            content_digest=item.content_digest,
-            content_size=item.content_size,
-            draft_kind=item.draft_kind,
-            generator_ref=item.generator_ref,
-            created_at=item.created_at,
-            superseded_by=item.superseded_by,
-        )
+        return CommunicationDraftRow(**model_values(item))
 
     @staticmethod
     def _draft_from_row(row: CommunicationDraftRow) -> CommunicationDraftRecord:
-        return CommunicationDraftRecord(
-            draft_id=row.draft_id,
-            case_id=row.case_id,
-            authority_epoch=row.authority_epoch,
-            channel=row.channel,
-            recipient_principal_id=row.recipient_principal_id,
-            recipient_external_subject=row.recipient_external_subject,
-            content_storage_ref=row.content_storage_ref,
-            content_digest=row.content_digest,
-            content_size=row.content_size,
-            draft_kind=row.draft_kind,
-            generator_ref=row.generator_ref,
-            created_at=row.created_at,
-            superseded_by=row.superseded_by,
-        )
+        return model_from_row(CommunicationDraftRecord, row)
 
     @staticmethod
-    def _communication_values(item: CommunicationEffectRecord) -> dict[str, Any]:
-        return {
-            "case_id": item.case_id,
-            "authority_epoch": item.authority_epoch,
-            "draft_id": item.draft_id,
-            "effect_id": item.effect_id,
-            "delivery_state": item.delivery_state.value,
-            "read_state": item.read_state.value,
-            "provider_message_ref": item.provider_message_ref,
-            "attempts": item.attempts,
-            "last_error_code": item.last_error_code,
-            "created_at": item.created_at,
-            "updated_at": item.updated_at,
-        }
-
-    @classmethod
-    def _communication_row(cls, item: CommunicationEffectRecord) -> CommunicationEffectRow:
-        return CommunicationEffectRow(
-            communication_event_id=item.communication_event_id,
-            **cls._communication_values(item),
-        )
+    def _communication_row(item: CommunicationEffectRecord) -> CommunicationEffectRow:
+        return CommunicationEffectRow(**model_values(item))
 
     @staticmethod
     def _communication_from_row(row: CommunicationEffectRow) -> CommunicationEffectRecord:
-        return CommunicationEffectRecord(
-            communication_event_id=row.communication_event_id,
-            case_id=row.case_id,
-            authority_epoch=row.authority_epoch,
-            draft_id=row.draft_id,
-            effect_id=row.effect_id,
-            delivery_state=row.delivery_state,
-            read_state=row.read_state,
-            provider_message_ref=row.provider_message_ref,
-            attempts=row.attempts,
-            last_error_code=row.last_error_code,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
+        return model_from_row(CommunicationEffectRecord, row)
 
 
 __all__ = ["CommitmentConflict", "CommitmentRepository"]
