@@ -31,7 +31,6 @@ from autonomous_development.domain.models import (
     Deployment,
     DevelopmentCycle,
     Experiment,
-    VerificationCheck,
     VerificationRun,
 )
 from autonomous_development.ports.codex import CodexProviderError
@@ -961,6 +960,12 @@ def _cycle_to_document(cycle: DevelopmentCycle) -> dict[str, object]:
             cycle.release_decision.value if cycle.release_decision is not None else None
         ),
     }
+
+
+def _mapping(value: object, field: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{field} must be an object")
+    return {str(key): item for key, item in value.items()}
 
 
 def _cycle_state_from_document(document: dict[str, object]) -> CycleState:
