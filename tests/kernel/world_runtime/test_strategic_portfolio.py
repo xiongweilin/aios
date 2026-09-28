@@ -56,8 +56,8 @@ def _setup(runtime: WorldRuntime) -> tuple[Mandate, Goal, Responsibility]:
         principal="owner",
         subject="acquire customers",
         scope={"quarter": "Q4"},
-        goal_refs=(goal.ref,
-    domain="sales",),
+        goal_refs=(goal.id,),
+        domain="sales",
     )
     runtime.responsibility.create(responsibility)
     return mandate, goal, responsibility
