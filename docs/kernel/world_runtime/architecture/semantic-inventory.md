@@ -41,3 +41,5 @@ Rules:
 7. A QualificationBinding records a current-use dependency. A dependency change opens one ReviewCase rather than rewriting the historical subject.
 8. Review assessment and review resolution are distinct transitions on the same durable ReviewCase.
 9. Personal facts, UI projections, model-routing policy, and reusable cognitive procedures remain outside the Runtime semantic inventory.
+
+10. Reference conformance runners are not Runtime payload owners. Public conformance vectors remain contract data; executable behavior is validated through the owning Runtime subsystem tests.
