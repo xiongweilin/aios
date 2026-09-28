@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import Engine, delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
-from autonomous_development.domain.enums import (
-    DevelopmentRequestStatus,
-    HumanInterventionStatus,
-)
+from autonomous_development.domain.enums import HumanInterventionStatus
 from autonomous_development.domain.models import (
     DevelopmentRequest,
     HumanIntervention,

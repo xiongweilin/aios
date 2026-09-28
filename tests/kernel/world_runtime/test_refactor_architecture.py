@@ -1,7 +1,6 @@
 from semantic_language import SemanticKind
 import semantic_language
 
-from world_runtime import conformance
 from world_runtime.decisions import Decision
 from world_runtime.epistemics import Claim, EpistemicLedger
 from world_runtime.execution import CapabilityRequest, ExecutionService
@@ -53,16 +52,6 @@ def test_payload_classes_live_with_their_owner() -> None:
     assert Revision.__module__ == "world_runtime.lineage"
     assert EpistemicLedger.__module__ == "world_runtime.epistemics"
     assert ExecutionService.__module__ == "world_runtime.execution"
-
-
-def test_conformance_runner_delegates_checks_to_partition_modules() -> None:
-    vector_ids = {str(item["id"]) for item in conformance.conformance_vectors()["vectors"]}
-    assert set(conformance.CHECKS) == vector_ids
-    assert all(
-        callback.__module__.startswith("world_runtime.conformance_")
-        and callback.__module__ != "world_runtime.conformance"
-        for callback in conformance.CHECKS.values()
-    )
 
 
 def test_compact_qualification_has_no_legacy_three_object_api() -> None:

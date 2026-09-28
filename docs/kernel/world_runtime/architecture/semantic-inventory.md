@@ -19,7 +19,7 @@ persistence, and policy.
 | Mandate | owner-local namespace | world-runtime/governance | yes |
 | Conflict | owner-local namespace | world-runtime/epistemics | yes |
 | ClaimRevision / EvidenceAssessment / BeliefState | owner-local namespace | world-runtime/epistemics | yes |
-| CognitiveControllerState | owner-local namespace | world-runtime/cognition | yes |
+| CognitiveEpisode | owner-local namespace | world-runtime/cognition | yes |
 | Experience | owner-local namespace | world-runtime/memory | yes |
 | DomainAssignment / DomainReport | owner-local namespace | world-runtime/domains | yes |
 | StrategyAssessment | owner-local namespace | world-runtime/strategy | yes |

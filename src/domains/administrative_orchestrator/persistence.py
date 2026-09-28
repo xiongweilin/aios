@@ -265,36 +265,6 @@ class SqlStore:
                 },
             )
 
-    def append_policy_evaluation(
-        self,
-        case_id: UUID,
-        case_version: int,
-        authority_epoch: int,
-        evaluation: PolicyEvaluation,
-    ) -> None:
-        with self.sessions.begin() as db:
-            db.add(
-                PolicyEvaluationRow(
-                    case_id=case_id,
-                    case_version=case_version,
-                    authority_epoch=authority_epoch,
-                    policy_json=evaluation.policy_ref.model_dump(mode="json"),
-                    evaluation_json=evaluation.model_dump(mode="json"),
-                    created_at=utcnow(),
-                )
-            )
-            self._append_audit(
-                db,
-                case_id,
-                "policy.evaluated",
-                {
-                    "case_version": case_version,
-                    "authority_epoch": authority_epoch,
-                    "policy_id": evaluation.policy_ref.policy_id,
-                    "policy_version": evaluation.policy_ref.version,
-                    "disposition": evaluation.disposition.value,
-                },
-            )
 
     def get_latest_policy_evaluation(self, case_id: UUID) -> PolicyEvaluation | None:
         with self.sessions() as db:
@@ -310,57 +280,7 @@ class SqlStore:
             )
             return None if row is None else PolicyEvaluation.model_validate(row.evaluation_json)
 
-    def append_decision(self, decision: Decision) -> None:
-        with self.sessions.begin() as db:
-            db.add(
-                DecisionRow(
-                    decision_id=decision.decision_id,
-                    case_id=decision.case_id,
-                    case_version=decision.case_version,
-                    authority_epoch=decision.authority_epoch,
-                    principal_id=decision.principal_id,
-                    decision_role=decision.decision_role,
-                    disposition=decision.disposition.value,
-                    rationale=decision.rationale,
-                    policy_json=decision.policy_ref.model_dump(mode="json"),
-                    decided_at=decision.decided_at,
-                )
-            )
-            self._append_audit(
-                db,
-                decision.case_id,
-                "decision.recorded",
-                {
-                    "decision_id": str(decision.decision_id),
-                    "case_version": decision.case_version,
-                    "authority_epoch": decision.authority_epoch,
-                    "principal_id": decision.principal_id,
-                    "decision_role": decision.decision_role,
-                    "disposition": decision.disposition.value,
-                    "policy_id": decision.policy_ref.policy_id,
-                    "policy_version": decision.policy_ref.version,
-                },
-            )
 
-    def get_decision(self, decision_id: UUID) -> Decision | None:
-        with self.sessions() as db:
-            row = db.get(DecisionRow, decision_id)
-            if row is None:
-                return None
-            return Decision.model_validate(
-                {
-                    "decision_id": row.decision_id,
-                    "case_id": row.case_id,
-                    "case_version": row.case_version,
-                    "authority_epoch": row.authority_epoch,
-                    "principal_id": row.principal_id,
-                    "decision_role": row.decision_role,
-                    "disposition": row.disposition,
-                    "rationale": row.rationale,
-                    "policy_ref": row.policy_json,
-                    "decided_at": row.decided_at,
-                }
-            )
 
     def list_audit_events(self, case_id: UUID) -> list[dict[str, Any]]:
         with self.sessions() as db:

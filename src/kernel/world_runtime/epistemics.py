@@ -133,56 +133,7 @@ class EpistemicLedger:
         self._persist_claim_revision(revision)
         return revision
 
-    def import_claim_revision(self, revision: ClaimRevision) -> ClaimRevision:
-        existing_revision = self.ledger.project_get(
-            "epistemics.claim-revision",
-            revision.id,
-        )
-        if existing_revision is not None:
-            current = self._claim_revision_from_value(existing_revision[0])
-            if current != revision:
-                raise ValueError("claim revision identity conflicts with existing Runtime state")
-            return current
 
-        identity = self.ledger.project_get("epistemics.claim", revision.claim_id)
-        if identity is None:
-            if revision.revision_number != 1 or revision.previous_revision_id is not None:
-                raise ValueError("first imported claim revision must be revision 1")
-        else:
-            current = self.current_claim_revision(revision.claim_id)
-            if revision.revision_number != current.revision_number + 1:
-                raise ValueError("claim revision sequence is not contiguous")
-            if revision.previous_revision_id != current.id:
-                raise ValueError("claim revision predecessor does not match current revision")
-        self._persist_claim_revision(revision)
-        return revision
-
-    def import_assessment(self, assessment: EvidenceAssessment) -> EvidenceAssessment:
-        existing = [
-            event
-            for event in self.ledger.events(
-                stream=f"claim:{assessment.claim_ref.id}",
-                kind="epistemics.evidence.assessed",
-            )
-            if event.payload.get("id") == assessment.id
-        ]
-        if existing:
-            payload = existing[-1].payload
-            if (
-                payload.get("claim_revision_id") != assessment.claim_revision_id
-                or payload.get("evidence_id") != assessment.evidence_ref.id
-                or payload.get("relation") != assessment.relation.value
-                or payload.get("evaluator_kind") != assessment.evaluator_kind.value
-            ):
-                raise ValueError("assessment identity conflicts with existing Runtime state")
-            return assessment
-        if self.ledger.project_get(
-            "epistemics.claim-revision",
-            assessment.claim_revision_id,
-        ) is None:
-            raise ValueError("claim revision must be imported before assessment")
-        self._persist_assessment(assessment)
-        return assessment
 
     def _persist_claim_revision(self, revision: ClaimRevision) -> None:
         value = self._claim_revision_value(revision)

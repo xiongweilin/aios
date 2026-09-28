@@ -12,6 +12,8 @@ def model_from_row(
     model: type[ModelT],
     row: object,
     /,
+    *,
+    rename: Mapping[str, str] | None = None,
     **overrides: Any,
 ) -> ModelT:
     values = {
@@ -19,6 +21,9 @@ def model_from_row(
         for name in model.model_fields
         if hasattr(row, name)
     }
+    for source, target in (rename or {}).items():
+        if hasattr(row, source):
+            values[target] = getattr(row, source)
     values.update(overrides)
     return model.model_validate(values)
 
@@ -30,6 +35,7 @@ def model_values(
     exclude: set[str] | frozenset[str] = frozenset(),
     rename: Mapping[str, str] | None = None,
     json_fields: set[str] | frozenset[str] = frozenset(),
+    extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     values = model.model_dump(mode="python", exclude=exclude)
     if json_fields:
@@ -39,4 +45,5 @@ def model_values(
                 values[name] = encoded[name]
     for source, target in (rename or {}).items():
         values[target] = values.pop(source)
+    values.update(extra or {})
     return values

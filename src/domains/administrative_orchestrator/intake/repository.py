@@ -274,16 +274,18 @@ def _artifact_from_row(row: SourceArtifactRow) -> SourceArtifact:
 
 
 def _span_from_row(row: EvidenceSpanRow) -> EvidenceSpan:
-    return model_from_row(EvidenceSpan, row, locator=row.locator_json)
+    return model_from_row(EvidenceSpan, row, rename={"locator_json": "locator"})
 
 
 def _interpretation_from_row(row: InterpretationRecordRow) -> InterpretationRecord:
     return model_from_row(
         InterpretationRecord,
         row,
-        artifact_refs=row.artifact_refs_json,
-        structured_output=row.structured_output_json,
-        evidence_span_refs=row.evidence_span_refs_json,
+        rename={
+            "artifact_refs_json": "artifact_refs",
+            "structured_output_json": "structured_output",
+            "evidence_span_refs_json": "evidence_span_refs",
+        },
     )
 
 
@@ -291,19 +293,31 @@ def _fact_from_row(row: CandidateFactAssertionRow) -> CandidateFactAssertion:
     return model_from_row(
         CandidateFactAssertion,
         row,
-        value=row.value_json,
-        source_refs=row.source_refs_json,
-        evidence_span_refs=row.evidence_span_refs_json,
+        rename={
+            "value_json": "value",
+            "source_refs_json": "source_refs",
+            "evidence_span_refs_json": "evidence_span_refs",
+        },
     )
+
+
+def _candidate_fact_semantics(fact: CandidateFactAssertion) -> dict[str, Any]:
+    return fact.model_dump(mode="json", exclude={"created_at"})
+
+
+def _candidate_semantics(candidate: CandidateAdministrativeRequest) -> dict[str, Any]:
+    return candidate.model_dump(mode="json", exclude={"status"})
 
 
 def _candidate_from_row(row: CandidateAdministrativeRequestRow) -> CandidateAdministrativeRequest:
     return model_from_row(
         CandidateAdministrativeRequest,
         row,
-        interpretation_refs=row.interpretation_refs_json,
-        candidate_fact_refs=row.candidate_fact_refs_json,
-        source_refs=row.source_refs_json,
+        rename={
+            "interpretation_refs_json": "interpretation_refs",
+            "candidate_fact_refs_json": "candidate_fact_refs",
+            "source_refs_json": "source_refs",
+        },
     )
 
 
@@ -311,94 +325,20 @@ def _case_update_from_row(row: CandidateCaseUpdateRow) -> CandidateCaseUpdate:
     return model_from_row(
         CandidateCaseUpdate,
         row,
-        interpretation_refs=row.interpretation_refs_json,
-        candidate_fact_refs=row.candidate_fact_refs_json,
-        source_refs=row.source_refs_json,
+        rename={
+            "interpretation_refs_json": "interpretation_refs",
+            "candidate_fact_refs_json": "candidate_fact_refs",
+            "source_refs_json": "source_refs",
+        },
     )
 
 
 def _assessment_from_row(row: IntakeAssessmentRow) -> IntakeAssessment:
-    return model_from_row(IntakeAssessment, row, basis=row.basis_json)
+    return model_from_row(IntakeAssessment, row, rename={"basis_json": "basis"})
 
 
 def _promotion_from_row(row: PromotionRecordRow) -> PromotionRecord:
     return model_from_row(PromotionRecord, row)
-
-
-def _candidate_fact_semantics(fact: CandidateFactAssertion) -> dict[str, Any]:
-    """Return the immutable candidate-fact fields used for idempotency."""
-    return fact.model_dump(mode="json", exclude={"created_at"})
-
-
-def _candidate_semantics(candidate: CandidateAdministrativeRequest) -> dict[str, Any]:
-    """Return the immutable candidate fields used for idempotency.
-
-    ``status`` is mutable review/admission state (active, admitted, superseded,
-    rejected) and must not turn a replay of the same candidate lineage into a
-    semantic conflict.
-    """
-    return candidate.model_dump(mode="json", exclude={"status"})
-
-
-def _candidate_from_row(row: CandidateAdministrativeRequestRow) -> CandidateAdministrativeRequest:
-    return CandidateAdministrativeRequest.model_validate(
-        {
-            "candidate_id": row.candidate_id,
-            "conversation_ref": row.conversation_ref,
-            "interpretation_refs": _uuid_tuple(row.interpretation_refs_json),
-            "candidate_requester": row.candidate_requester,
-            "candidate_intent": row.candidate_intent,
-            "candidate_fact_refs": _uuid_tuple(row.candidate_fact_refs_json),
-            "source_refs": _uuid_tuple(row.source_refs_json),
-            "created_at": row.created_at,
-            "supersedes_candidate_ref": row.supersedes_candidate_ref,
-            "status": row.status,
-        }
-    )
-
-
-def _case_update_from_row(row: CandidateCaseUpdateRow) -> CandidateCaseUpdate:
-    return CandidateCaseUpdate.model_validate(
-        {
-            "candidate_update_id": row.candidate_update_id,
-            "case_id": row.case_id,
-            "conversation_ref": row.conversation_ref,
-            "interpretation_refs": _uuid_tuple(row.interpretation_refs_json),
-            "candidate_fact_refs": _uuid_tuple(row.candidate_fact_refs_json),
-            "source_refs": _uuid_tuple(row.source_refs_json),
-            "created_at": row.created_at,
-            "status": row.status,
-        }
-    )
-
-
-def _assessment_from_row(row: IntakeAssessmentRow) -> IntakeAssessment:
-    return IntakeAssessment.model_validate(
-        {
-            "assessment_id": row.assessment_id,
-            "candidate_ref": row.candidate_ref,
-            "disposition": row.disposition,
-            "basis": row.basis_json,
-            "authority": row.authority,
-            "is_final": row.is_final,
-            "reviewer_principal_id": row.reviewer_principal_id,
-            "created_at": row.created_at,
-        }
-    )
-
-
-def _promotion_from_row(row: PromotionRecordRow) -> PromotionRecord:
-    return PromotionRecord.model_validate(
-        {
-            "promotion_id": row.promotion_id,
-            "candidate_ref": row.candidate_ref,
-            "assessment_ref": row.assessment_ref,
-            "request_id": row.request_id,
-            "ingress_receipt_ref": row.ingress_receipt_ref,
-            "promoted_at": row.promoted_at,
-            "promotion_policy_ref": row.promotion_policy_ref,
-        }
-    )
 
 
 class IntakeRepository:
@@ -427,80 +367,15 @@ class IntakeRepository:
                         "delivery identity was redelivered with a different digest"
                     )
                 return _receipt_from_row(existing)
-            db.add(IntakeReceiptRow(**model_values(receipt)))
+            db.add(
+                IntakeReceiptRow(**model_values(receipt))
+            )
             try:
                 db.flush()
             except IntegrityError as exc:
                 raise IntakeReceiptConflict("delivery identity was concurrently inserted") from exc
             return receipt
 
-    def persist_verified_receipt_and_enqueue(
-        self,
-        receipt: IntakeReceipt,
-        *,
-        event_type: str,
-        aggregate_id: str,
-        payload: dict[str, Any],
-    ) -> IntakeDeliveryAcceptance:
-        """Atomically persist a verified receipt and its async processing handoff.
-
-        The outbox event deliberately uses the receipt identity as its own
-        event id. A redelivery therefore cannot create a second worker job,
-        while a process crash after commit still leaves the event available to
-        the existing bounded outbox relay.
-        """
-        # 使用 lazy import，因为 persistence.py 会在
-        # messaging.py 导入共享 SQLAlchemy Base 时注册此 repository。
-        from ..messaging import OutboxEventRow, emit_outbox
-
-        if receipt.verification_status.value != "verified":
-            raise ValueError("only verified intake receipts may be enqueued")
-        with self.store.sessions.begin() as db:
-            existing = db.execute(
-                select(IntakeReceiptRow).where(
-                    IntakeReceiptRow.source_system == receipt.source_system,
-                    IntakeReceiptRow.tenant_ref == receipt.tenant_ref,
-                    IntakeReceiptRow.source_event_id == receipt.source_event_id,
-                )
-            ).scalar_one_or_none()
-            if existing is not None:
-                if existing.delivery_digest != receipt.delivery_digest:
-                    raise IntakeReceiptConflict(
-                        "delivery identity was redelivered with a different digest"
-                    )
-                restored = _receipt_from_row(existing)
-                outbox = db.get(OutboxEventRow, existing.receipt_id)
-                if outbox is None:
-                    emit_outbox(
-                        db,
-                        event_type=event_type,
-                        aggregate_id=aggregate_id,
-                        payload=payload,
-                        event_id=existing.receipt_id,
-                    )
-                return IntakeDeliveryAcceptance(
-                    receipt=restored,
-                    outbox_event_id=existing.receipt_id,
-                    created=False,
-                )
-
-            db.add(IntakeReceiptRow(**model_values(receipt)))
-            emit_outbox(
-                db,
-                event_type=event_type,
-                aggregate_id=aggregate_id,
-                payload=payload,
-                event_id=receipt.receipt_id,
-            )
-            try:
-                db.flush()
-            except IntegrityError as exc:
-                raise IntakeReceiptConflict("delivery identity was concurrently inserted") from exc
-            return IntakeDeliveryAcceptance(
-                receipt=receipt,
-                outbox_event_id=receipt.receipt_id,
-                created=True,
-            )
 
     def attach_artifact_to_receipt(self, receipt_id: UUID, artifact_id: UUID) -> IntakeReceipt:
         """Attach the immutable canonical artifact exactly once to a receipt."""
@@ -543,7 +418,9 @@ class IntakeRepository:
                         "canonical source revision was redelivered with a different digest"
                     )
                 return _artifact_from_row(existing)
-            db.add(SourceArtifactRow(**model_values(artifact)))
+            db.add(
+                SourceArtifactRow(**model_values(artifact))
+            )
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -564,7 +441,13 @@ class IntakeRepository:
             ).scalar_one_or_none()
             if existing is not None:
                 return _span_from_row(existing)
-            db.add(EvidenceSpanRow(**model_values(span, rename={"locator": "locator_json"}, json_fields={"locator"})))
+            db.add(
+                EvidenceSpanRow(
+                    **model_values(
+                        span, rename={"locator": "locator_json"}, json_fields={"locator"}
+                    )
+                )
+            )
             db.flush()
             return span
 
@@ -578,7 +461,19 @@ class IntakeRepository:
                         "interpretation identity was reused with different semantics"
                     )
                 return restored
-            db.add(InterpretationRecordRow(**model_values(interpretation, rename={"artifact_refs": "artifact_refs_json", "structured_output": "structured_output_json", "evidence_span_refs": "evidence_span_refs_json"}, json_fields={"artifact_refs", "structured_output", "evidence_span_refs"})))
+            db.add(
+                InterpretationRecordRow(
+                    **model_values(
+                        interpretation,
+                        rename={
+                            "artifact_refs": "artifact_refs_json",
+                            "structured_output": "structured_output_json",
+                            "evidence_span_refs": "evidence_span_refs_json",
+                        },
+                        json_fields={"artifact_refs", "structured_output", "evidence_span_refs"},
+                    )
+                )
+            )
             db.flush()
             return interpretation
 
@@ -599,7 +494,19 @@ class IntakeRepository:
                 if _candidate_fact_semantics(restored) != _candidate_fact_semantics(fact):
                     raise CandidateConflict("candidate fact identity was reused with different semantics")
                 return restored
-            db.add(CandidateFactAssertionRow(**model_values(fact, rename={"value": "value_json", "source_refs": "source_refs_json", "evidence_span_refs": "evidence_span_refs_json"}, json_fields={"value", "source_refs", "evidence_span_refs"})))
+            db.add(
+                CandidateFactAssertionRow(
+                    **model_values(
+                        fact,
+                        rename={
+                            "value": "value_json",
+                            "source_refs": "source_refs_json",
+                            "evidence_span_refs": "evidence_span_refs_json",
+                        },
+                        json_fields={"value", "source_refs", "evidence_span_refs"},
+                    )
+                )
+            )
             db.flush()
             return fact
 
@@ -632,7 +539,19 @@ class IntakeRepository:
                 if _candidate_semantics(restored) != _candidate_semantics(candidate):
                     raise CandidateConflict("candidate identity was reused with different semantics")
                 return restored
-            db.add(CandidateAdministrativeRequestRow(**model_values(candidate, rename={"interpretation_refs": "interpretation_refs_json", "candidate_fact_refs": "candidate_fact_refs_json", "source_refs": "source_refs_json"}, json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"})))
+            db.add(
+                CandidateAdministrativeRequestRow(
+                    **model_values(
+                        candidate,
+                        rename={
+                            "interpretation_refs": "interpretation_refs_json",
+                            "candidate_fact_refs": "candidate_fact_refs_json",
+                            "source_refs": "source_refs_json",
+                        },
+                        json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"},
+                    )
+                )
+            )
             db.flush()
             return candidate
 
@@ -660,13 +579,31 @@ class IntakeRepository:
 
     def append_case_update(self, update: CandidateCaseUpdate) -> CandidateCaseUpdate:
         with self.store.sessions.begin() as db:
-            db.add(CandidateCaseUpdateRow(**model_values(update, rename={"interpretation_refs": "interpretation_refs_json", "candidate_fact_refs": "candidate_fact_refs_json", "source_refs": "source_refs_json"}, json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"})))
+            db.add(
+                CandidateCaseUpdateRow(
+                    **model_values(
+                        update,
+                        rename={
+                            "interpretation_refs": "interpretation_refs_json",
+                            "candidate_fact_refs": "candidate_fact_refs_json",
+                            "source_refs": "source_refs_json",
+                        },
+                        json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"},
+                    )
+                )
+            )
             db.flush()
             return update
 
     def append_assessment(self, assessment: IntakeAssessment) -> IntakeAssessment:
         with self.store.sessions.begin() as db:
-            db.add(IntakeAssessmentRow(**model_values(assessment, rename={"basis": "basis_json"}, json_fields={"basis"})))
+            db.add(
+                IntakeAssessmentRow(
+                    **model_values(
+                        assessment, rename={"basis": "basis_json"}, json_fields={"basis"}
+                    )
+                )
+            )
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -717,7 +654,9 @@ class IntakeRepository:
             ).scalar_one_or_none()
             if request_existing is not None:
                 raise PromotionConflict("request was already linked to another promotion")
-            db.add(PromotionRecordRow(**model_values(promotion)))
+            db.add(
+                PromotionRecordRow(**model_values(promotion))
+            )
             try:
                 db.flush()
             except IntegrityError as exc:

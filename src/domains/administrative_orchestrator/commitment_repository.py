@@ -336,19 +336,6 @@ class CommitmentRepository:
             db.add(self._attestation_row(attestation))
         return attestation
 
-    def get_attestation(self, case_id: UUID, commitment_version: int) -> CommitmentFulfillmentAttestation | None:
-        with self.store.sessions() as db:
-            row = (
-                db.execute(
-                    select(CommitmentFulfillmentAttestationRow).where(
-                        CommitmentFulfillmentAttestationRow.case_id == case_id,
-                        CommitmentFulfillmentAttestationRow.commitment_version == commitment_version,
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            return None if row is None else self._attestation_from_row(row)
 
     def put_draft(self, draft: CommunicationDraftRecord) -> CommunicationDraftRecord:
         with self.store.sessions.begin() as db:
@@ -391,18 +378,6 @@ class CommitmentRepository:
             db.add(self._communication_row(communication))
         return communication
 
-    def get_communication(self, effect_id: UUID) -> CommunicationEffectRecord | None:
-        with self.store.sessions() as db:
-            row = (
-                db.execute(
-                    select(CommunicationEffectRow).where(
-                        CommunicationEffectRow.effect_id == effect_id
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            return None if row is None else self._communication_from_row(row)
 
     def get_communication_event(self, communication_event_id: UUID) -> CommunicationEffectRecord | None:
         with self.store.sessions() as db:
