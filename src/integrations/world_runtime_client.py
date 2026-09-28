@@ -14,11 +14,13 @@ class WorldRuntimeBoundaryError(RuntimeError):
 class WorldRuntimeHttpClient:
     """Shared HTTP and contract-negotiation boundary for domain Runtime adapters."""
 
+    REQUIRED_CONTRACTS: Mapping[str, str] = {}
+
     def __init__(
         self,
         base_url: str,
         *,
-        required_contracts: Mapping[str, str],
+        required_contracts: Mapping[str, str] | None = None,
         timeout_seconds: float = 3.0,
         transport: httpx.BaseTransport | None = None,
         bearer_token: str = "",
@@ -30,7 +32,7 @@ class WorldRuntimeHttpClient:
             headers["Authorization"] = f"Bearer {bearer_token}"
         if delegation_id:
             headers["X-World-Runtime-Delegation"] = delegation_id
-        self._required_contracts = dict(required_contracts)
+        self._required_contracts = dict(required_contracts or self.REQUIRED_CONTRACTS)
         self._component = component
         self._verified = False
         self.client = httpx.Client(
