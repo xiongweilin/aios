@@ -1,0 +1,48 @@
+services:
+  acceptance-codex:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "/acceptance/codex_stub.py"]
+    environment:
+      AIOS_ACCEPTANCE_CODEX_TOKEN_FILE: /run/secrets/codex-ws-token
+    volumes:
+      - type: bind
+        source: ./tests/acceptance/autonomous_development/codex_stub.py
+        target: /acceptance/codex_stub.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE:?set AIOS_HOST_CODEX_APP_SERVER_TOKEN_FILE}
+        target: /run/secrets/codex-ws-token
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "18786"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; socket.create_connection(('127.0.0.1', 18786), timeout=1).close()"
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  autonomous-development:
+    environment:
+      AUTODEV_CODEX_APP_SERVER_URL: ws://acceptance-codex:18786
+      AUTODEV_DOCKER_NETWORK: ${AUTODEV_DOCKER_NETWORK:?set AUTODEV_DOCKER_NETWORK}
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /acceptance-target
+    depends_on:
+      acceptance-codex:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${AIOS_ACCEPTANCE_HOST_TARGET_ROOT:?set AIOS_ACCEPTANCE_HOST_TARGET_ROOT}
+        target: /acceptance-target
+        read_only: true
+        bind:
+          create_host_path: false

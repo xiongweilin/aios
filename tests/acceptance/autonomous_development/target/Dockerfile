@@ -47,6 +47,7 @@ RUN set -eux; \
     rm -f /tmp/zlib-fixed.apk
 
 ENV PYTHONPATH=/opt/site-packages
+ENV AIOS_ACCEPTANCE_STATE_ROOT=/tmp/aios-acceptance-state
 USER 65532
 
 EXPOSE 8000

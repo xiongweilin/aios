@@ -5,7 +5,7 @@ x-aios-service: &aios-service
     context: .
     args:
       AIOS_APP_ROOT: ${AIOS_CONTAINER_APP_ROOT:?set AIOS_CONTAINER_APP_ROOT}
-  image: aios:local
+  image: ${AIOS_IMAGE:-aios:local}
   restart: unless-stopped
 
 x-administrative-environment: &administrative-environment
@@ -61,7 +61,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
     ports:
-      - "127.0.0.1:19090:9090"
+      - "127.0.0.1:${AIOS_PROMETHEUS_HOST_PORT-19090}:9090"
     volumes:
       - type: bind
         source: ./config/prometheus/prometheus.yml
@@ -90,7 +90,7 @@ services:
       PERSONAL_WORLD_PORT: ${PERSONAL_WORLD_PORT:-8080}
       PERSONAL_WORLD_DATABASE_URL: postgresql+psycopg://${AIOS_POSTGRES_USER}:${AIOS_POSTGRES_PASSWORD}@postgres:5432/personal_world
     ports:
-      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:${AIOS_PERSONAL_WORLD_HOST_PORT-18080}:8080"
     depends_on:
       database-init:
         condition: service_completed_successfully
@@ -105,7 +105,7 @@ services:
       WORLD_RUNTIME_POSTGRES_SCHEMA: ${WORLD_RUNTIME_POSTGRES_SCHEMA:-public}
       WORLD_RUNTIME_ROOT_PRINCIPAL: ${WORLD_RUNTIME_ROOT_PRINCIPAL:-human:owner}
     ports:
-      - "127.0.0.1:18086:8086"
+      - "127.0.0.1:${AIOS_WORLD_RUNTIME_HOST_PORT-18086}:8086"
     depends_on:
       database-init:
         condition: service_completed_successfully
@@ -134,7 +134,7 @@ services:
       CONTROL_PLANE_ENVIRONMENT_CHECKS: ${CONTROL_PLANE_ENVIRONMENT_CHECKS:-false}
       CONTROL_PLANE_NOTIFICATIONS: ${CONTROL_PLANE_NOTIFICATIONS:-false}
     ports:
-      - "127.0.0.1:18083:18083"
+      - "127.0.0.1:${AIOS_CONTROL_PLANE_HOST_PORT-18083}:18083"
     volumes:
       - ${CONTROL_PLANE_HOST_DATA_ROOT:?set CONTROL_PLANE_HOST_DATA_ROOT}:${CONTROL_PLANE_DATA_ROOT:?set CONTROL_PLANE_DATA_ROOT}
       - type: bind
@@ -173,7 +173,7 @@ services:
     environment:
       <<: *administrative-environment
     ports:
-      - "127.0.0.1:18100:8000"
+      - "127.0.0.1:${AIOS_ADMINISTRATIVE_API_HOST_PORT-18100}:8000"
     volumes:
       - ${ADMIN_HOST_ARTIFACT_ROOT:?set ADMIN_HOST_ARTIFACT_ROOT}:${ADMIN_INTAKE_ARTIFACT_ROOT}
     depends_on:
@@ -213,7 +213,7 @@ services:
       AUTODEV_CODEX_HOST_PATH_MAP_FILE: /run/secrets/autodev-path-map.json
       AUTODEV_OPERATOR_HMAC_SECRET_FILE: /run/secrets/operator-hmac
     ports:
-      - "127.0.0.1:18110:8765"
+      - "127.0.0.1:${AIOS_AUTODEV_HOST_PORT-18110}:8765"
     volumes:
       - ${AUTODEV_HOST_STATE_ROOT:?set AUTODEV_HOST_STATE_ROOT}:${AUTODEV_STATE_ROOT}
       - ${AUTODEV_HOST_WORKSPACE_ROOT:?set AUTODEV_HOST_WORKSPACE_ROOT}:${AUTODEV_WORKSPACE_ROOT:?set AUTODEV_WORKSPACE_ROOT}
