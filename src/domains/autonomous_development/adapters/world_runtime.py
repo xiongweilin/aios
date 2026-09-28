@@ -479,7 +479,7 @@ class WorldRuntimeDevelopmentBridge:
         return basis, evidence
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.client.post(path, payload)
+        return self.client.post(path, payload, verify=False)
 
     def _get(self, path: str) -> dict[str, Any]:
         return self.client.get(path)
