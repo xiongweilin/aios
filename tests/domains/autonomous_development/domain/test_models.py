@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from autonomous_development.domain.enums import DeploymentState, FeedbackKind, VerificationStatus
 from autonomous_development.domain.models import (
     CanaryStage,

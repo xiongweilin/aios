@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from .ledger import SemanticLedger
-
 
 BUNDLE_VERSION = "world-runtime-state-v1"
 
@@ -171,10 +171,7 @@ class StateBundleService:
                 )
             elif namespace == "execution.run":
                 require("execution.work", value.get("work_id"), owner)
-            elif namespace == "governance.authorization":
-                require("governance.mandate", value.get("mandate_id"), owner)
-                require("decision.current", value.get("decision_id"), owner)
-            elif namespace == "strategy.goal":
+            elif namespace == "governance.authorization" or namespace == "strategy.goal":
                 require("governance.mandate", value.get("mandate_id"), owner)
                 require("decision.current", value.get("decision_id"), owner)
             elif namespace == "recovery.disposition":

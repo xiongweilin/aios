@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from world_runtime import WorldRuntime
 from world_runtime.identity import DelegationGrant
 

@@ -5,8 +5,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.diagnoses import SqlDiagnosisRepository
 from autonomous_development.adapters.postgres.feedback import SqlFeedbackRepository
@@ -32,6 +30,7 @@ from autonomous_development.domain.models import (
 from autonomous_development.domain.policies import ScopeViolation
 from autonomous_development.ports.codex import CodexTurnRequest, CodexTurnResult
 from autonomous_development.ports.repository import RepositoryBaseline
+from sqlalchemy import create_engine
 
 
 class FakeRuntimeReporter:

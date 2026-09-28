@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
 from world_runtime.decisions import Decision
 from world_runtime.execution import (

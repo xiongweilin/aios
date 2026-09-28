@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.target_contract import TomlTargetContractLoader
 
 

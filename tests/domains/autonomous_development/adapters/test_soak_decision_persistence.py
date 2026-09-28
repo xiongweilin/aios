@@ -1,11 +1,10 @@
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.adapters.postgres.soak_decisions import SqlSoakDecisionRepository
 from autonomous_development.domain.enums import SoakDecisionKind
 from autonomous_development.domain.soak import PostPromotionSoakDecision
 from autonomous_development.ports.persistence import OperationConflictError
+from sqlalchemy import create_engine
 
 
 def decision(kind: SoakDecisionKind = SoakDecisionKind.COMPLETE) -> PostPromotionSoakDecision:

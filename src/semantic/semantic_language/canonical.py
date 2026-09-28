@@ -9,7 +9,7 @@ from typing import Any
 
 
 def _normalize(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         data = asdict(value)
         kind = getattr(value, "kind", None)
         if kind is not None:

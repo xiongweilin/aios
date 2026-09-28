@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.application.soak import PostPromotionSoakService
 from autonomous_development.domain.canary import CanaryGuardrails
 from autonomous_development.domain.enums import (

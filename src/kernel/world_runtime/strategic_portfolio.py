@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
+from typing import cast
 
 from .common import new_id
 from .decisions import assert_decision_applies
@@ -491,14 +492,14 @@ class StrategicPortfolioService:
                         payload=value,
                     )
                 return allocation
-            except LedgerConcurrencyConflict:
+            except LedgerConcurrencyConflict as exc:
                 existing = self.ledger.project_get(
                     "strategy.resource-allocation",
                     allocation.id,
                 )
                 if existing is not None:
                     if existing[0] != value:
-                        raise ValueError("resource allocation identity rebound")
+                        raise ValueError("resource allocation identity rebound") from exc
                     return self.get_allocation(allocation.id)
                 if attempt == 2:
                     raise
@@ -590,7 +591,10 @@ class StrategicPortfolioService:
             elif isinstance(raw, Mapping):
                 if "amount" not in raw or "unit" not in raw:
                     raise ValueError("resource budget requires amount and unit")
-                line = ResourceBudgetLine(float(raw["amount"]), str(raw["unit"]))
+                line = ResourceBudgetLine(
+                    float(cast(float, raw["amount"])),
+                    str(raw["unit"]),
+                )
             else:
                 raise ValueError("resource budget requires structured amount/unit lines")
             if not str(resource_type).strip() or line.amount < 0 or not line.unit.strip():

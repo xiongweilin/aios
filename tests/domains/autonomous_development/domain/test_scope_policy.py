@@ -1,5 +1,4 @@
 import pytest
-
 from autonomous_development.domain.models import ChangeProposal
 from autonomous_development.domain.policies import ScopeViolation, validate_changed_paths
 

@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from autonomous_development.application.target_registry import TargetRegistryService
 from autonomous_development.domain.models import (
     DevelopmentTarget,

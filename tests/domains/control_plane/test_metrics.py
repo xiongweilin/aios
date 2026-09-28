@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from prometheus_client import CollectorRegistry, generate_latest
-
 from control_plane.environment import CheckObservation, EnvironmentSnapshot
 from control_plane.metrics import ControlPlaneMetricsCollector
 from control_plane.runtime_bridge import DomainWork
+from prometheus_client import CollectorRegistry, generate_latest
+
 from tests.domain_harness import DomainHarness, make_harness
 
 

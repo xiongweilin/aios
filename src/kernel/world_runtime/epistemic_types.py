@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any
 
 from semantic_language import SemanticKind, SemanticRef
 
 from .common import utcnow
-
 
 EPISTEMICS_NAMESPACE = "world-runtime.epistemics"
 

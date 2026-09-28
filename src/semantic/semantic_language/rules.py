@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .core import SemanticKind, SemanticRef
 
-
 KindLike = SemanticKind | str | SemanticRef
 
 

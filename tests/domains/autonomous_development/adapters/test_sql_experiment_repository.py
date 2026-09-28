@@ -1,6 +1,4 @@
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.experiments import SqlExperimentRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.canary import CanaryStageDecision
@@ -10,6 +8,7 @@ from autonomous_development.ports.persistence import (
     ConcurrentUpdateError,
     OperationConflictError,
 )
+from sqlalchemy import create_engine
 
 
 def experiment(stage_index: int = 0) -> Experiment:

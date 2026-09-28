@@ -8,6 +8,7 @@ from control_plane.domain_controller import PersonalController
 from control_plane.domain_store import DomainJournal
 from control_plane.provider_protocol import CapabilityProvider, ProviderRegistry
 from control_plane.runtime_bridge import PersonalRuntimeBridge, WorldRuntimeClient
+
 from tests.runtime_stub import RuntimeStub
 
 

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import builtins
+import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-import hashlib
-import json
 from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -207,7 +208,7 @@ class CapabilityResult(BaseModel):
     external_ref: str | None = None
 
     @model_validator(mode="after")
-    def _derive_provider_success(self) -> "CapabilityResult":
+    def _derive_provider_success(self) -> CapabilityResult:
         if self.provider_success is None:
             self.provider_success = self.status == "succeeded"
         if self.external_ref is None and self.external_operation_ref is not None:
@@ -251,7 +252,7 @@ class ProviderRegistry:
         self._enabled.pop(provider_id, None)
         return provider
 
-    def list(self) -> list[ProviderDescriptor]:
+    def list(self) -> builtins.list[ProviderDescriptor]:
         return [
             provider.descriptor.model_copy(
                 update={"enabled": self._enabled.get(provider.descriptor.id, False)}
@@ -259,7 +260,7 @@ class ProviderRegistry:
             for provider in self._providers.values()
         ]
 
-    def providers_for(self, capability: str) -> list[ProviderDescriptor]:
+    def providers_for(self, capability: str) -> builtins.list[ProviderDescriptor]:
         values = [
             descriptor
             for descriptor in self.list()

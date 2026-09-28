@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from world_runtime.decisions import Decision
-from world_runtime.governance import Mandate
-from world_runtime.responsibility import Responsibility
 import asyncio
 import os
 import threading
@@ -14,9 +11,8 @@ import psycopg
 import pytest
 from psycopg import sql
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
-from world_runtime.postgres_ledger import PostgresLedger
+from world_runtime.decisions import Decision
 from world_runtime.execution import (
     CapabilityRequest,
     CapabilityResult,
@@ -24,8 +20,10 @@ from world_runtime.execution import (
     ProviderDescriptor,
     ProviderHealth,
 )
+from world_runtime.governance import Mandate
 from world_runtime.ledger import ProjectionVersionConflict
-
+from world_runtime.postgres_ledger import PostgresLedger
+from world_runtime.responsibility import Responsibility
 
 DSN_ENV = "WORLD_RUNTIME_TEST_POSTGRES_DSN"
 pytestmark = pytest.mark.postgres

@@ -4,8 +4,6 @@ import os
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.experiments import SqlExperimentRepository
 from autonomous_development.adapters.postgres.release_decisions import (
     SqlReleaseDecisionRepository,
@@ -20,6 +18,7 @@ from autonomous_development.domain.models import (
     Experiment,
     ReleaseDecision,
 )
+from sqlalchemy import create_engine
 
 pytestmark = pytest.mark.integration
 

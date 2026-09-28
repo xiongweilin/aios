@@ -3,8 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from semantic_language import SemanticRef
-
 from personal_world.model.contracts import (
     ContextProjectionRequest,
     PersonalFactCreate,
@@ -16,6 +14,7 @@ from personal_world.model.contracts import (
 )
 from personal_world.persistence import NotFoundError
 from personal_world.service import PersonalWorldService
+from semantic_language import SemanticRef
 
 
 def semantic(namespace: str, item_id: str) -> SemanticRef:

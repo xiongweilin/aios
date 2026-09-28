@@ -1,5 +1,4 @@
 import pytest
-
 from autonomous_development.application.canary import CanaryService
 from autonomous_development.application.experiments import ExperimentService
 from autonomous_development.domain.canary import (

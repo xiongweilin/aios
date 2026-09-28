@@ -1,9 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dbos import DBOS, DBOSConfig, SetWorkflowID
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.schema import metadata
@@ -22,6 +19,8 @@ from autonomous_development.ports.traffic import TrafficRouteState, TrafficSplit
 from autonomous_development.workflows.post_promotion_soak import (
     PostPromotionSoakWorkflow,
 )
+from dbos import DBOS, DBOSConfig, SetWorkflowID
+from sqlalchemy import create_engine
 
 
 class FakeReleaseRuntime:

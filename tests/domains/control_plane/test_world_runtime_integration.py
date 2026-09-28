@@ -8,10 +8,6 @@ from fastapi.testclient import TestClient
 
 pytest.importorskip("world_runtime")
 
-from world_runtime import WorldRuntime
-from world_runtime.identity import DelegationGrant
-from world_runtime.service import create_app
-
 from control_plane.domain_controller import PersonalController
 from control_plane.domain_store import DomainJournal
 from control_plane.provider_protocol import (
@@ -23,6 +19,9 @@ from control_plane.provider_protocol import (
     ProviderRegistry,
 )
 from control_plane.runtime_bridge import PersonalRuntimeBridge, WorldRuntimeClient
+from world_runtime import WorldRuntime
+from world_runtime.identity import DelegationGrant
+from world_runtime.service import create_app
 
 
 class TestClientTransport(httpx.BaseTransport):

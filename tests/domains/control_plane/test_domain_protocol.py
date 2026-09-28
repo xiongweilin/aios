@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import pytest
-
 from control_plane.runtime_bridge import WorldRuntimeBoundaryError, WorldRuntimeClient
+
 from tests.domain_harness import make_harness
 from tests.runtime_stub import contract_mismatch_transport
 

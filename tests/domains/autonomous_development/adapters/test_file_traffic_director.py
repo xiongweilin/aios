@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.adapters.traffic import AtomicFileTrafficDirector
 from autonomous_development.adapters.traffic.file import TrafficOperationConflict

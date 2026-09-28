@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-
 from administrative_orchestrator.integrations.credentials import CredentialRef
 from administrative_orchestrator.integrations.effect_common import (
     ConnectorStatus,

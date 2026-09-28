@@ -36,7 +36,7 @@ class SemanticRefCommand(BaseModel):
     version: Literal["0.1"]
 
     @model_validator(mode="after")
-    def _validate_namespace(self) -> "SemanticRefCommand":
+    def _validate_namespace(self) -> SemanticRefCommand:
         universal = {item.value for item in SemanticKind}
         if self.namespace == "universal" and self.kind not in universal:
             raise ValueError("domain-specific SemanticRef kind requires non-universal namespace")
@@ -74,7 +74,7 @@ class DomainReportCommand(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_typed_refs(self) -> "DomainReportCommand":
+    def _validate_typed_refs(self) -> DomainReportCommand:
         if any(ref.kind != SemanticKind.EVIDENCE.value for ref in self.evidence_refs):
             raise ValueError("evidence_refs must contain only Evidence refs")
         if any(ref.kind != SemanticKind.OUTCOME.value for ref in self.outcome_refs):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.integrations.runtime_capabilities import (
     WORLD_RUNTIME_EFFECT_CAPABILITIES,

@@ -1,10 +1,9 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dbos import DBOS, DBOSConfig, DBOSConfiguredInstance, SetWorkflowID
-
 from autonomous_development.application.iteration_scheduler import FeedbackIterationResult
 from autonomous_development.workflows.feedback_autonomy import FeedbackAutonomyWorkflow
+from dbos import DBOS, DBOSConfig, DBOSConfiguredInstance, SetWorkflowID
 
 
 class FakeScheduler:

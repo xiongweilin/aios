@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.domain import (
     AuthorityClass,
     EffectRecord,

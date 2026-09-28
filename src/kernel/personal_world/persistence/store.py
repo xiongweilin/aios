@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from enum import Enum
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any, Protocol, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
-
 from semantic_language import SemanticRef
 from sqlalchemy import Select, String, func, select
 from sqlalchemy.engine import Engine

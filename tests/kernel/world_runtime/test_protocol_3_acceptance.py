@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-
 from world_runtime import WorldRuntime
 from world_runtime.identity import DelegationGrant
 from world_runtime.service import create_app
-
 
 OWNER = {"Authorization": "Bearer owner-token"}
 OTHER = {"Authorization": "Bearer other-token"}

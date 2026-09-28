@@ -1,7 +1,4 @@
-from world_runtime.responsibility import Responsibility
 import pytest
-
-
 from world_runtime import WorldRuntime
 from world_runtime.execution import (
     CapabilityRequest,
@@ -10,6 +7,7 @@ from world_runtime.execution import (
     ProviderDescriptor,
     ProviderHealth,
 )
+from world_runtime.responsibility import Responsibility
 
 
 class LeaseProvider:

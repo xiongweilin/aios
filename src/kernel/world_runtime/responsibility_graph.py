@@ -116,11 +116,11 @@ class ResponsibilityGraphService:
                         payload=value,
                     )
                 return item
-            except LedgerConcurrencyConflict:
+            except LedgerConcurrencyConflict as exc:
                 existing = self.ledger.project_get(self._RELATION_NAMESPACE, item.id)
                 if existing is not None:
                     if self._identity(existing[0]) != self._identity(value):
-                        raise ValueError("responsibility relation identity rebound")
+                        raise ValueError("responsibility relation identity rebound") from exc
                     return self.get(item.id)
                 if attempt == 2:
                     raise

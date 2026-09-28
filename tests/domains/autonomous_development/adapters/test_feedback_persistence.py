@@ -1,14 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.feedback import SqlFeedbackRepository
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.enums import FeedbackKind
 from autonomous_development.domain.models import ReleasedVersion, UserFeedback
 from autonomous_development.ports.persistence import OperationConflictError
+from sqlalchemy import create_engine
 
 
 def release(release_id: str, deployment_id: str = "deployment-1") -> ReleasedVersion:

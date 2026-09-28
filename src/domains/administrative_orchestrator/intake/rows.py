@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..persistence import Base
 
+
 class SourceArtifactRow(Base):
     __tablename__ = "administrative_source_artifact"
     __table_args__ = (

@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.docker_cli import DockerDeploymentProvider
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.ports.deployment import DeploymentProviderError, DeploymentSpec

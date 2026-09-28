@@ -9,6 +9,7 @@ from control_plane.provider_protocol import (
     ProviderDescriptor,
     ProviderHealth,
 )
+
 from tests.domain_harness import make_harness
 
 

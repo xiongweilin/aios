@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.domain import EffectStatus
 from administrative_orchestrator.effect_provider import (
     ProviderExecutionResult,

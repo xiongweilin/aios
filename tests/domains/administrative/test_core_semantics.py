@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from administrative_orchestrator.domain import (
     AdministrativeRequest,
     AuthorityClass,

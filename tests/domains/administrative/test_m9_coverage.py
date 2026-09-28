@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from administrative_orchestrator.commitment_models import CommitmentState
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.integrations.credentials import (
@@ -14,7 +13,6 @@ from administrative_orchestrator.integrations.credentials import (
     EnvironmentOrFileCredentialResolver,
     read_credential_file,
 )
-
 
 
 def test_m9_credential_resolvers_keep_values_at_the_process_edge(

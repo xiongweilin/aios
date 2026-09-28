@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from contextlib import contextmanager
+from collections.abc import Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Iterable, Iterator, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from .common import new_id, utcnow
 
@@ -37,7 +38,7 @@ class SemanticLedger(Protocol):
 
     def close(self) -> None: ...
 
-    def transaction(self) -> Iterator[None]: ...
+    def transaction(self) -> AbstractContextManager[None]: ...
 
     def append(
         self,
@@ -186,7 +187,7 @@ class SQLiteLedger:
             dict(payload),
             recorded,
             valid,
-            int(cur.lastrowid),
+            cur.lastrowid,
         )
 
     def events(

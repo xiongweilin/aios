@@ -2,7 +2,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.adapters.http_observer import HttpDeploymentObserver
 from autonomous_development.domain.enums import DeploymentState

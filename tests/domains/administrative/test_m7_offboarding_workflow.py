@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.domain import CaseStatus
 from administrative_orchestrator.workflows import definitions
 from administrative_orchestrator.workflows.protocol import (

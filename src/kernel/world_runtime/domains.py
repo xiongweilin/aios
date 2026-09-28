@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from semantic_language import SemanticKind, SemanticRef
 
@@ -123,9 +124,11 @@ class DomainProtocolService:
             raise ValueError("outcome_refs must contain only Outcome refs")
         if any(ref.namespace == "universal" for ref in outcome_refs):
             raise ValueError("domain outcome refs require an explicit domain namespace")
-        if kind in {"evidence-submission", "outcome-candidate", "completion-proposal"}:
-            if not evidence_refs:
-                raise ValueError(f"{kind} requires evidence refs")
+        if (
+            kind in {"evidence-submission", "outcome-candidate", "completion-proposal"}
+            and not evidence_refs
+        ):
+            raise ValueError(f"{kind} requires evidence refs")
         if kind == "outcome-candidate" and not outcome_refs:
             raise ValueError("outcome-candidate requires domain-owned outcome refs")
 

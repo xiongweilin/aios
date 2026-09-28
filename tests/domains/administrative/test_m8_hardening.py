@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.completion import assess_administrative_completion
 from administrative_orchestrator.domain import (
     AdministrativeCase,

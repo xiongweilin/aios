@@ -5,8 +5,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.diagnoses import SqlDiagnosisRepository
 from autonomous_development.adapters.postgres.evidence_windows import SqlEvidenceWindowRepository
@@ -57,6 +55,7 @@ from autonomous_development.ports.target_contract import (
     TargetVerificationGateContract,
 )
 from autonomous_development.ports.telemetry import TelemetryEvidence
+from sqlalchemy import create_engine
 
 CONTRACT_REVISION = "sha256:" + "d" * 64
 

@@ -7,22 +7,56 @@ from typing import Any
 from .common import new_id, utcnow
 from .execution_types import (
     CapabilityContractRegistry as CapabilityContractRegistry,
+)
+from .execution_types import (
     CapabilityEffectRule as CapabilityEffectRule,
+)
+from .execution_types import (
     CapabilityProvider as CapabilityProvider,
+)
+from .execution_types import (
     CapabilityRequest as CapabilityRequest,
+)
+from .execution_types import (
     CapabilityResult as CapabilityResult,
+)
+from .execution_types import (
     EffectClass as EffectClass,
+)
+from .execution_types import (
     EffectIdentityReboundError as EffectIdentityReboundError,
+)
+from .execution_types import (
     InvocationContext as InvocationContext,
+)
+from .execution_types import (
     ProviderDescriptor as ProviderDescriptor,
+)
+from .execution_types import (
     ProviderHealth as ProviderHealth,
+)
+from .execution_types import (
     ProviderRegistry as ProviderRegistry,
+)
+from .execution_types import (
     ReconciliationContract as ReconciliationContract,
+)
+from .execution_types import (
     Run as Run,
+)
+from .execution_types import (
     Work as Work,
+)
+from .execution_types import (
     assert_closed_capability_request as assert_closed_capability_request,
+)
+from .execution_types import (
     effect_identity_fingerprint as effect_identity_fingerprint,
+)
+from .execution_types import (
     effect_identity_payload as effect_identity_payload,
+)
+from .execution_types import (
     reconciliation_contract_for as reconciliation_contract_for,
 )
 from .governance import GovernanceService
@@ -271,12 +305,18 @@ class ExecutionService:
             latest = self.get_run(run_id)
             if latest is None:
                 raise KeyError(run_id) from exc
-            if latest.lease_owner == owner and latest.lease_expires_at is not None:
-                if latest.lease_expires_at > utcnow():
-                    return latest
-            if latest.lease_owner and latest.lease_expires_at is not None:
-                if latest.lease_expires_at > utcnow():
-                    raise PermissionError("run lease is held by another owner") from exc
+            if (
+                latest.lease_owner == owner
+                and latest.lease_expires_at is not None
+                and latest.lease_expires_at > utcnow()
+            ):
+                return latest
+            if (
+                latest.lease_owner
+                and latest.lease_expires_at is not None
+                and latest.lease_expires_at > utcnow()
+            ):
+                raise PermissionError("run lease is held by another owner") from exc
             raise PermissionError("run lease acquisition lost a concurrent race") from exc
         run = self.get_run(run_id)
         assert run is not None
@@ -506,14 +546,14 @@ class ExecutionService:
                     kind="execution.effect-identity.bound",
                     payload=value,
                 )
-        except LedgerConcurrencyConflict:
+        except LedgerConcurrencyConflict as exc:
             existing = self.ledger.project_get("execution.effect-identity", key)
             if existing is None:
                 raise
             if existing[0].get("fingerprint") != fingerprint:
                 raise EffectIdentityReboundError(
                     "idempotency identity rebound to a different semantic effect"
-                )
+                ) from exc
 
     def prepare_invocation(
         self,

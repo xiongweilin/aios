@@ -23,7 +23,8 @@ def test_public_vector_suite_is_versioned_sha_pinned_and_complete() -> None:
     assert SUITE["suite_version"] == MANIFEST["suite_version"]
     assert MANIFEST["source_path"] == "src/kernel/world_runtime/contracts/vectors.json"
     assert MANIFEST["schema_version"] == 1
-    assert hashlib.sha256(SOURCE_BYTES).hexdigest() == MANIFEST["source_sha256"]
+    canonical_source_bytes = SOURCE_BYTES.replace(b"\r\n", b"\n")
+    assert hashlib.sha256(canonical_source_bytes).hexdigest() == MANIFEST["source_sha256"]
     assert len(VECTORS) == MANIFEST["vector_count"] == 65
     assert len(vector_ids) == len(set(vector_ids))
     assert set(TRACEABILITY) == set(vector_ids)

@@ -1,12 +1,11 @@
-from world_runtime.responsibility import Responsibility
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
-
 from world_runtime import WorldRuntime
 from world_runtime.contracts import contract_schema, domain_conformance_vectors
 from world_runtime.domain_protocol import DomainReportCommand
 from world_runtime.domains import DomainAssignment
+from world_runtime.responsibility import Responsibility
 from world_runtime.service import create_app
 
 

@@ -10,8 +10,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from autonomous_development.domain.models import RequestAttribution
-from autonomous_development.ports.persistence import RequestAttributionRepository
 from autonomous_development.ports.deployment import is_local_deployment_url
+from autonomous_development.ports.persistence import RequestAttributionRepository
 from autonomous_development.ports.traffic import TrafficRouteReader, TrafficRouteSnapshot
 
 from .metrics import Arm, CanaryMetricsRegistry

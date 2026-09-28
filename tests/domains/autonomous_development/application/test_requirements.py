@@ -6,8 +6,6 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.operator import SqlOperatorRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.application.requirements import RequirementAnalysisService
@@ -31,6 +29,7 @@ from autonomous_development.ports.target_contract import (
     TargetVerificationContract,
     TargetVerificationGateContract,
 )
+from sqlalchemy import create_engine
 
 
 class FakeCodex:

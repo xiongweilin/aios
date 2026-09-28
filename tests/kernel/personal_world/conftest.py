@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from personal_world.model.contracts import DataAccessProfile, RecordKind, SensitivityClass
 from personal_world.persistence import SqlAlchemyPersonalWorldStore, create_database_engine
 from personal_world.service import PersonalWorldService

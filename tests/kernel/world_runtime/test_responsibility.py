@@ -1,9 +1,8 @@
-from world_runtime.decisions import Decision
-from world_runtime.responsibility import Responsibility
 import pytest
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
+from world_runtime.decisions import Decision
+from world_runtime.responsibility import Responsibility
 
 
 def test_work_completion_does_not_discharge_responsibility():

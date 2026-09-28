@@ -32,7 +32,7 @@ class MeetingCommitmentDraft(BaseModel):
     evidence_span_refs: tuple[UUID, ...] = ()
 
     @model_validator(mode="after")
-    def validate_due_time(self) -> "MeetingCommitmentDraft":
+    def validate_due_time(self) -> MeetingCommitmentDraft:
         if self.candidate_due_at is not None and self.candidate_due_at.tzinfo is None:
             raise ValueError("candidate_due_at must be offset-aware")
         return self

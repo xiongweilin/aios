@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-
 from administrative_orchestrator.integrations.credentials import CredentialRef
 from administrative_orchestrator.integrations.effect_common import (
     ConnectorStatus,
@@ -15,6 +14,7 @@ from administrative_orchestrator.integrations.odoo_effects import (
     OdooFinancialEffectConnector,
     OdooFinancialVerifier,
 )
+
 from scripts.domains.administrative.production_world_runtime_stack import ProductionEffectProvider
 
 

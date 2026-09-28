@@ -4,7 +4,6 @@ import json
 from datetime import UTC, datetime
 
 import httpx
-
 from autonomous_development.adapters.world_runtime import WorldRuntimeDevelopmentBridge
 from autonomous_development.domain.enums import (
     CycleState,

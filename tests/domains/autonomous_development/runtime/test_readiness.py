@@ -4,11 +4,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-
-from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
-from pydantic import SecretStr
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.adapters.postgres.target_registry import (
@@ -36,6 +31,10 @@ from autonomous_development.ports.target_contract import (
 )
 from autonomous_development.runtime.config import RuntimeSettings
 from autonomous_development.runtime.readiness import RuntimeReadinessService
+from pydantic import SecretStr
+from sqlalchemy import create_engine
+
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
 
 CONTRACT_REVISION = "sha256:" + "d" * 64
 

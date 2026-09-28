@@ -5,10 +5,6 @@ from pathlib import Path
 from typing import ClassVar
 from uuid import UUID
 
-from fastapi.testclient import TestClient
-from pydantic import SecretStr
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.adapters.postgres.target_registry import (
@@ -31,6 +27,9 @@ from autonomous_development.runtime.composition import (
     compose_runtime,
 )
 from autonomous_development.runtime.config import RuntimeSettings
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
+from sqlalchemy import create_engine
 
 
 class FakeDBOS:

@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import cast
 
 from semantic_language import SemanticKind, SemanticRef
 
@@ -8,7 +9,6 @@ from .decisions import assert_decision_applies
 from .governance import assert_mandate_current
 from .ledger import SemanticLedger
 from .lineage import Revision, RevisionLineageService
-
 
 STRATEGY_NAMESPACE = "world-runtime.strategy"
 GOAL_KIND = "goal"
@@ -99,9 +99,9 @@ class StrategyService:
             id=str(value["id"]),
             goal_id=str(value["goal_id"]),
             disposition=str(value["disposition"]),
-            basis_refs=tuple(str(v) for v in value.get("basis_refs", [])),
-            evidence_refs=tuple(str(v) for v in value.get("evidence_refs", [])),
-            outcome_refs=tuple(str(v) for v in value.get("outcome_refs", [])),
+            basis_refs=tuple(str(v) for v in cast(list[object], value.get("basis_refs", []))),
+            evidence_refs=tuple(str(v) for v in cast(list[object], value.get("evidence_refs", []))),
+            outcome_refs=tuple(str(v) for v in cast(list[object], value.get("outcome_refs", []))),
             rationale=str(value.get("rationale", "")),
         )
 

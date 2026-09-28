@@ -1,9 +1,8 @@
-from hypothesis import given
-from hypothesis import strategies as st
-
 from autonomous_development.domain.enums import CycleState
 from autonomous_development.domain.models import DevelopmentCycle
 from autonomous_development.domain.transitions import StaleCycleError, transition_cycle
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 @given(

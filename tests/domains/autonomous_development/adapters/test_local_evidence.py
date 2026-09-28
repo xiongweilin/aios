@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.evidence.local import LocalEvidenceStore
 
 

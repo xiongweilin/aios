@@ -90,7 +90,6 @@ from autonomous_development.application.soak import PostPromotionSoakService
 from autonomous_development.application.source_promotion import SourcePromotionService
 from autonomous_development.application.target_registry import TargetRegistryService
 from autonomous_development.application.verification import VerificationService
-from integrations.codex_app_server import RemoteCodexAppServer
 from autonomous_development.domain.canary import CanaryGuardrails
 from autonomous_development.ports.deployment import DeploymentProvider
 from autonomous_development.ports.repository import RepositoryProvider
@@ -112,6 +111,7 @@ from autonomous_development.workflows.requirements import (
     RequirementAutonomyWorkflow,
     start_requirement_workflow,
 )
+from integrations.codex_app_server import RemoteCodexAppServer
 
 
 class RuntimeConfigurationError(RuntimeError):

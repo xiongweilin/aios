@@ -1,5 +1,4 @@
 import pytest
-
 from semantic_language import (
     NonSubstitutionError,
     SemanticKind,

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.application.build import BuildRejected, BuildService
 from autonomous_development.domain.models import CandidateRevision
 from autonomous_development.ports.build import BuiltImage, SupplyChainEvidence

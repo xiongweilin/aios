@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 
 import pytest
-
 from administrative_orchestrator.intake.artifacts import (
     ArtifactDigestMismatch,
     ArtifactNotFound,

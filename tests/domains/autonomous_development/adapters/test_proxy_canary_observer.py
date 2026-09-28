@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import httpx
-
 from autonomous_development.adapters.canary_proxy import ProxyCanaryObserver
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.domain.canary import CanaryGuardrails, evaluate_canary_stage

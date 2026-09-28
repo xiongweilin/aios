@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.completion import (
     assess_administrative_completion,
     assess_onboarding_completion,

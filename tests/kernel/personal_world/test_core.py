@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-
 from personal_world.model.contracts import (
     ContextProjectionRequest,
     DomainClaim,
@@ -17,8 +16,8 @@ from personal_world.model.contracts import (
     QualificationStatus,
     RecordKind,
     ResourceLinkCreate,
-    RevisionRequest,
     RevalidationRequest,
+    RevisionRequest,
     SemanticRef,
     SensitivityClass,
     SourceClass,

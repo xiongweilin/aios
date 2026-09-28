@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-
 from administrative_orchestrator.authority import AuthorityRepository, IdentityBinding
 from administrative_orchestrator.authority_lifecycle import AuthorityLifecycleRepository
 from administrative_orchestrator.config import Settings

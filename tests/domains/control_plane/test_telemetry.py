@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
-
 from control_plane import telemetry
+from fastapi import FastAPI
 
 
 def test_configure_telemetry_is_noop_without_endpoint(monkeypatch) -> None:

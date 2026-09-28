@@ -2,8 +2,6 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.operator import SqlOperatorRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.enums import (
@@ -16,6 +14,7 @@ from autonomous_development.domain.models import (
     OperatorEvent,
     RequirementAnalysis,
 )
+from sqlalchemy import create_engine
 
 
 def _request(*, request_id: str = "request-1", digest: str = "a" * 64) -> DevelopmentRequest:

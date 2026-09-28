@@ -1,5 +1,4 @@
 import pytest
-
 from autonomous_development.domain.canary import (
     CanaryGuardrails,
     CanaryStageEvidence,

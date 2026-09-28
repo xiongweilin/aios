@@ -4,9 +4,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-import pytest
-
 import control_plane.environment as environment
+import pytest
 from control_plane.config import ControlPlaneConfig
 from control_plane.environment import EnvironmentInspectionProvider, evaluate_environment
 

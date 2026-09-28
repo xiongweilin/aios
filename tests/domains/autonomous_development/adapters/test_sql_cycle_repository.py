@@ -1,11 +1,10 @@
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.application.cycles import CycleService
 from autonomous_development.domain.enums import CycleState
 from autonomous_development.domain.models import DevelopmentCycle
 from autonomous_development.ports.persistence import OperationConflictError
+from sqlalchemy import create_engine
 
 
 def make_service(tmp_path):

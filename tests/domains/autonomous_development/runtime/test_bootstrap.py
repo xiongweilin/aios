@@ -5,9 +5,6 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import SecretStr
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.evidence.local import LocalEvidenceStore
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.target_registry import (
@@ -23,6 +20,8 @@ from autonomous_development.ports.deployment import DeploymentRuntime, Deploymen
 from autonomous_development.runtime import bootstrap
 from autonomous_development.runtime.bootstrap import bootstrap_runtime
 from autonomous_development.runtime.config import RuntimeSettings
+from pydantic import SecretStr
+from sqlalchemy import create_engine
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 

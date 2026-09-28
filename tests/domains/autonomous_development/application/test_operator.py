@@ -5,8 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.operator import SqlOperatorRepository
 from autonomous_development.adapters.postgres.proposals import SqlChangeProposalRepository
@@ -24,6 +22,7 @@ from autonomous_development.domain.models import (
     RequirementAnalysis,
 )
 from autonomous_development.ports.repository import RepositoryBaseline
+from sqlalchemy import create_engine
 
 NOW = datetime(2026, 9, 19, tzinfo=UTC)
 

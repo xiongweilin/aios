@@ -1,8 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.experiments import SqlExperimentRepository
 from autonomous_development.adapters.postgres.release_decisions import (
@@ -27,6 +25,7 @@ from autonomous_development.domain.models import (
     VerificationRun,
 )
 from autonomous_development.ports.persistence import OperationConflictError
+from sqlalchemy import create_engine
 
 
 def services() -> tuple[CycleService, ExperimentService, ReleaseService]:

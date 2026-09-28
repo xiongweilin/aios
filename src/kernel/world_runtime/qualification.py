@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Mapping
+from typing import cast
 
 from .common import new_id
 from .ledger import LedgerConcurrencyConflict, SemanticLedger
@@ -390,7 +391,7 @@ class QualificationService:
             assumption=str(value["assumption"]),
             scope=dict(value.get("scope", {})),
             review_policy=dict(value.get("review_policy", {})),
-            basis_refs=tuple(str(v) for v in value.get("basis_refs", [])),
+            basis_refs=tuple(str(v) for v in cast(list[object], value.get("basis_refs", []))),
             status=str(value.get("status", "active")),
             supersedes_binding_id=(
                 str(value["supersedes_binding_id"])
@@ -495,7 +496,7 @@ class QualificationService:
             observed_version=str(value["observed_version"]),
             reason=str(value["reason"]),
             required_action=str(value["required_action"]),
-            basis_refs=tuple(str(v) for v in value.get("basis_refs", [])),
+            basis_refs=tuple(str(v) for v in cast(list[object], value.get("basis_refs", []))),
             status=str(value.get("status", "open")),
             assessment_id=(
                 str(value["assessment_id"]) if value.get("assessment_id") else None
@@ -504,14 +505,14 @@ class QualificationService:
                 str(value["disposition"]) if value.get("disposition") else None
             ),
             assessment_basis_refs=tuple(
-                str(v) for v in value.get("assessment_basis_refs", [])
+                str(v) for v in cast(list[object], value.get("assessment_basis_refs", []))
             ),
             rationale=str(value.get("rationale", "")),
             resolution_ref=(
                 str(value["resolution_ref"]) if value.get("resolution_ref") else None
             ),
             resolution_basis_refs=tuple(
-                str(v) for v in value.get("resolution_basis_refs", [])
+                str(v) for v in cast(list[object], value.get("resolution_basis_refs", []))
             ),
         )
 

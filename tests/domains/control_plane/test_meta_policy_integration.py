@@ -2,6 +2,7 @@ from pathlib import Path
 
 from control_plane.alert_policy import AutonomousRepairPolicy, ManualTaskPolicy
 from control_plane.domain_controller import ControllerDecisionKind, StagedDomainPolicy
+
 from tests.domain_harness import make_harness
 
 

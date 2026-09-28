@@ -39,11 +39,10 @@ def test_case_changed_maps_to_deterministic_start_and_wake() -> None:
 
 
 def test_case_kind_selects_offboarding_workflow(monkeypatch) -> None:
-    from dbos import DBOS
-
     from administrative_orchestrator.workflows.definitions import (
         offboarding_case_workflow,
     )
+    from dbos import DBOS
 
     started: list[object] = []
     sent: list[dict] = []

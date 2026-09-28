@@ -90,11 +90,12 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["F"]
-ignore = ["E501"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501", "UP047"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/domains/administrative_orchestrator/integrations/odoo_effects.py" = ["SIM114"]
+"src/kernel/personal_world/api/app.py" = ["B008"]
 
 [tool.importlinter]
 root_packages = ["autonomous_development", "semantic_language", "world_runtime"]

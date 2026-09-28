@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from pydantic import BaseModel, Field
 
+from integrations.codex_app_server import RemoteCodexAppServer
+
 from .alert_context import (
     AlertContext,
     alert_context_from_event_payload,
@@ -34,7 +36,6 @@ from .alert_policy import (
 from .audit import inspect_session_fields, redact_value
 from .codex_boundary import CodexExecutionBoundary, ThreadIsolatedCodexProvider
 from .codex_provider import CodexProvider
-from integrations.codex_app_server import RemoteCodexAppServer
 from .config import ConfigurationError, ControlPlaneConfig
 from .domain_controller import ControllerStatus, PersonalController
 from .domain_store import DomainEvent, DomainJournal, new_id

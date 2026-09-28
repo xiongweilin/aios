@@ -24,13 +24,13 @@ from .ledger import LedgerConcurrencyConflict, SemanticLedger, SQLiteLedger
 from .lineage import RevisionLineageService
 from .memory import MemoryService
 from .ontology import OntologyRegistry
-from .recovery import RecoveryService
 from .qualification import QualificationService
+from .recovery import RecoveryService
 from .responsibility import ResponsibilityService
 from .responsibility_graph import ResponsibilityGraphService
 from .state_bundle import StateBundleService
-from .strategy import StrategyService
 from .strategic_portfolio import StrategicPortfolioService
+from .strategy import StrategyService
 
 
 class WorldRuntime:

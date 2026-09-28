@@ -6,14 +6,13 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
-
 from autonomous_development.adapters.postgres.backup import DockerPostgresBackup
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.process.subprocess_runner import SubprocessRunner
 from autonomous_development.application.cycles import CycleService
 from autonomous_development.domain.models import DevelopmentCycle
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 
 pytestmark = pytest.mark.integration
 

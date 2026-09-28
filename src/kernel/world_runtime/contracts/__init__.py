@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import tomllib
-from importlib.resources import files
 from functools import lru_cache
+from importlib.resources import files
 from typing import Any
-
 
 CATALOG_VERSION = "world-runtime-contracts-v12"
 CATALOG_OWNER = "world-runtime/contracts"

@@ -1,12 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.evidence_windows import (
     SqlEvidenceWindowRepository,
 )
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.models import EvidenceWindow
+from sqlalchemy import create_engine
 
 
 def test_evidence_window_roundtrips_immutably() -> None:

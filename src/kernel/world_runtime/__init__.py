@@ -15,12 +15,12 @@ from .epistemics import (
     ClaimRevision,
     Conflict,
     EpistemicLedger,
+    EvaluatorKind,
     Evidence,
     EvidenceAssessment,
     EvidencePredicate,
     EvidenceRelation,
     EvidenceRequirement,
-    EvaluatorKind,
     FalsificationCondition,
     Unknown,
     evaluate_predicate,
@@ -54,7 +54,6 @@ from .responsibility import Responsibility, ResponsibilityService
 from .responsibility_graph import ResponsibilityGraphService, ResponsibilityRelation
 from .runtime import WorldRuntime
 from .state_bundle import BUNDLE_VERSION, BundleValidation, StateBundleService
-from .strategy import Goal, GoalLifecycleTransition, StrategyAssessment, StrategyService
 from .strategic_portfolio import (
     PortfolioProposal,
     ResourceAllocation,
@@ -63,6 +62,7 @@ from .strategic_portfolio import (
     StrategicPortfolio,
     StrategicPortfolioService,
 )
+from .strategy import Goal, GoalLifecycleTransition, StrategyAssessment, StrategyService
 
 __all__ = [
     "Authorization", "BeliefState", "BeliefVerdict", "Claim", "ClaimRevision", "Conflict", "CapabilityRequest", "CapabilityResult",

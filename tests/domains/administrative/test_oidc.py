@@ -7,11 +7,10 @@ import time
 import httpx
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
-from jwt.algorithms import RSAAlgorithm
-
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.oidc import OidcVerificationError, OidcVerifier
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt.algorithms import RSAAlgorithm
 
 ISSUER = "https://id.example.test"
 AUDIENCE = "administrative-orchestrator"

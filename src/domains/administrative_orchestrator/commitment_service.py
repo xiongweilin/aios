@@ -23,12 +23,12 @@ from .commitment_lifecycle import CommitmentLifecycleCoordinator
 from .commitment_models import (
     CandidateCommitment,
     CandidateCommitmentClassification,
-    MeetingInterpretationPayload,
     CandidateCommitmentStatus,
     CommitmentFulfillmentKind,
     CommitmentRecord,
     CommitmentState,
     CommunicationEffectRecord,
+    MeetingInterpretationPayload,
     SpeakerPrincipalResolution,
 )
 from .commitment_repository import CommitmentConflict, CommitmentRepository

@@ -1,8 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.releases import SqlReleasedVersionRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.application.release_catalog import ReleaseCatalogService
@@ -18,6 +16,7 @@ from autonomous_development.ports.target_contract import (
     TargetVerificationContract,
     TargetVerificationGateContract,
 )
+from sqlalchemy import create_engine
 
 
 class FakeDeploymentProvider:

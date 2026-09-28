@@ -9,15 +9,14 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from semantic_language import SemanticKind, SemanticRef
 
-from .decisions import Decision
-from .governance import Mandate
-from .responsibility import Responsibility
-
 from .agency_protocol import register_agency_protocol_routes
 from .contracts import conformance_vectors, contract_catalog
+from .decisions import Decision
 from .domain_protocol import register_domain_protocol_routes
 from .execution import CapabilityRequest, CapabilityResult, EffectIdentityReboundError
+from .governance import Mandate
 from .identity import AuthenticatedRequestContext, DelegationGrant
+from .responsibility import Responsibility
 from .runtime import WorldRuntime
 
 

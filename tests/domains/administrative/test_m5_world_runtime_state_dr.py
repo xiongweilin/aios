@@ -3,9 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 import administrative_orchestrator.world_runtime_state_dr as runtime_state_dr
+import pytest
 from administrative_orchestrator.world_runtime_state_dr import (
     WorldRuntimeStateRecoveryError,
     backup_world_runtime_state,

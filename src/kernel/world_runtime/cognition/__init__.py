@@ -1,8 +1,8 @@
 """Cognitive investigation and closure owned by World Runtime."""
 
 from .kernel import (
-    CognitiveEpisode,
     CognitionEngine,
+    CognitiveEpisode,
     InvestigationBudget,
     InvestigationCandidate,
     InvestigationClosureReadiness,

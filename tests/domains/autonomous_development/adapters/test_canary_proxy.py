@@ -1,13 +1,12 @@
 import httpx
 import pytest
-from fastapi import FastAPI
-
 from autonomous_development.adapters.canary_proxy import (
     CanaryMetricsRegistry,
     create_canary_proxy,
 )
 from autonomous_development.domain.models import RequestAttribution
 from autonomous_development.ports.traffic import TrafficRouteSnapshot
+from fastapi import FastAPI
 
 
 class FakeRouteReader:

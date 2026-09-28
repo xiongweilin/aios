@@ -6,14 +6,13 @@ from threading import Barrier
 from uuid import uuid4
 
 import pytest
-
 from personal_world.model.contracts import (
     DataAccessProfile,
     PersonalFactCreate,
     QualificationStatus,
     RecordKind,
-    SensitivityClass,
     SemanticRef,
+    SensitivityClass,
     SourceClass,
     SourceDescriptorCreate,
 )

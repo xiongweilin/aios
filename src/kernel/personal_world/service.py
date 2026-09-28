@@ -27,6 +27,7 @@ from personal_world.model.contracts import (
     RecordKind,
     RelationshipCreate,
     ResourceLinkCreate,
+    RevalidationRequest,
     RevisionRequest,
     SearchHit,
     SearchRequest,
@@ -34,7 +35,6 @@ from personal_world.model.contracts import (
     SourceDescriptor,
     SourceDescriptorCreate,
     TemporalScope,
-    RevalidationRequest,
     utc_now,
 )
 from personal_world.persistence.store import SqlAlchemyPersonalWorldStore

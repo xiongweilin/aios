@@ -41,7 +41,7 @@ class EvidenceSpan(UtcModel):
     locator_digest: str | None = Field(default=None, min_length=64, max_length=64)
 
     @model_validator(mode="after")
-    def validate_locator_digest(self) -> "EvidenceSpan":
+    def validate_locator_digest(self) -> EvidenceSpan:
         expected = _locator_digest(self.locator)
         if self.locator_digest is None:
             self.locator_digest = expected
@@ -68,7 +68,7 @@ class InterpretationRecord(UtcModel):
     status: InterpretationStatus = InterpretationStatus.SUCCEEDED
 
     @model_validator(mode="after")
-    def validate_provenance(self) -> "InterpretationRecord":
+    def validate_provenance(self) -> InterpretationRecord:
         for name in (
             "interpretation_profile_ref", "model_provider", "model_identity",
             "model_version", "schema_ref", "response_digest",

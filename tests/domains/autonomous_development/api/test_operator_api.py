@@ -7,9 +7,6 @@ import time
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from autonomous_development.api.operator import create_operator_router
 from autonomous_development.api.operator_security import OperatorAuthenticator
 from autonomous_development.application.operator import OperatorStatus
@@ -20,6 +17,8 @@ from autonomous_development.domain.models import (
     OperatorEvent,
     RequirementAnalysis,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 SECRET = "operator-secret"
 

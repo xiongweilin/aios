@@ -3,7 +3,6 @@ import hmac
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.api.operator_security import (
     OperatorAuthenticationError,
     OperatorAuthenticator,

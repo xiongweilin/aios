@@ -1,15 +1,14 @@
-from world_runtime.decisions import Decision
-from world_runtime.strategy import Goal
-from world_runtime.governance import Mandate
-from world_runtime.responsibility import Responsibility
 from datetime import timedelta
 
 import pytest
-from semantic_language import SemanticKind, SemanticRef
-
 import world_runtime.governance as governance_module
+from semantic_language import SemanticKind, SemanticRef
 from world_runtime import DomainAssignment, WorldRuntime
 from world_runtime.common import utcnow
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
+from world_runtime.strategy import Goal
 
 
 def _evidence_ref(identifier: str = "evidence:integrity") -> SemanticRef:

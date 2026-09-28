@@ -1,5 +1,4 @@
 import pytest
-
 from world_runtime import WorldRuntime
 from world_runtime.execution import (
     CapabilityRequest,

@@ -1,8 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
-from administrative_orchestrator.execution_repository import ExecutionRepository
 from administrative_orchestrator.domain import (
     AdministrativeRequest,
     Decision,
@@ -10,6 +8,7 @@ from administrative_orchestrator.domain import (
     FactSnapshot,
     PolicyRef,
 )
+from administrative_orchestrator.execution_repository import ExecutionRepository
 from administrative_orchestrator.persistence import ConcurrencyConflict, SqlStore
 from administrative_orchestrator.policy import OnboardingFacts, OnboardingPolicy
 from administrative_orchestrator.service import (

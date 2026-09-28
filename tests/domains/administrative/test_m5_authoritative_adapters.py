@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-
 from administrative_orchestrator.auth import Authenticator
 from administrative_orchestrator.authority import AuthorityRepository, IdentityBinding
 from administrative_orchestrator.config import Settings

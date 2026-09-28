@@ -15,8 +15,9 @@ from autonomous_development.ports.codex import (
     CodexTurnRequest,
     CodexTurnResult,
 )
-from ..codex_thread_journal import CodexThreadJournal
 from integrations.codex_app_server import CodexBridgeError, RemoteCodexAppServer
+
+from ..codex_thread_journal import CodexThreadJournal
 
 
 class CodexExecProvider(CodexProvider):

@@ -27,8 +27,8 @@ from personal_world.model.contracts import (
     RedactionRequest,
     RelationshipCreate,
     ResourceLinkCreate,
-    RevisionRequest,
     RevalidationRequest,
+    RevisionRequest,
     SearchRequest,
     SourceDescriptorCreate,
 )

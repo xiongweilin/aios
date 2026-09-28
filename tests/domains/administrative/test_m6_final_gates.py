@@ -3,8 +3,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
-
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _SOURCE_ROOT = _REPOSITORY_ROOT / "src" / "administrative_orchestrator"
 _FORBIDDEN_MODEL_FIELDS = {

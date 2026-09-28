@@ -1,6 +1,4 @@
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.feedback_triggers import (
     SqlFeedbackTriggerRepository,
 )
@@ -9,6 +7,7 @@ from autonomous_development.ports.persistence import (
     FeedbackTriggerReceipt,
     OperationConflictError,
 )
+from sqlalchemy import create_engine
 
 
 def receipt(*, outcome: str = "prepared") -> FeedbackTriggerReceipt:

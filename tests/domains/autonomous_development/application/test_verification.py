@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.application.verification import (
     VerificationPolicyError,
     VerificationService,

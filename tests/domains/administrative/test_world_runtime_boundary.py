@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import httpx
 import pytest
-
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.domain import (
     AdministrativeCase,

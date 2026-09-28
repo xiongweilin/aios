@@ -9,6 +9,7 @@ from typing import Any
 
 from autonomous_development.domain.enums import VerificationStatus
 from autonomous_development.domain.models import CandidateRevision, VerificationCheck
+from autonomous_development.ports.deployment import is_local_deployment_url
 from autonomous_development.ports.evidence import EvidenceStore
 from autonomous_development.ports.process import (
     CommandRequest,
@@ -16,7 +17,6 @@ from autonomous_development.ports.process import (
     CommandUnavailable,
     ProcessRunner,
 )
-from autonomous_development.ports.deployment import is_local_deployment_url
 from autonomous_development.ports.quality import PerformanceGateFactory, QualityGate
 
 

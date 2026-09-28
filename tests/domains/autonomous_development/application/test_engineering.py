@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.git_cli.repository import GitCliRepository
 from autonomous_development.application.engineering import EngineeringService
 from autonomous_development.domain.models import ChangeProposal

@@ -3,17 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from hypothesis import given, settings, strategies as st
-
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from personal_world.model.contracts import (
     DataAccessProfile,
     PersonalFactCreate,
     QualificationStatus,
     RecordKind,
-    SensitivityClass,
     RevalidationRequest,
     RevisionRequest,
     SemanticRef,
+    SensitivityClass,
     SourceClass,
     SourceDescriptorCreate,
     TemporalScope,

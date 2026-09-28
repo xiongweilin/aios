@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-
 from world_runtime import WorldRuntime
 from world_runtime.service import create_app
 

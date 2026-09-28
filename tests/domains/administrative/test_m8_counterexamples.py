@@ -5,8 +5,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
-
 from administrative_orchestrator.domain import (
     AdministrativeCase,
     CaseStatus,
@@ -26,8 +24,7 @@ from administrative_orchestrator.financial import (
     qualify_invoice_transaction,
     qualify_vendor,
 )
-
-
+from pydantic import ValidationError
 
 
 def _invoice() -> InvoiceFacts:

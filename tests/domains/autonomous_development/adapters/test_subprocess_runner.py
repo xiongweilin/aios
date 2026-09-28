@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.process import SubprocessRunner
 from autonomous_development.ports.process import CommandRequest, CommandUnavailable
 

@@ -1,8 +1,5 @@
 from datetime import UTC, datetime
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from autonomous_development.api.feedback import create_feedback_router
 from autonomous_development.application.feedback import FeedbackService
 from autonomous_development.application.release_catalog import ReleaseCatalogService
@@ -12,6 +9,8 @@ from autonomous_development.domain.models import (
     UserFeedback,
 )
 from autonomous_development.ports.persistence import ServingReleaseReceipt
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 class MemoryReleaseRepository:

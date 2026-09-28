@@ -6,8 +6,6 @@ from typing import Any, ClassVar, TypeVar
 
 import httpx
 
-from integrations.world_runtime_client import WorldRuntimeBoundaryError, WorldRuntimeHttpClient
-
 from autonomous_development.domain.models import (
     BuildArtifact,
     CandidateRevision,
@@ -18,6 +16,7 @@ from autonomous_development.domain.models import (
     ProductObjectiveRevision,
     ReleasedVersion,
 )
+from integrations.world_runtime_client import WorldRuntimeBoundaryError, WorldRuntimeHttpClient
 
 T = TypeVar("T")
 

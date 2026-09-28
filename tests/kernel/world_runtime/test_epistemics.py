@@ -1,19 +1,17 @@
-from world_runtime.epistemics import Claim, Conflict, Evidence, Unknown
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import (
     BeliefVerdict,
+    EvaluatorKind,
     EvidencePredicate,
     EvidenceRelation,
     EvidenceRequirement,
-    EvaluatorKind,
     FalsificationCondition,
     WorldRuntime,
 )
-
+from world_runtime.epistemics import Claim, Conflict, Evidence, Unknown
 
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=UTC)
 
@@ -290,3 +288,27 @@ def test_model_assessment_is_recorded_but_cannot_establish_belief() -> None:
         evaluator_kind=EvaluatorKind.HUMAN,
     )
     assert runtime.epistemics.current_belief(claim.id)[0] is BeliefVerdict.SUPPORTED
+
+
+def test_unknown_preserves_owner_specific_reference_kinds() -> None:
+    runtime = WorldRuntime.sqlite()
+    unknown = Unknown(
+        id="unknown:owner-specific",
+        subject="deployment",
+        question="which controller owns the assignment?",
+        blocks=(
+            SemanticRef(
+                kind="assignment",
+                id="assignment:1",
+                namespace="control-plane",
+            ),
+        ),
+    )
+
+    runtime.epistemics.record_unknown(unknown)
+
+    projection = runtime.ledger.project_get("epistemics.unknown", unknown.id)
+    assert projection is not None
+    assert projection[0]["blocks"] == [
+        {"kind": "assignment", "id": "assignment:1"}
+    ]

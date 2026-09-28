@@ -9,8 +9,6 @@ from uuid import UUID
 
 import psycopg
 import pytest
-from sqlalchemy import create_engine, func, select
-
 from administrative_orchestrator.config import get_settings
 from administrative_orchestrator.domain import (
     AdministrativeRequest,
@@ -40,6 +38,7 @@ from administrative_orchestrator.workflows.relay import (
     execute_outbox_action,
     plan_outbox_action,
 )
+from sqlalchemy import create_engine, func, select
 
 pytestmark = pytest.mark.skipif(
     os.getenv("ADMIN_RUN_DBOS_INTEGRATION") != "1",

@@ -4,7 +4,6 @@ import asyncio
 from pathlib import Path
 
 import httpx
-
 from control_plane.app import ALERT_FINISHED_EVENT, ALERT_QUEUED_EVENT, create_app
 from control_plane.config import ControlPlaneConfig
 from control_plane.provider_protocol import (
@@ -14,6 +13,7 @@ from control_plane.provider_protocol import (
     ProviderDescriptor,
     ProviderHealth,
 )
+
 from tests.runtime_stub import RuntimeStub
 
 

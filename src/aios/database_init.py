@@ -20,13 +20,12 @@ def main() -> None:
     if not names:
         raise RuntimeError("AIOS_POSTGRES_DATABASES must contain at least one database")
 
-    with psycopg.connect(dsn, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            for name in names:
-                cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,))
-                if cursor.fetchone() is not None:
-                    continue
-                cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    with psycopg.connect(dsn, autocommit=True) as connection, connection.cursor() as cursor:
+        for name in names:
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,))
+            if cursor.fetchone() is not None:
+                continue
+            cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
 
 
 if __name__ == "__main__":

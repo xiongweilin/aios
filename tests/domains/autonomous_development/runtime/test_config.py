@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr, ValidationError
-
 from autonomous_development.runtime.config import RuntimeSettings
+from pydantic import SecretStr, ValidationError
 
 
 def settings(tmp_path: Path, **overrides: object) -> RuntimeSettings:

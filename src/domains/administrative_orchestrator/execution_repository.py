@@ -26,7 +26,6 @@ from .persistence import (
 from .persistence_mapping import model_from_row
 
 
-
 class ExecutionConflict(RuntimeError):
     pass
 

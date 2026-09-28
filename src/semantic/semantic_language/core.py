@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import uuid4
 
-
 SEMANTIC_REF_WIRE_VERSION = "0.1"
 
 

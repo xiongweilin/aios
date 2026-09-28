@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from world_runtime.decisions import Decision
-from world_runtime.governance import Mandate
-from world_runtime.responsibility import Responsibility
 import copy
 import hashlib
 import json
 from pathlib import Path
 
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
-
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 
 PRINCIPAL = "service:long-horizon"
 

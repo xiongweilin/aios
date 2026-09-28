@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any
 
 from ..common import new_id
 from ..epistemics import BeliefVerdict, EpistemicLedger
@@ -74,7 +75,7 @@ class CognitionEngine:
         if self.epistemics.open_unknowns(subject):
             return InvestigationClosureReadiness.NOT_READY
         verdicts = [self.epistemics.current_belief(cid)[0] for cid in material_claim_ids]
-        if any(v is BeliefVerdict.CONFLICTED for v in verdicts):
+        if any(v is BeliefVerdict.DISPUTED for v in verdicts):
             return InvestigationClosureReadiness.NOT_READY
         if any(v is BeliefVerdict.UNKNOWN for v in verdicts):
             return InvestigationClosureReadiness.TEMPORARY

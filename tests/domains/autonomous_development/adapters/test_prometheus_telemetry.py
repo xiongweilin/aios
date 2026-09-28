@@ -3,7 +3,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.adapters.prometheus import PrometheusTelemetryProvider
 

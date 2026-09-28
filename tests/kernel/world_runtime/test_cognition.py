@@ -1,13 +1,12 @@
-from world_runtime.epistemics import Claim, Evidence, Unknown
-
 from world_runtime import (
     BeliefVerdict,
+    EvaluatorKind,
     InvestigationBudget,
     InvestigationCandidate,
     InvestigationClosureReadiness,
-    EvaluatorKind,
     WorldRuntime,
 )
+from world_runtime.epistemics import Claim, Evidence, Unknown
 
 
 def test_cognition_controls_search_and_reopen_without_minting_work():
@@ -50,3 +49,48 @@ def test_cognition_controls_search_and_reopen_without_minting_work():
         reason="old frame failed",
     )
     assert rt.ledger.project_get("execution.work", episode.id) is None
+
+
+def test_disputed_material_claim_blocks_final_closure() -> None:
+    runtime = WorldRuntime.sqlite()
+    claim = Claim(id="claim:disputed", subject="incident", proposition="p is true")
+    supporting = Evidence(
+        id="evidence:disputed-supporting",
+        subject="incident",
+        source="review",
+        content={"status": "supported"},
+    )
+    contradicting = Evidence(
+        id="evidence:disputed-contradicting",
+        subject="incident",
+        source="review",
+        content={"status": "contradicted"},
+    )
+    runtime.epistemics.record_claim(claim)
+    runtime.epistemics.record_evidence(supporting)
+    runtime.epistemics.record_evidence(contradicting)
+    runtime.epistemics.assess(
+        claim=claim,
+        evidence=supporting,
+        verdict=BeliefVerdict.SUPPORTED,
+        rationale="one review supports the claim",
+        assessed_by="reviewer",
+        evaluator_kind=EvaluatorKind.DOMAIN_VERIFIER,
+    )
+    runtime.epistemics.assess(
+        claim=claim,
+        evidence=contradicting,
+        verdict=BeliefVerdict.UNSUPPORTED,
+        rationale="another review contradicts the claim",
+        assessed_by="reviewer",
+        evaluator_kind=EvaluatorKind.DOMAIN_VERIFIER,
+    )
+    assert runtime.epistemics.current_belief(claim.id)[0] is BeliefVerdict.DISPUTED
+
+    assert (
+        runtime.cognition.closure_readiness(
+            subject="incident",
+            material_claim_ids=(claim.id,),
+        )
+        is InvestigationClosureReadiness.NOT_READY
+    )

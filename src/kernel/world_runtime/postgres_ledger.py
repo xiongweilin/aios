@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
 from threading import RLock
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 import psycopg
 from psycopg import sql

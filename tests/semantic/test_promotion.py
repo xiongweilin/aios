@@ -1,5 +1,4 @@
 import pytest
-
 from semantic_language.promotion import PromotionCandidate, assert_promotion_eligible
 
 

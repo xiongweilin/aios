@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dbos import DBOS, DBOSConfig, DBOSConfiguredInstance, SetWorkflowID
-
 from autonomous_development.application.operator import RequirementPreparation
 from autonomous_development.domain.models import DevelopmentRequest
 from autonomous_development.workflows.requirements import RequirementAutonomyWorkflow
+from dbos import DBOS, DBOSConfig, DBOSConfiguredInstance, SetWorkflowID
 
 
 def request() -> DevelopmentRequest:

@@ -1,13 +1,12 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.request_attributions import (
     SqlRequestAttributionRepository,
 )
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.models import RequestAttribution
+from sqlalchemy import create_engine
 
 
 def repository() -> SqlRequestAttributionRepository:

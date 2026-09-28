@@ -2,7 +2,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from control_plane.config import ControlPlaneConfig
 from control_plane.personal_operations import PersonalOperationsProvider
 from control_plane.provider_protocol import CapabilityRequest, InvocationContext

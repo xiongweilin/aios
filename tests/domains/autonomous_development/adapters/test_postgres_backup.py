@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.postgres.backup import (
     DockerPostgresBackup,
     PostgresBackupError,

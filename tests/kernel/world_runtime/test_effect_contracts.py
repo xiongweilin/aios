@@ -1,7 +1,5 @@
 import pytest
-
 from world_runtime import WorldRuntime
-from world_runtime.responsibility import Responsibility
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -10,6 +8,7 @@ from world_runtime.execution import (
     ProviderDescriptor,
     ProviderHealth,
 )
+from world_runtime.responsibility import Responsibility
 
 
 class RecordingProvider:

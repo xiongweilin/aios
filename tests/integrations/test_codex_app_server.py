@@ -42,7 +42,7 @@ class FakeAppServer:
             connection: ServerConnection,
             request: object,
         ) -> object | None:
-            headers = getattr(request, "headers")
+            headers = request.headers
             if headers.get("Authorization") != "Bearer test-transport-token":
                 return connection.respond(401, "unauthorized")
             return None

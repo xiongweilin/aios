@@ -6,8 +6,6 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from pydantic import SecretStr
-
 from administrative_orchestrator import (
     commitment_responsibility as commitment_responsibility_module,
 )
@@ -16,8 +14,8 @@ from administrative_orchestrator.bootstrap_foundation import bootstrap_foundatio
 from administrative_orchestrator.commitment_models import (
     CandidateCommitmentClassification,
     CandidateCommitmentStatus,
-    MeetingInterpretationPayload,
     CommitmentState,
+    MeetingInterpretationPayload,
 )
 from administrative_orchestrator.commitment_service import (
     CommitmentIntakeError,
@@ -33,6 +31,7 @@ from administrative_orchestrator.intake.models import (
 )
 from administrative_orchestrator.integrations.world_runtime import WorldRuntimeBoundaryError
 from administrative_orchestrator.persistence import SqlStore
+from pydantic import SecretStr
 
 BASE_TIME = datetime(2026, 9, 13, 9, 0, tzinfo=UTC)
 

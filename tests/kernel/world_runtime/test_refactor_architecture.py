@@ -1,6 +1,5 @@
-from semantic_language import SemanticKind
 import semantic_language
-
+from semantic_language import SemanticKind
 from world_runtime.decisions import Decision
 from world_runtime.epistemics import Claim, EpistemicLedger
 from world_runtime.execution import CapabilityRequest, ExecutionService

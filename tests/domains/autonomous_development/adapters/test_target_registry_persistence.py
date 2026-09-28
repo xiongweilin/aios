@@ -1,8 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.adapters.postgres.target_registry import (
     SqlObjectiveRepository,
@@ -13,6 +11,7 @@ from autonomous_development.domain.models import (
     MutationPolicy,
     ProductObjectiveRevision,
 )
+from sqlalchemy import create_engine
 
 
 def policy() -> MutationPolicy:

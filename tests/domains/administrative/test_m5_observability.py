@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from administrative_orchestrator.observability import install_observability
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from administrative_orchestrator.observability import install_observability
 
 
 def _app() -> FastAPI:

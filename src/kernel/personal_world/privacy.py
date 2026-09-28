@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from personal_world.model.contracts import DataAccessProfile, PersonalRecord, RecordKind, SensitivityClass
+from personal_world.model.contracts import (
+    DataAccessProfile,
+    PersonalRecord,
+    RecordKind,
+    SensitivityClass,
+)
 
 
 class AccessDeniedError(PermissionError):

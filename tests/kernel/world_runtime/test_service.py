@@ -1,11 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
 from world_runtime.decisions import Decision
-from world_runtime.governance import Mandate
-from world_runtime.responsibility import Responsibility
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -14,8 +11,9 @@ from world_runtime.execution import (
     ProviderDescriptor,
     ProviderHealth,
 )
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from world_runtime.service import create_app
-
 
 
 def _client(

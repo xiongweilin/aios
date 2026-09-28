@@ -1,9 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dbos import DBOS, DBOSConfig, SetWorkflowID
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.cycles import SqlCycleRepository
 from autonomous_development.adapters.postgres.experiments import SqlExperimentRepository
 from autonomous_development.adapters.postgres.proposals import SqlChangeProposalRepository
@@ -56,6 +53,8 @@ from autonomous_development.ports.traffic import (
 from autonomous_development.workflows.autonomous_iteration import (
     AutonomousIterationWorkflow,
 )
+from dbos import DBOS, DBOSConfig, SetWorkflowID
+from sqlalchemy import create_engine
 
 
 class FakeEngineering:

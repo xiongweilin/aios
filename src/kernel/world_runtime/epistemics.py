@@ -1,30 +1,65 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any
 
-from semantic_language import SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from .common import new_id, utcnow
 from .epistemic_types import (
     BeliefState as BeliefState,
+)
+from .epistemic_types import (
     BeliefVerdict as BeliefVerdict,
+)
+from .epistemic_types import (
     Claim as Claim,
+)
+from .epistemic_types import (
     ClaimRevision as ClaimRevision,
+)
+from .epistemic_types import (
     Conflict as Conflict,
+)
+from .epistemic_types import (
     EpistemicObject as EpistemicObject,
-    Evidence as Evidence,
-    EvidenceAssessment as EvidenceAssessment,
-    EvidencePredicate as EvidencePredicate,
-    EvidenceRelation as EvidenceRelation,
-    EvidenceRequirement as EvidenceRequirement,
+)
+from .epistemic_types import (
     EvaluatorKind as EvaluatorKind,
+)
+from .epistemic_types import (
+    Evidence as Evidence,
+)
+from .epistemic_types import (
+    EvidenceAssessment as EvidenceAssessment,
+)
+from .epistemic_types import (
+    EvidencePredicate as EvidencePredicate,
+)
+from .epistemic_types import (
+    EvidenceRelation as EvidenceRelation,
+)
+from .epistemic_types import (
+    EvidenceRequirement as EvidenceRequirement,
+)
+from .epistemic_types import (
     FalsificationCondition as FalsificationCondition,
+)
+from .epistemic_types import (
     Unknown as Unknown,
+)
+from .epistemic_types import (
     _get_path,
+)
+from .epistemic_types import (
     evaluate_predicate as evaluate_predicate,
 )
 from .ledger import SemanticLedger
+
+
+def _semantic_ref_kind_value(kind: SemanticKind | str) -> str:
+    return kind.value if isinstance(kind, SemanticKind) else kind
 
 
 class EpistemicLedger:
@@ -213,7 +248,7 @@ class EpistemicLedger:
         metadata = dict(evidence.metadata)
         declared_provenance = metadata.get("provenance_class")
         if evidence.derived_from:
-            if any(ref.kind.value != "evidence" for ref in evidence.derived_from):
+            if any(_semantic_ref_kind_value(ref.kind) != "evidence" for ref in evidence.derived_from):
                 raise ValueError("derived evidence may derive only from Evidence refs")
             if declared_provenance is not None and str(declared_provenance) != "derived":
                 raise ValueError(
@@ -233,7 +268,8 @@ class EpistemicLedger:
             "valid_from": evidence.valid_from.isoformat() if evidence.valid_from else None,
             "valid_to": evidence.valid_to.isoformat() if evidence.valid_to else None,
             "derived_from": [
-                {"kind": ref.kind.value, "id": ref.id} for ref in evidence.derived_from
+                {"kind": _semantic_ref_kind_value(ref.kind), "id": ref.id}
+                for ref in evidence.derived_from
             ],
             "metadata": metadata,
             "kind": str(metadata.get("kind", "observation")),
@@ -259,7 +295,8 @@ class EpistemicLedger:
             "question": unknown.question,
             "status": "open",
             "blocks": [
-                {"kind": ref.kind.value, "id": ref.id} for ref in unknown.blocks
+                {"kind": _semantic_ref_kind_value(ref.kind), "id": ref.id}
+                for ref in unknown.blocks
             ],
         }
         with self.ledger.transaction():
@@ -310,7 +347,8 @@ class EpistemicLedger:
             "id": conflict.id,
             "subject": conflict.subject,
             "members": [
-                {"kind": ref.kind.value, "id": ref.id} for ref in conflict.members
+                {"kind": _semantic_ref_kind_value(ref.kind), "id": ref.id}
+                for ref in conflict.members
             ],
             "description": conflict.description,
             "status": "open",

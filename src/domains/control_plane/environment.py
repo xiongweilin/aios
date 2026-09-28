@@ -773,9 +773,10 @@ class EnvironmentInspectionProvider:
             for project, configured in self.config.project_dirs.items():
                 if candidate == Path(configured).resolve(strict=False):
                     return project
-            if self.config.chezmoi_source_dir:
-                if candidate == Path(self.config.chezmoi_source_dir).resolve(strict=False):
-                    return "chezmoi"
+            if self.config.chezmoi_source_dir and candidate == Path(
+                self.config.chezmoi_source_dir
+            ).resolve(strict=False):
+                return "chezmoi"
             return ""
 
         def subject_for_path(raw_path: str) -> dict[str, str]:

@@ -6,9 +6,10 @@ import os
 import posixpath
 import re
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from websockets.exceptions import ConnectionClosed, WebSocketException

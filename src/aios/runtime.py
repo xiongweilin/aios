@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import uvicorn
-
 from world_runtime import WorldRuntime
 from world_runtime.service import create_app
 

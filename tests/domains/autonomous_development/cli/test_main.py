@@ -5,7 +5,6 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-
 from autonomous_development.cli import main as cli
 from autonomous_development.ports.readiness import ReadinessCheck, ReadinessReport
 

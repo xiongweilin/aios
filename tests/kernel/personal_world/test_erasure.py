@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-
 from personal_world.model.contracts import (
     ClaimCreate,
     ErasureRequest,

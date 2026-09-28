@@ -5,10 +5,6 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
-from world_runtime import WorldRuntime
-from world_runtime.service import create_app
-
 from autonomous_development.adapters.world_runtime import WorldRuntimeDevelopmentBridge
 from autonomous_development.domain.enums import (
     CycleState,
@@ -26,6 +22,9 @@ from autonomous_development.domain.models import (
     ProductObjectiveRevision,
     ReleasedVersion,
 )
+from fastapi.testclient import TestClient
+from world_runtime import WorldRuntime
+from world_runtime.service import create_app
 
 pytestmark = pytest.mark.integration
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from control_plane.domain_controller import ControllerDecision, ControllerDecisionKind
 from control_plane.provider_protocol import (
     CapabilityRequest,
@@ -18,6 +17,7 @@ from control_plane.runtime_bridge import (
     PersonalRuntimeBridge,
     WorldRuntimeBoundaryError,
 )
+
 from tests.domain_harness import make_harness
 
 

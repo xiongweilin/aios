@@ -1,19 +1,17 @@
 import pytest
-
 from world_runtime.ledger import SQLiteLedger
 
 
 def test_semantic_transaction_rolls_back_event_and_projection_together() -> None:
     ledger = SQLiteLedger()
-    with pytest.raises(RuntimeError, match="boom"):
-        with ledger.transaction():
-            ledger.project_put("demo", "item", {"status": "changed"})
-            ledger.append(
-                stream="demo:item",
-                kind="demo.changed",
-                payload={"status": "changed"},
-            )
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError, match="boom"), ledger.transaction():
+        ledger.project_put("demo", "item", {"status": "changed"})
+        ledger.append(
+            stream="demo:item",
+            kind="demo.changed",
+            payload={"status": "changed"},
+        )
+        raise RuntimeError("boom")
 
     assert ledger.project_get("demo", "item") is None
     assert ledger.events(stream="demo:item") == []

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, ClassVar
 
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from integrations.world_runtime_client import WorldRuntimeBoundaryError, WorldRuntimeHttpClient

@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.authority import ApprovalSatisfaction, AuthorityRepository
 from administrative_orchestrator.domain import (
     AdministrativeCase,

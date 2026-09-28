@@ -1,9 +1,8 @@
-from sqlalchemy import create_engine
-
 from autonomous_development.adapters.postgres.diagnoses import SqlDiagnosisRepository
 from autonomous_development.adapters.postgres.proposals import SqlChangeProposalRepository
 from autonomous_development.adapters.postgres.schema import metadata
 from autonomous_development.domain.models import ChangeProposal, Diagnosis
+from sqlalchemy import create_engine
 
 
 def test_diagnosis_and_proposal_are_immutable_roundtrip_records() -> None:

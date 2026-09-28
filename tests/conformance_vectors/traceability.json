@@ -2,7 +2,7 @@
   "schema_version": 1,
   "source_path": "src/kernel/world_runtime/contracts/vectors.json",
   "suite_version": "world-runtime-conformance-v11",
-  "source_sha256": "4833ebe2d398ce9869cdf83e0874652544d5c717e6c8965ec28d4af3aca54fad",
+  "source_sha256": "48a70808535a4584a918de19bfe213d594e006f78759ca32b7be75d000fa1b72",
   "vector_count": 65,
   "traceability": {
     "responsibility-terminal-assessment-requires-basis": [

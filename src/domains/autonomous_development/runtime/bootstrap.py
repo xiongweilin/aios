@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from alembic import command
 from alembic.config import Config
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import create_engine
 
-from alembic import command
 from autonomous_development.adapters.docker_cli.deployment import DockerDeploymentProvider
 from autonomous_development.adapters.evidence.local import LocalEvidenceStore
 from autonomous_development.adapters.git_cli.repository import GitCliRepository

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from world_runtime.decisions import Decision
-from world_runtime.strategy import Goal
-from world_runtime.governance import Mandate
-from world_runtime.lineage import Revision
 import pytest
 from semantic_language import SemanticKind, SemanticRef
-
 from world_runtime import WorldRuntime
-from world_runtime.governance import assert_mandate_current
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate, assert_mandate_current
+from world_runtime.lineage import Revision
 from world_runtime.ontology import SemanticTypeDefinition
+from world_runtime.strategy import Goal
 
 
 def _evidence_ref(identifier: str) -> SemanticRef:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from administrative_orchestrator.persistence import SqlStore
 from administrative_orchestrator.policy import (
     OffboardingFacts,

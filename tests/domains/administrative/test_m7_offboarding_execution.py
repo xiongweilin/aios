@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-
 from administrative_orchestrator.authority import (
     ApprovalSatisfaction,
     AuthorityRepository,
@@ -39,7 +38,12 @@ from administrative_orchestrator.offboarding_execution import (
     OffboardingExecutionEngine,
     ProductionTrustOffboardingExecutionEngine,
 )
-from administrative_orchestrator.persistence import DecisionRow, PolicyEvaluationRow, SqlStore, utcnow
+from administrative_orchestrator.persistence import (
+    DecisionRow,
+    PolicyEvaluationRow,
+    SqlStore,
+    utcnow,
+)
 from administrative_orchestrator.policy import OffboardingFacts
 from administrative_orchestrator.policy_plane import (
     PolicyRepository,

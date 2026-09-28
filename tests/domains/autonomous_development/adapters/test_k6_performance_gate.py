@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from autonomous_development.adapters.evidence import LocalEvidenceStore
 from autonomous_development.adapters.quality import K6PerformanceGate
 from autonomous_development.domain.enums import VerificationStatus
