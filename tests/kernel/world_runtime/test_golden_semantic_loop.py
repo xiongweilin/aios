@@ -6,9 +6,7 @@ from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
 import pytest
-    SemanticKind,
-    SemanticRef,
-)
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import (
     BeliefVerdict,
