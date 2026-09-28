@@ -78,8 +78,8 @@ async def test_authorized_provider_success_is_not_outcome_or_discharge(tmp_path:
         id="responsibility:1",
         principal="development-controller",
         subject="checkout",
-        goal_refs=(goal.ref,
-    domain="development",),
+        goal_refs=(goal.id,),
+        domain="development",
     )
     rt.responsibility.create(responsibility)
     work = rt.execution.admit_work(
