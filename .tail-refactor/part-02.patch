@@ -1,0 +1,276 @@
+-    candidate_ref: UUID
+-    disposition: IntakeDisposition
+-    basis: dict[str, Any] = Field(default_factory=dict)
+-    authority: AssessmentAuthority
+-    is_final: bool = False
+-    reviewer_principal_id: str | None = Field(default=None, max_length=255)
+-    created_at: datetime = Field(default_factory=utcnow)
+-
+-    @model_validator(mode="after")
+-    def validate_assessment_authority(self) -> IntakeAssessment:
+-        if self.is_final:
+-            if self.authority == AssessmentAuthority.MODEL_SUGGESTION:
+-                raise ValueError("model suggestion cannot be a final intake assessment")
+-            if not self.basis:
+-                raise ValueError("final intake assessment requires a non-empty basis")
+-            if (
+-                self.authority == AssessmentAuthority.HUMAN_REVIEW
+-                and not (self.reviewer_principal_id or "").strip()
+-            ):
+-                raise ValueError("human final assessment requires reviewer_principal_id")
+-        return self
+-
+-
+-class PromotionRecord(UtcModel):
+-    promotion_id: UUID = Field(default_factory=uuid4)
+-    candidate_ref: UUID
+-    assessment_ref: UUID
+-    request_id: UUID
+-    ingress_receipt_ref: str = Field(min_length=1, max_length=1000)
+-    promoted_at: datetime = Field(default_factory=utcnow)
+-    promotion_policy_ref: str = Field(min_length=1, max_length=512)
+-
+-    @model_validator(mode="after")
+-    def validate_promotion_lineage(self) -> PromotionRecord:
+-        _require_text(self.ingress_receipt_ref, "ingress_receipt_ref")
+-        _require_text(self.promotion_policy_ref, "promotion_policy_ref")
+-        return self
+-
+-
+-__all__ = [
+-    "AssessmentAuthority",
+-    "CandidateAdministrativeRequest",
+-    "CandidateAuthority",
+-    "CandidateCaseUpdate",
+-    "CandidateCaseUpdateStatus",
+-    "CandidateFactAssertion",
+-    "CandidateStatus",
+-    "DocumentRepresentation",
+-    "EvidenceSpan",
+-    "IntakeAssessment",
+-    "IntakeDisposition",
+-    "IntakeReceipt",
+-    "IntakeVerificationStatus",
+-    "InterpretationRecord",
+-    "InterpretationStatus",
+-    "PromotionRecord",
+-    "SourceArtifact",
+-]
++__all__ = ["EvidenceSpan", "InterpretationRecord", "InterpretationStatus"]
+diff --git a/src/domains/administrative_orchestrator/integrations/authoritative_sources.py b/src/domains/administrative_orchestrator/integrations/authoritative_sources.py
+index 5c9114c..06a9747 100644
+--- a/src/domains/administrative_orchestrator/integrations/authoritative_sources.py
++++ b/src/domains/administrative_orchestrator/integrations/authoritative_sources.py
+@@ -93,18 +93,8 @@ class HRFactSource(Protocol):
+     def read_manager(self, employee_ref: str) -> AuthoritativeRecord: ...
+ 
+ 
+-class OrganizationDirectory(Protocol):
+-    def resolve_person(self, external_identity: str) -> AuthoritativeRecord: ...
+-
+-
+-class IdentityDirectory(Protocol):
+-    def read_identity(self, identity_ref: str) -> AuthoritativeRecord: ...
+-
+-
+ __all__ = [
+     "AuthoritativeRecord",
+     "HRFactSource",
+-    "IdentityDirectory",
+-    "OrganizationDirectory",
+     "SourceFreshness",
+ ]
+diff --git a/src/domains/administrative_orchestrator/integrations/effect_common.py b/src/domains/administrative_orchestrator/integrations/effect_common.py
+index 031bf35..ab2bd2d 100644
+--- a/src/domains/administrative_orchestrator/integrations/effect_common.py
++++ b/src/domains/administrative_orchestrator/integrations/effect_common.py
+@@ -61,6 +61,22 @@ def _unavailable_result(exc: Exception) -> ConnectorResult:
+     )
+ 
+ 
++def _failed_result(
++    error_code: str,
++    error_message: str,
++    *,
++    external_operation_ref: str | None = None,
++    reconciled: bool = False,
++) -> ConnectorResult:
++    return ConnectorResult(
++        ConnectorStatus.FAILED,
++        external_operation_ref=external_operation_ref,
++        error_code=error_code,
++        error_message=error_message,
++        reconciled=reconciled,
++    )
++
++
+ __all__ = [
+     "ConnectorConfigurationError",
+     "ConnectorResult",
+diff --git a/src/domains/administrative_orchestrator/integrations/keycloak_effects.py b/src/domains/administrative_orchestrator/integrations/keycloak_effects.py
+index 53c4656..ee67198 100644
+--- a/src/domains/administrative_orchestrator/integrations/keycloak_effects.py
++++ b/src/domains/administrative_orchestrator/integrations/keycloak_effects.py
+@@ -11,6 +11,7 @@ from .effect_common import (
+     ConnectorResult,
+     ConnectorStatus,
+     _ApplicationRejected,
++    _failed_result,
+     _TransportUnknown,
+     _unavailable_result,
+     _unknown_result,
+@@ -61,11 +62,10 @@ class KeycloakIdentityEffectConnector:
+         try:
+             existing = await self._find_by_attribute(self.connection.request_ref_attribute, request_ref)
+             if len(existing) > 1:
+-                return ConnectorResult(
+-                    ConnectorStatus.FAILED,
+-                    error_code="DuplicateExternalRequestIdentity",
+-                    error_message="multiple Keycloak users share the same request_ref",
+-                )
++                return _failed_result(
++                           'DuplicateExternalRequestIdentity',
++                           'multiple Keycloak users share the same request_ref',
++                       )
+             if existing:
+                 return ConnectorResult(
+                     ConnectorStatus.SUCCEEDED,
+@@ -78,11 +78,10 @@ class KeycloakIdentityEffectConnector:
+                 subject_ref,
+             )
+             if len(by_subject) > 1:
+-                return ConnectorResult(
+-                    ConnectorStatus.FAILED,
+-                    error_code="DuplicateExternalSubjectIdentity",
+-                    error_message="multiple Keycloak users share the same subject_ref",
+-                )
++                return _failed_result(
++                           'DuplicateExternalSubjectIdentity',
++                           'multiple Keycloak users share the same subject_ref',
++                       )
+             if by_subject:
+                 return ConnectorResult(
+                     ConnectorStatus.SUCCEEDED,
+@@ -128,11 +127,10 @@ class KeycloakIdentityEffectConnector:
+                     error_message=f"Keycloak create returned HTTP {response.status_code}",
+                 )
+             if response.status_code not in {201, 204}:
+-                return ConnectorResult(
+-                    ConnectorStatus.FAILED,
+-                    error_code="KeycloakCreateRejected",
+-                    error_message=f"Keycloak create returned HTTP {response.status_code}",
+-                )
++                return _failed_result(
++                           'KeycloakCreateRejected',
++                           f'Keycloak create returned HTTP {response.status_code}',
++                       )
+             location = response.headers.get("Location", "")
+             user_id = location.rstrip("/").rsplit("/", 1)[-1] if location else ""
+             if not user_id:
+@@ -163,12 +161,11 @@ class KeycloakIdentityEffectConnector:
+         if not rows:
+             return None
+         if len(rows) != 1:
+-            return ConnectorResult(
+-                ConnectorStatus.FAILED,
+-                error_code="DuplicateExternalRequestIdentity",
+-                error_message="reconciliation found multiple Keycloak users",
+-                reconciled=True,
+-            )
++            return _failed_result(
++                       'DuplicateExternalRequestIdentity',
++                       'reconciliation found multiple Keycloak users',
++                       reconciled=True,
++                   )
+         return ConnectorResult(
+             ConnectorStatus.SUCCEEDED,
+             external_operation_ref=f"keycloak:user:{rows[0]['id']}",
+@@ -285,11 +282,10 @@ class KeycloakIdentityDisableConnector:
+             marker = self.connector.connection.disable_request_ref_attribute
+             recorded = _first_attribute(_user_attributes(user), marker)
+             if recorded and recorded != request_ref:
+-                return ConnectorResult(
+-                    ConnectorStatus.FAILED,
+-                    error_code="ConflictingExternalRequestIdentity",
+-                    error_message="Keycloak user records a different disable request",
+-                )
++                return _failed_result(
++                           'ConflictingExternalRequestIdentity',
++                           'Keycloak user records a different disable request',
++                       )
+             if recorded == request_ref and user.get("enabled") is False:
+                 return _keycloak_success(user_id, reconciled=True)
+             response = await self.connector._request(
+@@ -301,11 +297,7 @@ class KeycloakIdentityDisableConnector:
+         except _TransportUnknown as exc:
+             return _unknown_result(exc)
+         except _ApplicationRejected as exc:
+-            return ConnectorResult(
+-                ConnectorStatus.FAILED,
+-                error_code="KeycloakApplicationRejected",
+-                error_message=str(exc),
+-            )
++            return _failed_result('KeycloakApplicationRejected', str(exc))
+ 
+     async def reconcile(self, request_ref: str) -> ConnectorResult | None:
+         try:
+@@ -329,12 +321,7 @@ class KeycloakIdentityDisableConnector:
+         except _TransportUnknown as exc:
+             return _unknown_result(exc, reconciled=True)
+         except _ApplicationRejected as exc:
+-            return ConnectorResult(
+-                ConnectorStatus.FAILED,
+-                error_code="KeycloakApplicationRejected",
+-                error_message=str(exc),
+-                reconciled=True,
+-            )
++            return _failed_result('KeycloakApplicationRejected', str(exc), reconciled=True)
+ 
+ 
+ class KeycloakIdentityDisableVerifier:
+@@ -387,11 +374,10 @@ class KeycloakSessionRevokeConnector:
+             marker = self.connector.connection.session_revoke_request_ref_attribute
+             recorded = _first_attribute(_user_attributes(user), marker)
+             if recorded and recorded != request_ref:
+-                return ConnectorResult(
+-                    ConnectorStatus.FAILED,
+-                    error_code="ConflictingExternalRequestIdentity",
+-                    error_message="Keycloak user records a different session revoke request",
+-                )
++                return _failed_result(
++                           'ConflictingExternalRequestIdentity',
++                           'Keycloak user records a different session revoke request',
++                       )
+             if recorded != request_ref:
+                 marker_response = await self.connector._request(
+                     "PUT",
+@@ -414,11 +400,7 @@ class KeycloakSessionRevokeConnector:
+         except _TransportUnknown as exc:
+             return _unknown_result(exc)
+         except _ApplicationRejected as exc:
+-            return ConnectorResult(
+-                ConnectorStatus.FAILED,
+-                error_code="KeycloakApplicationRejected",
+-                error_message=str(exc),
+-            )
++            return _failed_result('KeycloakApplicationRejected', str(exc))
+ 
+     async def reconcile(self, request_ref: str) -> ConnectorResult | None:
+         try:
+@@ -444,12 +426,7 @@ class KeycloakSessionRevokeConnector:
+         except _TransportUnknown as exc:
+             return _unknown_result(exc, reconciled=True)
+         except _ApplicationRejected as exc:
+-            return ConnectorResult(
+-                ConnectorStatus.FAILED,
+-                error_code="KeycloakApplicationRejected",
+-                error_message=str(exc),
+-                reconciled=True,
+-            )
++            return _failed_result('KeycloakApplicationRejected', str(exc), reconciled=True)
+ 
+ 
+ class KeycloakSessionVerifier:
+@@ -613,12 +590,11 @@ def _keycloak_write_result(
+             error_message=f"Keycloak {operation} returned HTTP {response.status_code}",
+         )
