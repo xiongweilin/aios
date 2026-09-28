@@ -1,3 +1,4 @@
+
  
 -    assert result.status is DocumentProcessingStatus.SUCCEEDED
 -    assert result.representation is not None
