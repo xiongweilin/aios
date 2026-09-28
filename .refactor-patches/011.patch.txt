@@ -1,0 +1,161 @@
+         "blocking_reasons": "blocking_reasons_json",
+-                        },
+-                    )
+-                )
+-            )
+-            try:
+-                db.flush()
+-            except IntegrityError as exc:
+-                raise TransactionRecordConflict(
+-                    "qualification assessment was concurrently inserted"
+-                ) from exc
+-            self.store._append_audit(
+-                db,
+-                assessment.case_id,
+-                "transaction.qualification_assessment.appended",
+-                {
+-                    "assessment_id": str(assessment.assessment_id),
+-                    "authority_epoch": assessment.authority_epoch,
+-                    "assessment_kind": assessment.assessment_kind,
+-                    "result": assessment.result.value,
+-                    "rule_ref": assessment.rule_ref,
+-                },
+-            )
+-            emit_outbox(
+-                db,
+-                event_type="workflow.case_changed",
+-                aggregate_id=str(assessment.case_id),
+-                payload={
+-                    "case_id": str(assessment.case_id),
+-                    "authority_epoch": assessment.authority_epoch,
+-                    "cause": "qualification_assessment",
+-                    "assessment_id": str(assessment.assessment_id),
+-                    "assessment_kind": assessment.assessment_kind,
+-                },
+-            )
+-            return assessment
+-
+-    def get_assessment(self, assessment_id: UUID) -> TransactionQualificationAssessment | None:
+-        with self.store.sessions() as db:
+-            row = db.get(TransactionQualificationAssessmentRow, assessment_id)
+-            return None if row is None else _assessment_from_row(row)
+-
+-    def list_assessments(
+-        self, case_id: UUID, authority_epoch: int
+-    ) -> list[TransactionQualificationAssessment]:
+-        with self.store.sessions() as db:
+-            rows = (
+-                db.execute(
+-                    select(TransactionQualificationAssessmentRow)
+-                    .where(
+-                        TransactionQualificationAssessmentRow.case_id == case_id,
+-                        TransactionQualificationAssessmentRow.authority_epoch == authority_epoch,
+-                    )
+-                    .order_by(
+-                        TransactionQualificationAssessmentRow.created_at,
+-                        TransactionQualificationAssessmentRow.assessment_id,
+-                    )
+-                )
+-                .scalars()
+-                .all()
+-            )
+-            return [_assessment_from_row(row) for row in rows]
+-
+-    def list_current_assessments(
+-        self, case_id: UUID, authority_epoch: int
+-    ) -> list[TransactionQualificationAssessment]:
+-        with self.store.sessions() as db:
+-            rows = (
+-                db.execute(
+-                    select(TransactionQualificationAssessmentRow).where(
+-                        TransactionQualificationAssessmentRow.case_id == case_id,
+-                        TransactionQualificationAssessmentRow.authority_epoch == authority_epoch,
+-                    )
+-                )
+-                .scalars()
+-                .all()
+-            )
+-            return _current_assessments_from_rows(rows)
+-
+-
+ def _current_assessments_from_rows(
+     rows: list[TransactionQualificationAssessmentRow],
+ ) -> list[TransactionQualificationAssessment]:
+@@ -365,6 +111,5 @@ __all__ = [
+     "AdministrativeCaseEvidenceLinkRow",
+     "TransactionQualificationAssessmentRow",
+     "TransactionRecordConflict",
+-    "TransactionRepository",
+     "current_assessments_in_session",
+ ]
+diff --git a/src/domains/autonomous_development/adapters/quality/__init__.py b/src/domains/autonomous_development/adapters/quality/__init__.py
+index effcc60..d69c492 100644
+--- a/src/domains/autonomous_development/adapters/quality/__init__.py
++++ b/src/domains/autonomous_development/adapters/quality/__init__.py
+@@ -1,9 +1,7 @@
+-from .codex_review import CodexReviewGate
+ from .command import CommandQualityGate
+ from .k6 import K6PerformanceGate, K6PerformanceGateFactory
+ 
+ __all__ = [
+-    "CodexReviewGate",
+     "CommandQualityGate",
+     "K6PerformanceGate",
+     "K6PerformanceGateFactory",
+diff --git a/src/domains/control_plane/audit.py b/src/domains/control_plane/audit.py
+index f2a227a..b7696bb 100644
+--- a/src/domains/control_plane/audit.py
++++ b/src/domains/control_plane/audit.py
+@@ -37,45 +37,6 @@ def redact_value(value: Any) -> Any:
+     return value
+ 
+ 
+-def redact_args(args: list[str]) -> list[str]:
+-    """Redact command-line arguments that carry secret values.
+-
+-    Handles ``--key=value``, ``--key value`` and ``Header: Authorization: Bearer x``
+-    style arguments. Values themselves are never echoed.
+-    """
+-    redacted: list[str] = []
+-    pending_sensitive = False
+-    for arg in args:
+-        if pending_sensitive:
+-            redacted.append(REDACTED)
+-            pending_sensitive = False
+-            continue
+-        match = re.match(r"^(--?[^=]+)=(.*)$", arg)
+-        if match:
+-            key, value = match.group(1), match.group(2)
+-            if _key_is_sensitive(key) or ("authorization" in arg.lower() and value):
+-                redacted.append(f"{key}={REDACTED}")
+-            else:
+-                redacted.append(arg)
+-            continue
+-        if _key_is_sensitive(arg):
+-            if ":" in arg:
+-                # `key: value` 形式的 argument 已经携带自己的 value
+-                redacted.append(REDACTED)
+-            else:
+-                redacted.append(arg)
+-                pending_sensitive = True
+-            continue
+-        lowered = arg.lower()
+-        if "authorization" in lowered and ("bearer" in lowered or ":" in arg):
+-            redacted.append(REDACTED)
+-            continue
+-        redacted.append(arg)
+-    if pending_sensitive:
+-        redacted.append(REDACTED)
+-    return redacted
+-
+-
+ def redact_text(text: str) -> str:
+     """Redact JSON-document shaped text line by line (used for agent-sessions)."""
+     out: list[str] = []
+diff --git a/src/kernel/world_runtime/__init__.py b/src/kernel/world_runtime/__init__.py
+index 893798c..9683ed9 100644
+--- a/src/kernel/world_runtime/__init__.py
++++ b/src/kernel/world_runtime/__init__.py
+@@ -76,7 +76,7 @@ __all__ = [
+     "Mandate", "Revision", "RevisionLineageService", "SemanticTypeDefinition",
+     "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "Qualificat
