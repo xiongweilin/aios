@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+from aios.runtime_compat import WORLD_RUNTIME_PROTOCOL
 from pydantic import SecretStr
 from sqlalchemy import create_engine
 
