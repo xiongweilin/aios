@@ -33,7 +33,7 @@ RUN python -m pip install --no-cache-dir "uv==${UV_VERSION}" \
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --timeout 90 .
 
 COPY contracts ./contracts
 COPY migrations ./migrations
