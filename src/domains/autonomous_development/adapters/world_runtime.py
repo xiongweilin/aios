@@ -6,7 +6,7 @@ from typing import Any, ClassVar, TypeVar
 
 import httpx
 
-from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+from integrations.world_runtime_client import WorldRuntimeBoundaryError, WorldRuntimeHttpClient
 
 from autonomous_development.domain.models import (
     BuildArtifact,
@@ -22,15 +22,9 @@ from autonomous_development.domain.models import (
 T = TypeVar("T")
 
 
-class WorldRuntimeBoundaryError(RuntimeError):
-    pass
-
-
 class WorldRuntimeDevelopmentBridge:
     """HTTP-only adapter from Development semantics to generic World Runtime contracts."""
 
-    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
-    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS: ClassVar[dict[str, str]] = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",
@@ -56,10 +50,14 @@ class WorldRuntimeDevelopmentBridge:
         transport: httpx.BaseTransport | None = None,
         bearer_token: str = "",
     ) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._timeout_seconds = timeout_seconds
-        self._transport = transport
-        self._bearer_token = bearer_token
+        self.client = WorldRuntimeHttpClient(
+            base_url,
+            required_contracts=self.REQUIRED_CONTRACTS,
+            timeout_seconds=timeout_seconds,
+            transport=transport,
+            bearer_token=bearer_token,
+            component="Development",
+        )
 
     @staticmethod
     def responsibility_ref(cycle_id: str) -> str:
@@ -70,24 +68,7 @@ class WorldRuntimeDevelopmentBridge:
         return f"development-assignment:{cycle_id}"
 
     def ensure_contracts(self) -> None:
-        payload = self._get("/v1/contracts")
-        if str(payload.get("runtime_protocol", "")) != self.REQUIRED_RUNTIME_PROTOCOL:
-            raise WorldRuntimeBoundaryError(
-                "World Runtime protocol is incompatible with Development"
-            )
-        if str(payload.get("semantic_language", "")) != self.REQUIRED_SEMANTIC_LANGUAGE:
-            raise WorldRuntimeBoundaryError(
-                "World Runtime semantic-language version is incompatible with Development"
-            )
-        contracts = payload.get("contracts")
-        if not isinstance(contracts, dict):
-            raise WorldRuntimeBoundaryError("World Runtime contract catalog is malformed")
-        for name, expected in self.REQUIRED_CONTRACTS.items():
-            descriptor = contracts.get(name)
-            if not isinstance(descriptor, dict) or descriptor.get("current") != expected:
-                raise WorldRuntimeBoundaryError(
-                    f"World Runtime contract mismatch for {name}: expected {expected}"
-                )
+        self.client.ensure_contracts()
 
     def ensure_assignment(
         self,
@@ -498,64 +479,10 @@ class WorldRuntimeDevelopmentBridge:
         return basis, evidence
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        try:
-            with httpx.Client(
-                base_url=self._base_url,
-                timeout=self._timeout_seconds,
-                trust_env=False,
-                follow_redirects=False,
-                transport=self._transport,
-                headers=(
-                    {"Authorization": f"Bearer {self._bearer_token}"}
-                    if self._bearer_token
-                    else {}
-                ),
-            ) as client:
-                response = client.post(path, json=payload)
-        except httpx.HTTPError as exc:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime request failed for {path}: {type(exc).__name__}"
-            ) from exc
-        if response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime rejected {path}: HTTP {response.status_code}"
-            )
-        value = response.json()
-        if not isinstance(value, dict):
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime returned non-object response for {path}"
-            )
-        return value
+        return self.client.post(path, payload)
 
     def _get(self, path: str) -> dict[str, Any]:
-        try:
-            with httpx.Client(
-                base_url=self._base_url,
-                timeout=self._timeout_seconds,
-                trust_env=False,
-                follow_redirects=False,
-                transport=self._transport,
-                headers=(
-                    {"Authorization": f"Bearer {self._bearer_token}"}
-                    if self._bearer_token
-                    else {}
-                ),
-            ) as client:
-                response = client.get(path)
-        except httpx.HTTPError as exc:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime request failed for {path}: {type(exc).__name__}"
-            ) from exc
-        if response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime rejected {path}: HTTP {response.status_code}"
-            )
-        value = response.json()
-        if not isinstance(value, dict):
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime returned non-object response for {path}"
-            )
-        return value
+        return self.client.get(path)
 
 
 __all__ = ["WorldRuntimeBoundaryError", "WorldRuntimeDevelopmentBridge"]
