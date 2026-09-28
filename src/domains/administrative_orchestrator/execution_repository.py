@@ -23,6 +23,8 @@ from .persistence import (
     SqlStore,
     utcnow,
 )
+from .persistence_mapping import model_from_row
+
 
 
 class ExecutionConflict(RuntimeError):
@@ -355,41 +357,15 @@ class ExecutionRepository:
 
     @staticmethod
     def _decision_from_row(row: DecisionRow) -> Decision:
-        return Decision.model_validate(
-            {
-                "decision_id": row.decision_id,
-                "case_id": row.case_id,
-                "case_version": row.case_version,
-                "authority_epoch": row.authority_epoch,
-                "principal_id": row.principal_id,
-                "decision_role": row.decision_role,
-                "disposition": row.disposition,
-                "rationale": row.rationale,
-                "policy_ref": row.policy_json,
-                "decided_at": row.decided_at,
-            }
-        )
+        return model_from_row(Decision, row, policy_ref=row.policy_json)
 
     @staticmethod
     def _authorization_from_row(row: AuthorizationRow) -> ExecutionAuthorization:
-        return ExecutionAuthorization.model_validate(
-            {
-                "authorization_id": row.authorization_id,
-                "case_id": row.case_id,
-                "case_version": row.case_version,
-                "authority_epoch": row.authority_epoch,
-                "decision_id": row.decision_id,
-                "approval_satisfaction_id": row.approval_satisfaction_id,
-                "issuer_principal_id": row.issuer_principal_id,
-                "target_system": row.target_system,
-                "subject_ref": row.subject_ref,
-                "allowed_operations": tuple(row.allowed_operations),
-                "authority_class": row.authority_class,
-                "policy_ref": row.policy_json,
-                "issued_at": row.issued_at,
-                "expires_at": row.expires_at,
-                "revoked_at": row.revoked_at,
-            }
+        return model_from_row(
+            ExecutionAuthorization,
+            row,
+            allowed_operations=row.allowed_operations,
+            policy_ref=row.policy_json,
         )
 
     @staticmethod
@@ -403,58 +379,20 @@ class ExecutionRepository:
         row: EffectRow,
         lineage: EffectObligationLinkRow | None = None,
     ) -> EffectRecord:
-        return EffectRecord.model_validate(
-            {
-                "effect_id": row.effect_id,
-                "case_id": row.case_id,
-                "case_version": row.case_version,
-                "authority_epoch": row.authority_epoch,
-                "authorization_id": row.authorization_id,
-                "obligation_id": (
-                    lineage.obligation_id if lineage is not None else None
-                ),
-                "governance_basis_id": (
-                    lineage.governance_basis_id if lineage is not None else None
-                ),
-                "target_system": row.target_system,
-                "operation": row.operation,
-                "subject_ref": row.subject_ref,
-                "reversibility": row.reversibility,
-                "authority_class": row.authority_class,
-                "status": row.status,
-                "provider_ref": row.provider_ref,
-                "created_at": row.created_at,
-                "updated_at": row.updated_at,
-            }
+        return model_from_row(
+            EffectRecord,
+            row,
+            obligation_id=lineage.obligation_id if lineage is not None else None,
+            governance_basis_id=lineage.governance_basis_id if lineage is not None else None,
         )
 
     @staticmethod
     def _realization_from_row(row: RealizationRow) -> EffectRealizationAssessment:
-        return EffectRealizationAssessment.model_validate(
-            {
-                "assessment_id": row.assessment_id,
-                "effect_id": row.effect_id,
-                "disposition": row.disposition,
-                "evidence": row.evidence_json,
-                "assessed_at": row.assessed_at,
-            }
-        )
+        return model_from_row(EffectRealizationAssessment, row, evidence=row.evidence_json)
 
     @staticmethod
     def _outcome_from_row(row: OutcomeRow) -> ConfirmedOutcome:
-        return ConfirmedOutcome.model_validate(
-            {
-                "outcome_id": row.outcome_id,
-                "case_id": row.case_id,
-                "case_version": row.case_version,
-                "authority_epoch": row.authority_epoch,
-                "effect_id": row.effect_id,
-                "realization_assessment_id": row.realization_assessment_id,
-                "outcome_kind": row.outcome_kind,
-                "evidence": row.evidence_json,
-                "confirmed_at": row.confirmed_at,
-            }
-        )
+        return model_from_row(ConfirmedOutcome, row, evidence=row.evidence_json)
 
     @staticmethod
     def _effect_identity(effect: EffectRecord) -> tuple[object, ...]:
