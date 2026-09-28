@@ -140,4 +140,4 @@ index 4a7cd8f..142cde9 100644
 -                    return ConnectorResult(
 -                        ConnectorStatus.FAILED,
 -                        error_code="DuplicateExternalSubjectIdentity",
--                        error_message=
+-                        error_message
