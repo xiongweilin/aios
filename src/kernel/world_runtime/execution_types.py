@@ -251,11 +251,6 @@ class ProviderRegistry:
         self._enabled.pop(provider_id, None)
         return provider
 
-    def set_enabled(self, provider_id: str, enabled: bool) -> None:
-        if provider_id not in self._providers:
-            raise KeyError(provider_id)
-        self._enabled[provider_id] = enabled
-
     def list(self) -> list[ProviderDescriptor]:
         return [
             provider.descriptor.model_copy(

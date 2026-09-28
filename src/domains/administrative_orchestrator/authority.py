@@ -436,11 +436,6 @@ class AuthorityRepository:
         with self.store.sessions.begin() as session:
             return self._put_decision_binding_in_session(session, binding)
 
-    def get_decision_binding(self, decision_id: UUID) -> DecisionAuthorityBinding | None:
-        with self.store.sessions() as db:
-            row = db.get(DecisionAuthorityBindingRow, decision_id)
-            return None if row is None else self._decision_binding_from_row(row)
-
     def put_approval_satisfaction(
         self,
         satisfaction: ApprovalSatisfaction,

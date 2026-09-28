@@ -31,18 +31,6 @@ from administrative_orchestrator.financial import (
     match_three_way,
     qualify_vendor,
 )
-from administrative_orchestrator.intake.document_repository import (
-    DocumentRepository,
-    DocumentRepresentationConflict,
-)
-from administrative_orchestrator.intake.documents import (
-    DocumentParseError,
-    MessageAttachment,
-    PdfTextDocumentParser,
-)
-from administrative_orchestrator.intake.models import DocumentRepresentation, SourceArtifact
-from administrative_orchestrator.intake.repository import IntakeRepository
-from administrative_orchestrator.persistence import SqlStore
 from administrative_orchestrator.verification import (
     VerificationDisposition,
     verify_financial_observation,
@@ -137,131 +125,16 @@ def test_financial_verification_reports_identity_and_payload_mismatches() -> Non
     assert result.differences["payload"]["actual"] == "str"
 
 
-def _source_artifact() -> SourceArtifact:
-    return SourceArtifact(
-        source_kind="attachment",
-        source_system="test",
-        tenant_ref="tenant:test",
-        canonical_source_ref="attachment:test:1",
-        source_event_ref="event:test:1",
-        content_digest="a" * 64,
-        storage_ref="sha256:" + "a" * 64,
-        size=1,
-        authenticity_class="test",
-        retention_class="m8",
-    )
 
 
-def _representation(artifact_ref, *, representation_id=None, storage_ref="sha256:representation"):
-    return DocumentRepresentation(
-        representation_id=representation_id or uuid4(),
-        source_artifact_ref=artifact_ref,
-        representation_kind="plain-text",
-        extractor_ref="test-parser",
-        extractor_version="1",
-        content_digest="b" * 64,
-        storage_ref=storage_ref,
-        size=4,
-        created_at=NOW,
-        metadata={"test": True},
-    )
 
 
-def test_document_representation_repository_enforces_identity_semantics_and_listing() -> None:
-    store = SqlStore("sqlite+pysqlite:///:memory:")
-    store.init_schema()
-    artifact = IntakeRepository(store).append_source_artifact(_source_artifact())
-    repository = DocumentRepository(store)
-    original = _representation(artifact.artifact_id)
-
-    assert repository.append_representation(original) == original
-    assert repository.get(original.representation_id) == original
-    assert repository.list_for_artifact(artifact.artifact_id) == [original]
-    assert repository.get(uuid4()) is None
-
-    with pytest.raises(DocumentRepresentationConflict, match="identity was reused"):
-        repository.append_representation(
-            original.model_copy(update={"storage_ref": "sha256:changed"})
-        )
-
-    with pytest.raises(DocumentRepresentationConflict, match="semantics already exist"):
-        repository.append_representation(
-            original.model_copy(update={"representation_id": uuid4()})
-        )
 
 
-def _pdf_attachment(content: bytes = b"not-a-pdf") -> MessageAttachment:
-    return MessageAttachment(
-        attachment_ref="pdf:test",
-        message_ref="message:test",
-        source_system="test",
-        tenant_ref="tenant:test",
-        source_event_ref="event:test",
-        filename="document.pdf",
-        mime_type="application/pdf",
-        content=content,
-    )
 
 
-def test_pdf_parser_rejects_unsupported_and_bounded_inputs() -> None:
-    with pytest.raises(ValueError, match="limits must be positive"):
-        PdfTextDocumentParser(max_bytes=0)
-
-    plain = _pdf_attachment().model_copy(update={"filename": "document.txt", "mime_type": "text/plain"})
-    with pytest.raises(DocumentParseError, match="supported PDF"):
-        PdfTextDocumentParser().parse(plain, b"text")
-
-    with pytest.raises(DocumentParseError, match="byte limit"):
-        PdfTextDocumentParser(max_bytes=1).parse(_pdf_attachment(), b"xx")
-
-    with pytest.raises(DocumentParseError, match="malformed"):
-        PdfTextDocumentParser().parse(_pdf_attachment(), b"not-a-pdf")
 
 
-def test_pdf_parser_enforces_page_text_and_extraction_limits(monkeypatch: pytest.MonkeyPatch) -> None:
-    import pypdf
-
-    class Page:
-        def __init__(self, text: str = "text", *, fail: bool = False) -> None:
-            self.text = text
-            self.fail = fail
-
-        def extract_text(self) -> str:
-            if self.fail:
-                raise RuntimeError("parser failure detail")
-            return self.text
-
-    monkeypatch.setattr(
-        pypdf,
-        "PdfReader",
-        lambda *args, **kwargs: SimpleNamespace(pages=[Page(), Page()]),
-    )
-    with pytest.raises(DocumentParseError, match="page limit"):
-        PdfTextDocumentParser(max_pages=1).parse(_pdf_attachment(), b"ignored")
-
-    monkeypatch.setattr(
-        pypdf,
-        "PdfReader",
-        lambda *args, **kwargs: SimpleNamespace(pages=[Page("")]),
-    )
-    with pytest.raises(DocumentParseError, match="no extractable text"):
-        PdfTextDocumentParser().parse(_pdf_attachment(), b"ignored")
-
-    monkeypatch.setattr(
-        pypdf,
-        "PdfReader",
-        lambda *args, **kwargs: SimpleNamespace(pages=[Page("long text")]),
-    )
-    with pytest.raises(DocumentParseError, match="text limit"):
-        PdfTextDocumentParser(max_text_chars=1).parse(_pdf_attachment(), b"ignored")
-
-    monkeypatch.setattr(
-        pypdf,
-        "PdfReader",
-        lambda *args, **kwargs: SimpleNamespace(pages=[Page(fail=True)]),
-    )
-    with pytest.raises(DocumentParseError, match="text extraction"):
-        PdfTextDocumentParser().parse(_pdf_attachment(), b"ignored")
 
 
 def test_legacy_completion_reports_missing_outcomes_and_realizations() -> None:
@@ -352,6 +225,8 @@ def test_financial_boundaries_cover_exact_values_and_policy_rejection_paths() ->
     )
     assert match_three_way(invoice=invoice, purchase_order={"currency": "USD", "po_number": "PO-1", "total": "bad"}, receipt={}) is TransactionQualificationResult.INCOMPLETE
     assert match_three_way(invoice=invoice, purchase_order={"currency": "USD", "po_number": "PO-1", "total": "10", "line_items": "bad"}, receipt={}) is TransactionQualificationResult.MISMATCH
+
+
 def test_workflow_selects_financial_engine_without_preparing_runtime_effect_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -76,7 +76,7 @@ __all__ = [
     "Mandate", "Revision", "RevisionLineageService", "SemanticTypeDefinition",
     "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "QualificationBinding", "QualificationService", "ReviewCase", "RecoveryDisposition",
     "RecoveryDispositionKind", "RecoveryResolution", "RecoveryResolutionStatus",
-    "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger", 
+    "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger",
     "StrategicIssue", "StrategicPortfolio", "StrategicPortfolioService", "PortfolioProposal", "ResourceAllocation", "ResourceBudgetLine", "StrategyAssessment", "StrategyService", "BUNDLE_VERSION", "BundleValidation",
     "StateBundleService", "Unknown", "Work", "WorldRuntime", "evaluate_predicate",
 ]

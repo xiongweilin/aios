@@ -36,11 +36,6 @@ GOVERNANCE_REVALIDATION = Counter(
     "Governance revalidation outcomes before reality transitions.",
     ("result",),
 )
-CONNECTOR_OUTCOME = Counter(
-    "administrative_connector_outcome_total",
-    "Production connector outcomes without request-identity cardinality.",
-    ("system", "operation", "outcome"),
-)
 IDENTITY_LIFECYCLE = Counter(
     "administrative_identity_lifecycle_total",
     "Identity lifecycle semantic transitions.",
@@ -51,47 +46,12 @@ RESPONSIBILITY_DISCHARGE = Counter(
     "Kernel responsibility discharge workflow outcomes without case identity labels.",
     ("result",),
 )
-INVESTIGATIONS = Counter(
-    "administrative_investigations_total",
-    "Bounded Administrative investigation lifecycle events.",
-    ("trigger_type", "result"),
-)
-INVESTIGATION_FAILURES = Counter(
-    "administrative_investigation_failures_total",
-    "Administrative investigation advisory failures by bounded trigger type.",
-    ("trigger_type",),
-)
-REOPEN_ASSESSMENTS = Counter(
-    "administrative_reopen_assessments_total",
-    "Administrative reopen assessments by bounded disposition.",
-    ("disposition",),
-)
-REOPENS = Counter(
-    "administrative_reopens_total",
-    "Authorized Administrative reopen transitions.",
-    (),
-)
-INVESTIGATION_DURATION = Histogram(
-    "administrative_investigation_duration_seconds",
-    "Bounded investigation advisory duration by trigger type.",
-    ("trigger_type",),
-)
-
-
-def current_correlation_id() -> str:
-    return _CORRELATION_ID.get()
-
-
 def record_authoritative_refresh(*, success: bool) -> None:
     AUTHORITATIVE_REFRESH.labels(result="success" if success else "failure").inc()
 
 
 def record_governance_revalidation(*, valid: bool) -> None:
     GOVERNANCE_REVALIDATION.labels(result="valid" if valid else "stale").inc()
-
-
-def record_connector_outcome(*, system: str, operation: str, outcome: str) -> None:
-    CONNECTOR_OUTCOME.labels(system=system, operation=operation, outcome=outcome).inc()
 
 
 def record_identity_lifecycle(event: str) -> None:
@@ -102,26 +62,6 @@ def record_responsibility_discharge(*, result: str) -> None:
     if result not in {"pending", "discharged"}:
         result = "pending"
     RESPONSIBILITY_DISCHARGE.labels(result=result).inc()
-
-
-def record_investigation_request(*, trigger_type: str, result: str) -> None:
-    INVESTIGATIONS.labels(trigger_type=trigger_type, result=result).inc()
-
-
-def record_investigation_failure(*, trigger_type: str) -> None:
-    INVESTIGATION_FAILURES.labels(trigger_type=trigger_type).inc()
-
-
-def record_reopen_assessment(*, disposition: str) -> None:
-    REOPEN_ASSESSMENTS.labels(disposition=disposition).inc()
-
-
-def record_reopen() -> None:
-    REOPENS.inc()
-
-
-def observe_investigation_duration(*, trigger_type: str, seconds: float) -> None:
-    INVESTIGATION_DURATION.labels(trigger_type=trigger_type).observe(seconds)
 
 
 def install_observability(app: FastAPI, *, service_name: str) -> None:
@@ -196,16 +136,9 @@ def _record_operations_semantics(method: str, path: str, status_code: int) -> No
 
 
 __all__ = [
-    "current_correlation_id",
     "install_observability",
     "record_authoritative_refresh",
-    "record_connector_outcome",
     "record_governance_revalidation",
     "record_identity_lifecycle",
-    "record_investigation_failure",
-    "record_investigation_request",
-    "record_reopen",
-    "record_reopen_assessment",
     "record_responsibility_discharge",
-    "observe_investigation_duration",
 ]

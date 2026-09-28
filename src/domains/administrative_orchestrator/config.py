@@ -149,11 +149,8 @@ class Settings(BaseSettings):
     odoo_transaction_subject_ref_field: str = "x_administrative_transaction_subject_ref"
     odoo_transaction_payload_field: str = "x_administrative_m8_payload_json"
 
-    iam_source_kind: Literal["disabled", "keycloak"] = "disabled"
     keycloak_base_url: str = ""
     keycloak_realm: str = ""
-    keycloak_reader_client_id: str = ""
-    keycloak_reader_secret_env: str = "ADMIN_KEYCLOAK_READER_SECRET"
     keycloak_writer_client_id: str = ""
     keycloak_writer_secret_env: str = "ADMIN_KEYCLOAK_WRITER_SECRET"
     keycloak_verifier_client_id: str = ""

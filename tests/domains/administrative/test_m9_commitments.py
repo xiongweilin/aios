@@ -16,6 +16,7 @@ from administrative_orchestrator.bootstrap_foundation import bootstrap_foundatio
 from administrative_orchestrator.commitment_models import (
     CandidateCommitmentClassification,
     CandidateCommitmentStatus,
+    MeetingInterpretationPayload,
     CommitmentState,
 )
 from administrative_orchestrator.commitment_service import (
@@ -25,16 +26,11 @@ from administrative_orchestrator.commitment_service import (
 )
 from administrative_orchestrator.config import Settings
 from administrative_orchestrator.intake.artifacts import FilesystemArtifactStore
-from administrative_orchestrator.intake.interpretation import (
-    MeetingInterpretationPayload,
-)
 from administrative_orchestrator.intake.models import (
     EvidenceSpan,
     InterpretationRecord,
     InterpretationStatus,
-    SourceArtifact,
 )
-from administrative_orchestrator.intake.repository import IntakeRepository
 from administrative_orchestrator.integrations.world_runtime import WorldRuntimeBoundaryError
 from administrative_orchestrator.persistence import SqlStore
 
@@ -70,24 +66,9 @@ def _store(tmp_path: Path) -> SqlStore:
 
 
 def _interpretation(store: SqlStore, *, classification: str) -> tuple[InterpretationRecord, EvidenceSpan]:
-    intake = IntakeRepository(store)
     artifact_id = uuid4()
     span_id = uuid4()
     interpretation_id = uuid4()
-    artifact = SourceArtifact(
-        artifact_id=artifact_id,
-        source_kind="meeting-message",
-        source_system="meeting-source",
-        tenant_ref="tenant",
-        canonical_source_ref="message-1",
-        source_event_ref="event-1",
-        content_digest="a" * 64,
-        storage_ref="filesystem://sha256/" + "a" * 64,
-        mime_type="text/plain",
-        size=42,
-        authenticity_class="provider-verified",
-        retention_class="administrative-intake",
-    )
     span = EvidenceSpan(
         evidence_span_id=span_id,
         artifact_ref=artifact_id,
@@ -123,9 +104,6 @@ def _interpretation(store: SqlStore, *, classification: str) -> tuple[Interpreta
         response_digest="c" * 64,
         status=InterpretationStatus.SUCCEEDED,
     )
-    intake.append_source_artifact(artifact)
-    intake.append_evidence_span(span)
-    intake.append_interpretation(interpretation)
     return interpretation, span
 
 

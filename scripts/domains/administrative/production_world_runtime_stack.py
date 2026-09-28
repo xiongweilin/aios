@@ -15,14 +15,12 @@ from world_runtime.execution import (
 )
 
 from administrative_orchestrator.config import get_settings
-from administrative_orchestrator.integrations.credentials import (
-    CredentialRef,
-    EnvironmentOrFileCredentialResolver,
-    read_credential_file,
-)
-from administrative_orchestrator.integrations.production_effects import (
+from administrative_orchestrator.integrations.credentials import CredentialRef
+from administrative_orchestrator.integrations.effect_common import (
     ConnectorResult,
     ConnectorStatus,
+)
+from administrative_orchestrator.integrations.keycloak_effects import (
     KeycloakEffectConnection,
     KeycloakIdentityDisableConnector,
     KeycloakIdentityDisableVerifier,
@@ -30,6 +28,8 @@ from administrative_orchestrator.integrations.production_effects import (
     KeycloakIdentityVerifier,
     KeycloakSessionRevokeConnector,
     KeycloakSessionVerifier,
+)
+from administrative_orchestrator.integrations.odoo_effects import (
     OdooEffectConnection,
     OdooEmployeeDeactivateConnector,
     OdooEmployeeDeactivateVerifier,

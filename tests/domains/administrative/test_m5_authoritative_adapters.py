@@ -29,11 +29,6 @@ from administrative_orchestrator.integrations.credentials import (
     CredentialResolutionError,
     EnvironmentCredentialResolver,
 )
-from administrative_orchestrator.integrations.keycloak import (
-    KeycloakConnection,
-    KeycloakIdentityDirectory,
-    KeycloakSourceError,
-)
 from administrative_orchestrator.integrations.odoo import (
     OdooConnection,
     OdooHRFactSource,
@@ -370,118 +365,14 @@ def test_odoo_jsonrpc_rejects_transport_non_object_and_application_error() -> No
     assert_error(httpx.Response(200, json={"error": {"message": "denied"}}), "application error")
 
 
-def _keycloak_directory(*, client=None) -> KeycloakIdentityDirectory:
-    return KeycloakIdentityDirectory(
-        KeycloakConnection(
-            base_url="https://idp.example.test",
-            realm="company",
-            client_id="reader-client",
-            reader_credential=CredentialRef("keycloak:reader", "ADMIN_TEST_KEYCLOAK_READER"),
-        ),
-        credentials=_Resolver(),
-        client=client,
-    )
 
 
-def test_keycloak_authoritative_directory_maps_identity_and_resolution(monkeypatch) -> None:
-    directory = _keycloak_directory()
-
-    def get(path: str, *, params=None):
-        if path.endswith("/users/user-42"):
-            return {
-                "id": "user-42",
-                "username": "alice",
-                "email": "alice@example.test",
-                "enabled": True,
-                "emailVerified": True,
-                "attributes": {"employee_ref": ["employee:42"]},
-            }
-        if path.endswith("/users/user-42/groups"):
-            return [{"path": "/engineering"}, {"name": "fallback"}]
-        if path.endswith("/users/user-42/role-mappings/realm/composite"):
-            return [{"name": "employee"}, {"name": "reader"}]
-        if path.endswith("/users"):
-            assert params == {"username": "alice", "exact": "true", "max": "2"}
-            return [{"id": "user-42"}]
-        raise AssertionError(path)
-
-    monkeypatch.setattr(directory, "_get", get)
-
-    identity = directory.read_identity("keycloak:user:user-42")
-    assert identity.value["groups"] == ["/engineering", "fallback"]
-    assert identity.value["realm_roles"] == ["employee", "reader"]
-    assert identity.value["enabled"] is True
-
-    resolved = directory.resolve_person(" alice ")
-    assert resolved.value["present"] is True
-    assert resolved.value["external_identity"] == "alice"
 
 
-def test_keycloak_directory_absence_nonunique_and_invalid_refs(monkeypatch) -> None:
-    directory = _keycloak_directory()
-    monkeypatch.setattr(directory, "_get", lambda path, **kwargs: None)
-    missing = directory.read_identity("user-404")
-    assert missing.value["present"] is False
-
-    monkeypatch.setattr(
-        directory,
-        "_get",
-        lambda path, **kwargs: [{"id": "a"}, {"id": "b"}] if path.endswith("/users") else None,
-    )
-    unresolved = directory.resolve_person("duplicate")
-    assert unresolved.value["match_count"] == 2
-    assert unresolved.value["present"] is False
-
-    with pytest.raises(KeycloakSourceError, match="external identity is required"):
-        directory.resolve_person("   ")
-    with pytest.raises(KeycloakSourceError, match="invalid Keycloak user reference"):
-        directory.read_identity("keycloak:user:../../etc/passwd")
-    with pytest.raises(ValueError, match="base_url is not permitted"):
-        KeycloakConnection(
-            base_url="http://idp.example.test",
-            realm="company",
-            client_id="reader",
-            reader_credential=CredentialRef("keycloak:reader", "SECRET"),
-        )
-    with pytest.raises(ValueError, match="realm and client_id"):
-        KeycloakConnection(
-            base_url="https://idp.example.test",
-            realm="",
-            client_id="reader",
-            reader_credential=CredentialRef("keycloak:reader", "SECRET"),
-        )
 
 
-def test_keycloak_token_and_get_http_contracts() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/protocol/openid-connect/token"):
-            return httpx.Response(200, json={"access_token": "reader-token"})
-        if request.url.path.endswith("/users/missing"):
-            return httpx.Response(404)
-        return httpx.Response(200, json={"id": "user-42"})
-
-    directory = _keycloak_directory(client=httpx.Client(transport=httpx.MockTransport(handler)))
-    assert directory._token() == "reader-token"
-    assert directory._get("/admin/realms/company/users/missing") is None
-    assert directory._get("/admin/realms/company/users/user-42") == {"id": "user-42"}
 
 
-def test_keycloak_token_and_get_fail_closed() -> None:
-    def token_without_access(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={}, request=request)
-
-    directory = _keycloak_directory(
-        client=httpx.Client(transport=httpx.MockTransport(token_without_access))
-    )
-    with pytest.raises(KeycloakSourceError, match="lacks access_token"):
-        directory._token()
-
-    def server_error(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(503, request=request)
-
-    directory = _keycloak_directory(client=httpx.Client(transport=httpx.MockTransport(server_error)))
-    with pytest.raises(KeycloakSourceError, match="authentication failed"):
-        directory._token()
 
 
 def test_environment_credential_resolution(monkeypatch) -> None:

@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .domain import UtcModel, utcnow
 
@@ -17,6 +17,32 @@ class CandidateCommitmentClassification(StrEnum):
     SUGGESTION = "suggestion"
     INFORMATION = "information"
     ASSIGNMENT_TO_OTHER = "assignment_to_other"
+
+
+class MeetingCommitmentDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    speaker_label: str = Field(min_length=1, max_length=512)
+    candidate_action: str = Field(min_length=1, max_length=2000)
+    candidate_due_text: str | None = Field(default=None, max_length=512)
+    candidate_due_at: datetime | None = None
+    candidate_scope_ref: str | None = Field(default=None, max_length=1000)
+    candidate_beneficiary: str | None = Field(default=None, max_length=1000)
+    classification: CandidateCommitmentClassification
+    evidence_span_refs: tuple[UUID, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_due_time(self) -> "MeetingCommitmentDraft":
+        if self.candidate_due_at is not None and self.candidate_due_at.tzinfo is None:
+            raise ValueError("candidate_due_at must be offset-aware")
+        return self
+
+
+class MeetingInterpretationPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_commitments: tuple[MeetingCommitmentDraft, ...] = ()
+    evidence_span_refs: tuple[UUID, ...] = ()
 
 
 class CandidateCommitmentStatus(StrEnum):

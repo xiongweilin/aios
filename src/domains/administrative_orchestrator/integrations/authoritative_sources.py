@@ -93,18 +93,8 @@ class HRFactSource(Protocol):
     def read_manager(self, employee_ref: str) -> AuthoritativeRecord: ...
 
 
-class OrganizationDirectory(Protocol):
-    def resolve_person(self, external_identity: str) -> AuthoritativeRecord: ...
-
-
-class IdentityDirectory(Protocol):
-    def read_identity(self, identity_ref: str) -> AuthoritativeRecord: ...
-
-
 __all__ = [
     "AuthoritativeRecord",
     "HRFactSource",
-    "IdentityDirectory",
-    "OrganizationDirectory",
     "SourceFreshness",
 ]

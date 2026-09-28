@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from administrative_orchestrator.integrations.credentials import CredentialRef
-from administrative_orchestrator.integrations.production_effects import (
+from administrative_orchestrator.integrations.effect_common import (
     ConnectorStatus,
+)
+from administrative_orchestrator.integrations.odoo_effects import (
     OdooEffectConnection,
     OdooFinancialEffectConnector,
     OdooFinancialVerifier,

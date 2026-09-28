@@ -24,14 +24,6 @@ from administrative_orchestrator.execution_repository import (
     ExecutionConflict,
     ExecutionRepository,
 )
-from administrative_orchestrator.intake.artifacts import FilesystemArtifactStore
-from administrative_orchestrator.intake.documents import (
-    DocumentAttachmentProcessor,
-    DocumentErrorCode,
-    DocumentParseError,
-    DocumentProcessingStatus,
-    MessageAttachment,
-)
 from administrative_orchestrator.obligations import (
     AdministrativeObligation,
     AdministrativeObligationSet,
@@ -304,32 +296,3 @@ def test_repository_rejects_outcome_with_cross_effect_realization() -> None:
                 update={"realization_assessment_id": realization_b.assessment_id}
             )
         )
-
-
-def test_document_parser_failure_uses_bounded_error_without_exception_text(tmp_path) -> None:
-    class FailingParser:
-        def parse(self, attachment, content):
-            del attachment, content
-            raise DocumentParseError(
-                "parser dependency is unavailable",
-                code=DocumentErrorCode.PARSER_UNAVAILABLE,
-            )
-
-    attachment = MessageAttachment(
-        attachment_ref="document-1",
-        message_ref="message-1",
-        source_system="test",
-        tenant_ref="tenant:test",
-        source_event_ref="event-1",
-        filename="document.txt",
-        mime_type="text/plain",
-        content=b"safe test document",
-    )
-    result = DocumentAttachmentProcessor(
-        FilesystemArtifactStore(tmp_path / "artifacts"),
-        FailingParser(),
-    ).process(attachment)
-    assert result.status is DocumentProcessingStatus.FAILED
-    assert result.error_code == DocumentErrorCode.PARSER_UNAVAILABLE.value
-    assert result.error_message == "parser dependency is unavailable"
-    assert "document" not in result.error_message
