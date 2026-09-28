@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..persistence import Base, SqlStore
+from ..persistence_mapping import model_from_row, model_values
 from .models import (
     CandidateAdministrativeRequest,
     CandidateCaseUpdate,
@@ -265,92 +266,63 @@ def _uuid_tuple(values: list[str] | None) -> tuple[UUID, ...]:
 
 
 def _receipt_from_row(row: IntakeReceiptRow) -> IntakeReceipt:
-    return IntakeReceipt.model_validate(
-        {
-            "receipt_id": row.receipt_id,
-            "source_system": row.source_system,
-            "tenant_ref": row.tenant_ref,
-            "source_event_id": row.source_event_id,
-            "received_at": row.received_at,
-            "verification_status": row.verification_status,
-            "artifact_ref": row.artifact_ref,
-            "delivery_digest": row.delivery_digest,
-        }
-    )
+    return model_from_row(IntakeReceipt, row)
 
 
 def _artifact_from_row(row: SourceArtifactRow) -> SourceArtifact:
-    return SourceArtifact.model_validate(
-        {
-            "artifact_id": row.artifact_id,
-            "source_kind": row.source_kind,
-            "source_system": row.source_system,
-            "tenant_ref": row.tenant_ref,
-            "canonical_source_ref": row.canonical_source_ref,
-            "source_revision": row.source_revision,
-            "source_event_ref": row.source_event_ref,
-            "actor_external_identity_ref": row.actor_external_identity_ref,
-            "captured_at": row.captured_at,
-            "source_timestamp": row.source_timestamp,
-            "content_digest": row.content_digest,
-            "storage_ref": row.storage_ref,
-            "mime_type": row.mime_type,
-            "size": row.size,
-            "authenticity_class": row.authenticity_class,
-            "retention_class": row.retention_class,
-        }
-    )
+    return model_from_row(SourceArtifact, row)
 
 
 def _span_from_row(row: EvidenceSpanRow) -> EvidenceSpan:
-    return EvidenceSpan.model_validate(
-        {
-            "evidence_span_id": row.evidence_span_id,
-            "artifact_ref": row.artifact_ref,
-            "representation_ref": row.representation_ref,
-            "representation_digest": row.representation_digest,
-            "locator_kind": row.locator_kind,
-            "locator": row.locator_json,
-            "locator_digest": row.locator_digest,
-            "extractor_ref": row.extractor_ref,
-        }
-    )
+    return model_from_row(EvidenceSpan, row, locator=row.locator_json)
 
 
 def _interpretation_from_row(row: InterpretationRecordRow) -> InterpretationRecord:
-    return InterpretationRecord.model_validate(
-        {
-            "interpretation_id": row.interpretation_id,
-            "artifact_refs": _uuid_tuple(row.artifact_refs_json),
-            "interpretation_profile_ref": row.interpretation_profile_ref,
-            "model_provider": row.model_provider,
-            "model_identity": row.model_identity,
-            "model_version": row.model_version,
-            "schema_ref": row.schema_ref,
-            "interpreted_at": row.interpreted_at,
-            "structured_output": row.structured_output_json,
-            "evidence_span_refs": _uuid_tuple(row.evidence_span_refs_json),
-            "response_digest": row.response_digest,
-            "status": row.status,
-        }
+    return model_from_row(
+        InterpretationRecord,
+        row,
+        artifact_refs=row.artifact_refs_json,
+        structured_output=row.structured_output_json,
+        evidence_span_refs=row.evidence_span_refs_json,
     )
 
 
 def _fact_from_row(row: CandidateFactAssertionRow) -> CandidateFactAssertion:
-    return CandidateFactAssertion.model_validate(
-        {
-            "candidate_fact_id": row.candidate_fact_id,
-            "fact_key": row.fact_key,
-            "value": row.value_json,
-            "authority": row.authority,
-            "interpretation_ref": row.interpretation_ref,
-            "source_refs": _uuid_tuple(row.source_refs_json),
-            "evidence_span_refs": _uuid_tuple(row.evidence_span_refs_json),
-            "no_evidence_reason": row.no_evidence_reason,
-            "extractor_ref": row.extractor_ref,
-            "created_at": row.created_at,
-        }
+    return model_from_row(
+        CandidateFactAssertion,
+        row,
+        value=row.value_json,
+        source_refs=row.source_refs_json,
+        evidence_span_refs=row.evidence_span_refs_json,
     )
+
+
+def _candidate_from_row(row: CandidateAdministrativeRequestRow) -> CandidateAdministrativeRequest:
+    return model_from_row(
+        CandidateAdministrativeRequest,
+        row,
+        interpretation_refs=row.interpretation_refs_json,
+        candidate_fact_refs=row.candidate_fact_refs_json,
+        source_refs=row.source_refs_json,
+    )
+
+
+def _case_update_from_row(row: CandidateCaseUpdateRow) -> CandidateCaseUpdate:
+    return model_from_row(
+        CandidateCaseUpdate,
+        row,
+        interpretation_refs=row.interpretation_refs_json,
+        candidate_fact_refs=row.candidate_fact_refs_json,
+        source_refs=row.source_refs_json,
+    )
+
+
+def _assessment_from_row(row: IntakeAssessmentRow) -> IntakeAssessment:
+    return model_from_row(IntakeAssessment, row, basis=row.basis_json)
+
+
+def _promotion_from_row(row: PromotionRecordRow) -> PromotionRecord:
+    return model_from_row(PromotionRecord, row)
 
 
 def _candidate_fact_semantics(fact: CandidateFactAssertion) -> dict[str, Any]:
@@ -455,18 +427,7 @@ class IntakeRepository:
                         "delivery identity was redelivered with a different digest"
                     )
                 return _receipt_from_row(existing)
-            db.add(
-                IntakeReceiptRow(
-                    receipt_id=receipt.receipt_id,
-                    source_system=receipt.source_system,
-                    tenant_ref=receipt.tenant_ref,
-                    source_event_id=receipt.source_event_id,
-                    received_at=receipt.received_at,
-                    verification_status=receipt.verification_status.value,
-                    artifact_ref=receipt.artifact_ref,
-                    delivery_digest=receipt.delivery_digest,
-                )
-            )
+            db.add(IntakeReceiptRow(**model_values(receipt)))
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -523,18 +484,7 @@ class IntakeRepository:
                     created=False,
                 )
 
-            db.add(
-                IntakeReceiptRow(
-                    receipt_id=receipt.receipt_id,
-                    source_system=receipt.source_system,
-                    tenant_ref=receipt.tenant_ref,
-                    source_event_id=receipt.source_event_id,
-                    received_at=receipt.received_at,
-                    verification_status=receipt.verification_status.value,
-                    artifact_ref=receipt.artifact_ref,
-                    delivery_digest=receipt.delivery_digest,
-                )
-            )
+            db.add(IntakeReceiptRow(**model_values(receipt)))
             emit_outbox(
                 db,
                 event_type=event_type,
@@ -593,26 +543,7 @@ class IntakeRepository:
                         "canonical source revision was redelivered with a different digest"
                     )
                 return _artifact_from_row(existing)
-            db.add(
-                SourceArtifactRow(
-                    artifact_id=artifact.artifact_id,
-                    source_kind=artifact.source_kind,
-                    source_system=artifact.source_system,
-                    tenant_ref=artifact.tenant_ref,
-                    canonical_source_ref=artifact.canonical_source_ref,
-                    source_revision=artifact.source_revision,
-                    source_event_ref=artifact.source_event_ref,
-                    actor_external_identity_ref=artifact.actor_external_identity_ref,
-                    captured_at=artifact.captured_at,
-                    source_timestamp=artifact.source_timestamp,
-                    content_digest=artifact.content_digest,
-                    storage_ref=artifact.storage_ref,
-                    mime_type=artifact.mime_type,
-                    size=artifact.size,
-                    authenticity_class=artifact.authenticity_class,
-                    retention_class=artifact.retention_class,
-                )
-            )
+            db.add(SourceArtifactRow(**model_values(artifact)))
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -633,18 +564,7 @@ class IntakeRepository:
             ).scalar_one_or_none()
             if existing is not None:
                 return _span_from_row(existing)
-            db.add(
-                EvidenceSpanRow(
-                    evidence_span_id=span.evidence_span_id,
-                    artifact_ref=span.artifact_ref,
-                    representation_ref=span.representation_ref,
-                    representation_digest=span.representation_digest,
-                    locator_kind=span.locator_kind,
-                    locator_json=span.locator,
-                    locator_digest=span.locator_digest,
-                    extractor_ref=span.extractor_ref,
-                )
-            )
+            db.add(EvidenceSpanRow(**model_values(span, rename={"locator": "locator_json"}, json_fields={"locator"})))
             db.flush()
             return span
 
@@ -658,24 +578,7 @@ class IntakeRepository:
                         "interpretation identity was reused with different semantics"
                     )
                 return restored
-            db.add(
-                InterpretationRecordRow(
-                    interpretation_id=interpretation.interpretation_id,
-                    artifact_refs_json=[str(value) for value in interpretation.artifact_refs],
-                    interpretation_profile_ref=interpretation.interpretation_profile_ref,
-                    model_provider=interpretation.model_provider,
-                    model_identity=interpretation.model_identity,
-                    model_version=interpretation.model_version,
-                    schema_ref=interpretation.schema_ref,
-                    interpreted_at=interpretation.interpreted_at,
-                    structured_output_json=interpretation.structured_output,
-                    evidence_span_refs_json=[
-                        str(value) for value in interpretation.evidence_span_refs
-                    ],
-                    response_digest=interpretation.response_digest,
-                    status=interpretation.status.value,
-                )
-            )
+            db.add(InterpretationRecordRow(**model_values(interpretation, rename={"artifact_refs": "artifact_refs_json", "structured_output": "structured_output_json", "evidence_span_refs": "evidence_span_refs_json"}, json_fields={"artifact_refs", "structured_output", "evidence_span_refs"})))
             db.flush()
             return interpretation
 
@@ -696,20 +599,7 @@ class IntakeRepository:
                 if _candidate_fact_semantics(restored) != _candidate_fact_semantics(fact):
                     raise CandidateConflict("candidate fact identity was reused with different semantics")
                 return restored
-            db.add(
-                CandidateFactAssertionRow(
-                    candidate_fact_id=fact.candidate_fact_id,
-                    fact_key=fact.fact_key,
-                    value_json=fact.value,
-                    authority=fact.authority.value,
-                    interpretation_ref=fact.interpretation_ref,
-                    source_refs_json=[str(value) for value in fact.source_refs],
-                    evidence_span_refs_json=[str(value) for value in fact.evidence_span_refs],
-                    no_evidence_reason=fact.no_evidence_reason,
-                    extractor_ref=fact.extractor_ref,
-                    created_at=fact.created_at,
-                )
-            )
+            db.add(CandidateFactAssertionRow(**model_values(fact, rename={"value": "value_json", "source_refs": "source_refs_json", "evidence_span_refs": "evidence_span_refs_json"}, json_fields={"value", "source_refs", "evidence_span_refs"})))
             db.flush()
             return fact
 
@@ -742,20 +632,7 @@ class IntakeRepository:
                 if _candidate_semantics(restored) != _candidate_semantics(candidate):
                     raise CandidateConflict("candidate identity was reused with different semantics")
                 return restored
-            db.add(
-                CandidateAdministrativeRequestRow(
-                    candidate_id=candidate.candidate_id,
-                    conversation_ref=candidate.conversation_ref,
-                    interpretation_refs_json=[str(value) for value in candidate.interpretation_refs],
-                    candidate_requester=candidate.candidate_requester,
-                    candidate_intent=candidate.candidate_intent,
-                    candidate_fact_refs_json=[str(value) for value in candidate.candidate_fact_refs],
-                    source_refs_json=[str(value) for value in candidate.source_refs],
-                    created_at=candidate.created_at,
-                    supersedes_candidate_ref=candidate.supersedes_candidate_ref,
-                    status=candidate.status.value,
-                )
-            )
+            db.add(CandidateAdministrativeRequestRow(**model_values(candidate, rename={"interpretation_refs": "interpretation_refs_json", "candidate_fact_refs": "candidate_fact_refs_json", "source_refs": "source_refs_json"}, json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"})))
             db.flush()
             return candidate
 
@@ -783,35 +660,13 @@ class IntakeRepository:
 
     def append_case_update(self, update: CandidateCaseUpdate) -> CandidateCaseUpdate:
         with self.store.sessions.begin() as db:
-            db.add(
-                CandidateCaseUpdateRow(
-                    candidate_update_id=update.candidate_update_id,
-                    case_id=update.case_id,
-                    conversation_ref=update.conversation_ref,
-                    interpretation_refs_json=[str(value) for value in update.interpretation_refs],
-                    candidate_fact_refs_json=[str(value) for value in update.candidate_fact_refs],
-                    source_refs_json=[str(value) for value in update.source_refs],
-                    created_at=update.created_at,
-                    status=update.status.value,
-                )
-            )
+            db.add(CandidateCaseUpdateRow(**model_values(update, rename={"interpretation_refs": "interpretation_refs_json", "candidate_fact_refs": "candidate_fact_refs_json", "source_refs": "source_refs_json"}, json_fields={"interpretation_refs", "candidate_fact_refs", "source_refs"})))
             db.flush()
             return update
 
     def append_assessment(self, assessment: IntakeAssessment) -> IntakeAssessment:
         with self.store.sessions.begin() as db:
-            db.add(
-                IntakeAssessmentRow(
-                    assessment_id=assessment.assessment_id,
-                    candidate_ref=assessment.candidate_ref,
-                    disposition=assessment.disposition.value,
-                    basis_json=assessment.basis,
-                    authority=assessment.authority.value,
-                    is_final=assessment.is_final,
-                    reviewer_principal_id=assessment.reviewer_principal_id,
-                    created_at=assessment.created_at,
-                )
-            )
+            db.add(IntakeAssessmentRow(**model_values(assessment, rename={"basis": "basis_json"}, json_fields={"basis"})))
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -862,17 +717,7 @@ class IntakeRepository:
             ).scalar_one_or_none()
             if request_existing is not None:
                 raise PromotionConflict("request was already linked to another promotion")
-            db.add(
-                PromotionRecordRow(
-                    promotion_id=promotion.promotion_id,
-                    candidate_ref=promotion.candidate_ref,
-                    assessment_ref=promotion.assessment_ref,
-                    request_id=promotion.request_id,
-                    ingress_receipt_ref=promotion.ingress_receipt_ref,
-                    promoted_at=promotion.promoted_at,
-                    promotion_policy_ref=promotion.promotion_policy_ref,
-                )
-            )
+            db.add(PromotionRecordRow(**model_values(promotion)))
             try:
                 db.flush()
             except IntegrityError as exc:
