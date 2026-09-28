@@ -1,0 +1,265 @@
+-def record_investigation_failure(*, trigger_type: str) -> None:
+-    INVESTIGATION_FAILURES.labels(trigger_type=trigger_type).inc()
+-
+-
+-def record_reopen_assessment(*, disposition: str) -> None:
+-    REOPEN_ASSESSMENTS.labels(disposition=disposition).inc()
+-
+-
+-def record_reopen() -> None:
+-    REOPENS.inc()
+-
+-
+-def observe_investigation_duration(*, trigger_type: str, seconds: float) -> None:
+-    INVESTIGATION_DURATION.labels(trigger_type=trigger_type).observe(seconds)
+-
+-
+ def install_observability(app: FastAPI, *, service_name: str) -> None:
+     """Install bounded request telemetry and correlation propagation once per app."""
+ 
+@@ -196,16 +136,9 @@ def _record_operations_semantics(method: str, path: str, status_code: int) -> No
+ 
+ 
+ __all__ = [
+-    "current_correlation_id",
+     "install_observability",
+     "record_authoritative_refresh",
+-    "record_connector_outcome",
+     "record_governance_revalidation",
+     "record_identity_lifecycle",
+-    "record_investigation_failure",
+-    "record_investigation_request",
+-    "record_reopen",
+-    "record_reopen_assessment",
+     "record_responsibility_discharge",
+-    "observe_investigation_duration",
+ ]
+diff --git a/src/domains/administrative_orchestrator/onboarding_execution.py b/src/domains/administrative_orchestrator/onboarding_execution.py
+index 55a1ebb..1702bf6 100644
+--- a/src/domains/administrative_orchestrator/onboarding_execution.py
++++ b/src/domains/administrative_orchestrator/onboarding_execution.py
+@@ -31,7 +31,10 @@ from .service import (
+     plan_effect,
+     require_reopen,
+ )
+-from .transaction_repository import TransactionRecordConflict, TransactionRepository
++from .transaction_repository import (
++    TransactionRecordConflict,
++    current_assessments_in_session,
++)
+ from .verification import verify_financial_observation, verify_onboarding_observation
+ from .verified_obligation_execution import VerifiedObligationExecutor
+ 
+@@ -213,9 +216,10 @@ class OnboardingExecutionEngine:
+         }
+         required = required_by_case.get(case.case_kind, set())
+         try:
+-            assessments = TransactionRepository(self.store).list_current_assessments(
+-                case.case_id, case.authority_epoch
+-            )
++            with self.store.sessions() as db:
++                assessments = current_assessments_in_session(
++                    db, case.case_id, case.authority_epoch
++                )
+         except TransactionRecordConflict as exc:
+             raise TransitionError(str(exc)) from exc
+         qualified = {
+diff --git a/src/domains/administrative_orchestrator/persistence.py b/src/domains/administrative_orchestrator/persistence.py
+index 84ae159..92cfe98 100644
+--- a/src/domains/administrative_orchestrator/persistence.py
++++ b/src/domains/administrative_orchestrator/persistence.py
+@@ -197,7 +197,7 @@ class SqlStore:
+         # 在 metadata 创建前导入 optional domain row module，使
+         # 直接 in-memory/test store 获得与
+         # application entrypoint 相同的 table topology。
+-        from . import investigation_repository as _investigation_repository  # noqa: F401
++        from . import investigation_rows as _investigation_rows  # noqa: F401
+ 
+         Base.metadata.create_all(self.engine)
+ 
+@@ -378,10 +378,6 @@ class SqlStore:
+         )
+ 
+ 
+-# 在 shared metadata 中注册 Intake Plane table，同时不移动
+-# 本 module 中已经稳定的 M0-M5 persistence definition。Import
+-# 发生在 Base 和 SqlStore 完全初始化之后，因此 intake/repository.py
+-# 可以安全复用现有 database/session boundary。
++# Register owner-local tables in shared metadata without importing retired service layers.
+ from . import transaction_repository as _transaction_repository  # noqa: E402, F401
+-from .intake import document_repository as _document_repository  # noqa: E402, F401
+-from .intake import repository as _intake_repository  # noqa: E402, F401
++from .intake import rows as _intake_rows  # noqa: E402, F401
+diff --git a/src/domains/administrative_orchestrator/policy_plane.py b/src/domains/administrative_orchestrator/policy_plane.py
+index 0dc5617..28b4987 100644
+--- a/src/domains/administrative_orchestrator/policy_plane.py
++++ b/src/domains/administrative_orchestrator/policy_plane.py
+@@ -450,30 +450,6 @@ def compile_onboarding_policy(record: PolicyVersionRecord) -> OnboardingPolicy:
+     return OnboardingPolicy(record.policy_ref, definition=record.definition)
+ 
+ 
+-def compile_procurement_policy(record: PolicyVersionRecord):
+-    from .financial import ProcurementPolicy
+-
+-    if record.policy_id != "procurement-request":
+-        raise PolicyPlaneError("record is not a procurement-request policy")
+-    return ProcurementPolicy(record.policy_ref, definition=record.definition)
+-
+-
+-def compile_invoice_ap_policy(record: PolicyVersionRecord):
+-    from .financial import InvoiceAPPolicy
+-
+-    if record.policy_id != "invoice-ap-preparation":
+-        raise PolicyPlaneError("record is not an invoice-ap-preparation policy")
+-    return InvoiceAPPolicy(record.policy_ref, definition=record.definition)
+-
+-
+-def compile_expense_policy(record: PolicyVersionRecord):
+-    from .financial import ExpensePolicy
+-
+-    if record.policy_id != "expense-reimbursement":
+-        raise PolicyPlaneError("record is not an expense-reimbursement policy")
+-    return ExpensePolicy(record.policy_ref, definition=record.definition)
+-
+-
+ __all__ = [
+     "PolicyLifecycleEvent",
+     "PolicyLifecycleEventRow",
+@@ -484,9 +460,6 @@ __all__ = [
+     "PolicyVersionStatus",
+     "compile_onboarding_policy",
+     "compile_offboarding_policy",
+-    "compile_procurement_policy",
+-    "compile_invoice_ap_policy",
+-    "compile_expense_policy",
+     "default_onboarding_policy_version",
+     "default_offboarding_policy_version",
+     "default_procurement_policy_version",
+diff --git a/src/domains/administrative_orchestrator/production_readiness.py b/src/domains/administrative_orchestrator/production_readiness.py
+index c4aacaa..33cfeec 100644
+--- a/src/domains/administrative_orchestrator/production_readiness.py
++++ b/src/domains/administrative_orchestrator/production_readiness.py
+@@ -19,9 +19,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
+         raise ProductionReadinessError("production connectors require runtime_profile=production")
+     if settings.hris_source_kind != "odoo":
+         raise ProductionReadinessError("production onboarding requires ADMIN_HRIS_SOURCE_KIND=odoo")
+-    if settings.iam_source_kind != "keycloak":
+-        raise ProductionReadinessError("production onboarding requires ADMIN_IAM_SOURCE_KIND=keycloak")
+-
+     _require_https(settings.odoo_base_url, "Odoo")
+     _require_nonempty(settings.odoo_database, "ADMIN_ODOO_DATABASE")
+     _require_nonempty(settings.odoo_reader_username, "ADMIN_ODOO_READER_USERNAME")
+@@ -60,7 +57,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
+ 
+     _require_https(settings.keycloak_base_url, "Keycloak")
+     _require_nonempty(settings.keycloak_realm, "ADMIN_KEYCLOAK_REALM")
+-    _require_nonempty(settings.keycloak_reader_client_id, "ADMIN_KEYCLOAK_READER_CLIENT_ID")
+     _require_nonempty(settings.keycloak_writer_client_id, "ADMIN_KEYCLOAK_WRITER_CLIENT_ID")
+     _require_nonempty(settings.keycloak_verifier_client_id, "ADMIN_KEYCLOAK_VERIFIER_CLIENT_ID")
+     if settings.keycloak_writer_client_id == settings.keycloak_verifier_client_id:
+diff --git a/src/domains/administrative_orchestrator/transaction_repository.py b/src/domains/administrative_orchestrator/transaction_repository.py
+index f365c1e..a685fbf 100644
+--- a/src/domains/administrative_orchestrator/transaction_repository.py
++++ b/src/domains/administrative_orchestrator/transaction_repository.py
+@@ -1,19 +1,16 @@
+ from __future__ import annotations
+ 
+ from datetime import datetime
+-from typing import Any
+ from uuid import UUID
+ 
+ from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Uuid, select
+-from sqlalchemy.exc import IntegrityError
+ from sqlalchemy.orm import Mapped, mapped_column
+ 
+ from .financial import (
+-    AdministrativeCaseEvidenceLink,
+     TransactionQualificationAssessment,
+ )
+-from .persistence import Base, SqlStore
+-from .persistence_mapping import model_from_row, model_values
++from .persistence import Base
++from .persistence_mapping import model_from_row
+ 
+ 
+ class TransactionRecordConflict(RuntimeError):
+@@ -61,10 +58,6 @@ class TransactionQualificationAssessmentRow(Base):
+     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+ 
+ 
+-def _link_from_row(row: AdministrativeCaseEvidenceLinkRow) -> AdministrativeCaseEvidenceLink:
+-    return model_from_row(AdministrativeCaseEvidenceLink, row)
+-
+-
+ def _assessment_from_row(
+     row: TransactionQualificationAssessmentRow,
+ ) -> TransactionQualificationAssessment:
+@@ -76,253 +69,6 @@ def _assessment_from_row(
+     )
+ 
+ 
+-def _link_semantics(link: AdministrativeCaseEvidenceLink) -> dict[str, Any]:
+-    return link.model_dump(mode="json", exclude={"link_id"})
+-
+-
+-def _assessment_semantics(assessment: TransactionQualificationAssessment) -> dict[str, Any]:
+-    return assessment.model_dump(mode="json", exclude={"assessment_id"})
+-
+-
+-class TransactionRepository:
+-    """Persistence boundary for M8 transaction evidence and qualification."""
+-
+-    def __init__(self, store: SqlStore) -> None:
+-        self.store = store
+-
+-    def append_evidence_link(
+-        self, link: AdministrativeCaseEvidenceLink
+-    ) -> AdministrativeCaseEvidenceLink:
+-        with self.store.sessions.begin() as db:
+-            existing = db.get(AdministrativeCaseEvidenceLinkRow, link.link_id)
+-            if existing is not None:
+-                restored = _link_from_row(existing)
+-                if _link_semantics(restored) != _link_semantics(link):
+-                    raise TransactionRecordConflict(
+-                        "evidence link identity was reused with different semantics"
+-                    )
+-                return restored
+-            existing_semantic = (
+-                db.execute(
+-                    select(AdministrativeCaseEvidenceLinkRow).where(
+-                        AdministrativeCaseEvidenceLinkRow.case_id == link.case_id,
+-                        AdministrativeCaseEvidenceLinkRow.authority_epoch
+-                        == link.authority_epoch,
+-                        AdministrativeCaseEvidenceLinkRow.artifact_ref == link.artifact_ref,
+-                        AdministrativeCaseEvidenceLinkRow.representation_ref
+-                        == link.representation_ref,
+-                        AdministrativeCaseEvidenceLinkRow.declared_role == link.declared_role,
+-                    )
+-                )
+-                .scalars()
+-                .first()
+-            )
+-            if existing_semantic is not None:
+-                restored = _link_from_row(existing_semantic)
+-                if _link_semantics(restored) != _link_semantics(link):
+-                    raise TransactionRecordConflict(
+-                        "evidence link semantics already exist with different identity"
+-                    )
+-                return restored
+-            db.add(AdministrativeCaseEvidenceLinkRow(**model_values(link)))
+-            try:
+-                db.flush()
+-            except IntegrityError as exc:
+-                raise TransactionRecordConflict(
+-                    "evidence link was concurrently inserted"
+-                ) from exc
+-            self.store._append_audit(
+-                db,
+-                link.case_id,
+-                "transaction.evidence_link.appended",
+-                {
+-                    "link_id": str(link.link_id),
+-                    "authority_epoch": link.authority_epoch,
+-                    "artifact_ref": str(link.artifact_ref),
+-                    "representation_ref": (
+-                        str(link.representation_ref) if link.representation_ref else None
