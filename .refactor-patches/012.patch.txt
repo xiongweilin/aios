@@ -1,0 +1,147 @@
+ionBinding", "QualificationService", "ReviewCase", "RecoveryDisposition",
+     "RecoveryDispositionKind", "RecoveryResolution", "RecoveryResolutionStatus",
+-    "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger", 
++    "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger",
+     "StrategicIssue", "StrategicPortfolio", "StrategicPortfolioService", "PortfolioProposal", "ResourceAllocation", "ResourceBudgetLine", "StrategyAssessment", "StrategyService", "BUNDLE_VERSION", "BundleValidation",
+     "StateBundleService", "Unknown", "Work", "WorldRuntime", "evaluate_predicate",
+ ]
+diff --git a/src/kernel/world_runtime/execution_types.py b/src/kernel/world_runtime/execution_types.py
+index 063731b..08a5f65 100644
+--- a/src/kernel/world_runtime/execution_types.py
++++ b/src/kernel/world_runtime/execution_types.py
+@@ -251,11 +251,6 @@ class ProviderRegistry:
+         self._enabled.pop(provider_id, None)
+         return provider
+ 
+-    def set_enabled(self, provider_id: str, enabled: bool) -> None:
+-        if provider_id not in self._providers:
+-            raise KeyError(provider_id)
+-        self._enabled[provider_id] = enabled
+-
+     def list(self) -> list[ProviderDescriptor]:
+         return [
+             provider.descriptor.model_copy(
+diff --git a/src/kernel/world_runtime/strategy.py b/src/kernel/world_runtime/strategy.py
+index 3ee76c6..fbdcc10 100644
+--- a/src/kernel/world_runtime/strategy.py
++++ b/src/kernel/world_runtime/strategy.py
+@@ -150,24 +150,6 @@ class StrategyService:
+                 payload=value,
+             )
+ 
+-    def propose_option(
+-        self,
+-        *,
+-        subject: str,
+-        hypothesis: Mapping[str, object],
+-        evaluation: Mapping[str, object],
+-        basis_refs: tuple[str, ...],
+-    ) -> StrategicOption:
+-        if not basis_refs:
+-            raise ValueError("strategic option requires basis")
+-        return StrategicOption(
+-            new_id("strategic-option"),
+-            subject,
+-            dict(hypothesis),
+-            dict(evaluation),
+-            basis_refs,
+-        )
+-
+     def get_goal(self, goal_id: str) -> Mapping[str, object]:
+         row = self.ledger.project_get("strategy.goal", goal_id)
+         if row is None:
+diff --git a/tests/domains/administrative/test_m5_authoritative_adapters.py b/tests/domains/administrative/test_m5_authoritative_adapters.py
+index f667be2..5326917 100644
+--- a/tests/domains/administrative/test_m5_authoritative_adapters.py
++++ b/tests/domains/administrative/test_m5_authoritative_adapters.py
+@@ -29,11 +29,6 @@ from administrative_orchestrator.integrations.credentials import (
+     CredentialResolutionError,
+     EnvironmentCredentialResolver,
+ )
+-from administrative_orchestrator.integrations.keycloak import (
+-    KeycloakConnection,
+-    KeycloakIdentityDirectory,
+-    KeycloakSourceError,
+-)
+ from administrative_orchestrator.integrations.odoo import (
+     OdooConnection,
+     OdooHRFactSource,
+@@ -370,118 +365,14 @@ def test_odoo_jsonrpc_rejects_transport_non_object_and_application_error() -> No
+     assert_error(httpx.Response(200, json={"error": {"message": "denied"}}), "application error")
+ 
+ 
+-def _keycloak_directory(*, client=None) -> KeycloakIdentityDirectory:
+-    return KeycloakIdentityDirectory(
+-        KeycloakConnection(
+-            base_url="https://idp.example.test",
+-            realm="company",
+-            client_id="reader-client",
+-            reader_credential=CredentialRef("keycloak:reader", "ADMIN_TEST_KEYCLOAK_READER"),
+-        ),
+-        credentials=_Resolver(),
+-        client=client,
+-    )
+-
+-
+-def test_keycloak_authoritative_directory_maps_identity_and_resolution(monkeypatch) -> None:
+-    directory = _keycloak_directory()
+-
+-    def get(path: str, *, params=None):
+-        if path.endswith("/users/user-42"):
+-            return {
+-                "id": "user-42",
+-                "username": "alice",
+-                "email": "alice@example.test",
+-                "enabled": True,
+-                "emailVerified": True,
+-                "attributes": {"employee_ref": ["employee:42"]},
+-            }
+-        if path.endswith("/users/user-42/groups"):
+-            return [{"path": "/engineering"}, {"name": "fallback"}]
+-        if path.endswith("/users/user-42/role-mappings/realm/composite"):
+-            return [{"name": "employee"}, {"name": "reader"}]
+-        if path.endswith("/users"):
+-            assert params == {"username": "alice", "exact": "true", "max": "2"}
+-            return [{"id": "user-42"}]
+-        raise AssertionError(path)
+-
+-    monkeypatch.setattr(directory, "_get", get)
+-
+-    identity = directory.read_identity("keycloak:user:user-42")
+-    assert identity.value["groups"] == ["/engineering", "fallback"]
+-    assert identity.value["realm_roles"] == ["employee", "reader"]
+-    assert identity.value["enabled"] is True
+-
+-    resolved = directory.resolve_person(" alice ")
+-    assert resolved.value["present"] is True
+-    assert resolved.value["external_identity"] == "alice"
+-
+-
+-def test_keycloak_directory_absence_nonunique_and_invalid_refs(monkeypatch) -> None:
+-    directory = _keycloak_directory()
+-    monkeypatch.setattr(directory, "_get", lambda path, **kwargs: None)
+-    missing = directory.read_identity("user-404")
+-    assert missing.value["present"] is False
+-
+-    monkeypatch.setattr(
+-        directory,
+-        "_get",
+-        lambda path, **kwargs: [{"id": "a"}, {"id": "b"}] if path.endswith("/users") else None,
+-    )
+-    unresolved = directory.resolve_person("duplicate")
+-    assert unresolved.value["match_count"] == 2
+-    assert unresolved.value["present"] is False
+-
+-    with pytest.raises(KeycloakSourceError, match="external identity is required"):
+-        directory.resolve_person("   ")
+-    with pytest.raises(KeycloakSourceError, match="invalid Keycloak user reference"):
+-        directory.read_identity("keycloak:user:../../etc/passwd")
+-    with pytest.raises(ValueError, match="base_url is not permitted"):
+-        KeycloakConnection(
+-            base_url="http://idp.example.test",
+-            realm="company",
+-            client_id="reader",
+-            reader_credential=CredentialRef("keycloak:reader", "SECRET"),
+-        )
+-    with pytest.raises(ValueError, match="realm and client_id"):
+-        Ke
