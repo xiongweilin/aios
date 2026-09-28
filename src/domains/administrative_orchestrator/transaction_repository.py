@@ -13,6 +13,7 @@ from .financial import (
     TransactionQualificationAssessment,
 )
 from .persistence import Base, SqlStore
+from .persistence_mapping import model_from_row, model_values
 
 
 class TransactionRecordConflict(RuntimeError):
@@ -61,33 +62,17 @@ class TransactionQualificationAssessmentRow(Base):
 
 
 def _link_from_row(row: AdministrativeCaseEvidenceLinkRow) -> AdministrativeCaseEvidenceLink:
-    return AdministrativeCaseEvidenceLink(
-        link_id=row.link_id,
-        case_id=row.case_id,
-        authority_epoch=row.authority_epoch,
-        artifact_ref=row.artifact_ref,
-        representation_ref=row.representation_ref,
-        declared_role=row.declared_role,
-        source=row.source,
-        linked_at=row.linked_at,
-        linked_by=row.linked_by,
-    )
+    return model_from_row(AdministrativeCaseEvidenceLink, row)
 
 
 def _assessment_from_row(
     row: TransactionQualificationAssessmentRow,
 ) -> TransactionQualificationAssessment:
-    return TransactionQualificationAssessment(
-        assessment_id=row.assessment_id,
-        case_id=row.case_id,
-        authority_epoch=row.authority_epoch,
-        assessment_kind=row.assessment_kind,
-        supersedes_assessment_id=row.supersedes_assessment_id,
-        input_refs=tuple(row.input_refs_json),
-        rule_ref=row.rule_ref,
-        result=row.result,
-        blocking_reasons=tuple(row.blocking_reasons_json),
-        created_at=row.created_at,
+    return model_from_row(
+        TransactionQualificationAssessment,
+        row,
+        input_refs=row.input_refs_json,
+        blocking_reasons=row.blocking_reasons_json,
     )
 
 
@@ -139,19 +124,7 @@ class TransactionRepository:
                         "evidence link semantics already exist with different identity"
                     )
                 return restored
-            db.add(
-                AdministrativeCaseEvidenceLinkRow(
-                    link_id=link.link_id,
-                    case_id=link.case_id,
-                    authority_epoch=link.authority_epoch,
-                    artifact_ref=link.artifact_ref,
-                    representation_ref=link.representation_ref,
-                    declared_role=link.declared_role,
-                    source=link.source,
-                    linked_at=link.linked_at,
-                    linked_by=link.linked_by,
-                )
-            )
+            db.add(AdministrativeCaseEvidenceLinkRow(**model_values(link)))
             try:
                 db.flush()
             except IntegrityError as exc:
@@ -266,16 +239,13 @@ class TransactionRepository:
                     )
             db.add(
                 TransactionQualificationAssessmentRow(
-                    assessment_id=assessment.assessment_id,
-                    case_id=assessment.case_id,
-                    authority_epoch=assessment.authority_epoch,
-                    assessment_kind=assessment.assessment_kind,
-                    supersedes_assessment_id=assessment.supersedes_assessment_id,
-                    input_refs_json=list(assessment.input_refs),
-                    rule_ref=assessment.rule_ref,
-                    result=assessment.result.value,
-                    blocking_reasons_json=list(assessment.blocking_reasons),
-                    created_at=assessment.created_at,
+                    **model_values(
+                        assessment,
+                        rename={
+                            "input_refs": "input_refs_json",
+                            "blocking_reasons": "blocking_reasons_json",
+                        },
+                    )
                 )
             )
             try:
