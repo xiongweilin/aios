@@ -13,7 +13,7 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert catalog["owner"] == CATALOG_OWNER == "world-runtime/contracts"
     assert catalog["catalog_version"] == CATALOG_VERSION
     assert catalog["runtime_protocol"] == "4.0"
-    assert catalog["semantic_language"] == "0.2.0"
+    assert catalog["semantic_language"] == "0.3.0"
     assert "persistent_responsibility" in catalog["contracts"]
     assert "reconciliation" in catalog["contracts"]
     assert "domain_effect_execution" in catalog["contracts"]
