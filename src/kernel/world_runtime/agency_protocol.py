@@ -67,7 +67,7 @@ class StrategicIssueCloseCommand(_ClosedModel):
     basis_refs: list[str] = Field(default_factory=list)
 
 
-class QualificationDependencyCommand(_ClosedModel):
+class QualificationBindingCommand(_ClosedModel):
     id: str | None = None
     principal: str
     subject_ref: str
@@ -77,7 +77,7 @@ class QualificationDependencyCommand(_ClosedModel):
     scope: dict[str, Any] = Field(default_factory=dict)
     review_policy: dict[str, Any] = Field(default_factory=dict)
     basis_refs: list[str] = Field(default_factory=list)
-    supersedes_dependency_id: str | None = None
+    supersedes_binding_id: str | None = None
 
 
 class QualificationChangeCommand(_ClosedModel):
@@ -100,8 +100,7 @@ class QualificationResolutionCommand(_ClosedModel):
 
 
 class QualificationAdvanceCommand(_ClosedModel):
-    obligation_id: str
-    assessment_id: str
+    review_id: str
     new_version: str
     basis_refs: list[str] = Field(default_factory=list)
     successor_id: str | None = None
@@ -161,7 +160,7 @@ def _review_value(item) -> dict[str, object]:
     return {
         "id": item.id,
         "principal": item.principal,
-        "dependency_id": item.dependency_id,
+        "binding_id": item.binding_id,
         "subject_ref": item.subject_ref,
         "dependency_ref": item.dependency_ref,
         "previous_version": item.previous_version,
@@ -172,7 +171,10 @@ def _review_value(item) -> dict[str, object]:
         "status": item.status,
         "assessment_id": item.assessment_id,
         "disposition": item.disposition,
+        "assessment_basis_refs": list(item.assessment_basis_refs),
+        "rationale": item.rationale,
         "resolution_ref": item.resolution_ref,
+        "resolution_basis_refs": list(item.resolution_basis_refs),
     }
 
 
@@ -474,8 +476,8 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
         }
 
     @app.post("/v1/qualification/dependencies")
-    async def register_qualification_dependency(
-        command: QualificationDependencyCommand,
+    async def register_qualification_binding(
+        command: QualificationBindingCommand,
         request: Request,
     ) -> dict[str, object]:
         context = _authenticate(runtime, request)
@@ -487,8 +489,8 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
                 operation="register-qualification-dependency",
                 resource=command.subject_ref,
             )
-            item = runtime.qualification.register_dependency(
-                dependency_id=command.id,
+            item = runtime.qualification.register_binding(
+                binding_id=command.id,
                 principal=command.principal,
                 subject_ref=command.subject_ref,
                 dependency_ref=command.dependency_ref,
@@ -497,7 +499,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
                 scope=command.scope,
                 review_policy=command.review_policy,
                 basis_refs=tuple(command.basis_refs),
-                supersedes_dependency_id=command.supersedes_dependency_id,
+                supersedes_binding_id=command.supersedes_binding_id,
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -516,7 +518,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             "review_policy": dict(item.review_policy),
             "basis_refs": list(item.basis_refs),
             "status": item.status,
-            "supersedes_dependency_id": item.supersedes_dependency_id,
+            "supersedes_binding_id": item.supersedes_binding_id,
         }
 
     @app.post("/v1/qualification/changes")
@@ -552,72 +554,62 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
         return {
             "reviews": [
                 _review_value(item)
-                for item in runtime.qualification.pending_obligations(
+                for item in runtime.qualification.pending_reviews(
                     principal=context.effective_principal,
                     subject_ref=subject_ref,
                 )
             ]
         }
 
-    @app.post("/v1/qualification/reviews/{obligation_id}/assess")
+    @app.post("/v1/qualification/reviews/{review_id}/assess")
     async def assess_qualification_review(
-        obligation_id: str,
+        review_id: str,
         command: QualificationAssessmentCommand,
         request: Request,
     ) -> dict[str, object]:
         context = _authenticate(runtime, request)
         try:
-            obligation = runtime.qualification.get_obligation(obligation_id)
-            runtime.identity.assert_claimed_principal(context, obligation.principal)
+            review = runtime.qualification.get_review(review_id)
+            runtime.identity.assert_claimed_principal(context, review.principal)
             _assert_transition_authority(
                 runtime,
                 context,
                 operation="assess-qualification-review",
-                resource=obligation_id,
+                resource=review_id,
             )
-            assessment = runtime.qualification.assess_review(
-                obligation_id,
+            updated = runtime.qualification.assess_review(
+                review_id,
                 assessment_id=command.id,
                 disposition=command.disposition,
                 basis_refs=tuple(command.basis_refs),
                 rationale=command.rationale,
             )
-            updated = runtime.qualification.get_obligation(obligation_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="review obligation not found") from exc
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        return {
-            "assessment": {
-                "id": assessment.id,
-                "obligation_id": assessment.obligation_id,
-                "disposition": assessment.disposition,
-                "basis_refs": list(assessment.basis_refs),
-                "rationale": assessment.rationale,
-            },
-            "review": _review_value(updated),
-        }
+        return _review_value(updated)
 
-    @app.post("/v1/qualification/reviews/{obligation_id}/resolve")
+    @app.post("/v1/qualification/reviews/{review_id}/resolve")
     async def resolve_qualification_review(
-        obligation_id: str,
+        review_id: str,
         command: QualificationResolutionCommand,
         request: Request,
     ) -> dict[str, object]:
         context = _authenticate(runtime, request)
         try:
-            obligation = runtime.qualification.get_obligation(obligation_id)
-            runtime.identity.assert_claimed_principal(context, obligation.principal)
+            review = runtime.qualification.get_review(review_id)
+            runtime.identity.assert_claimed_principal(context, review.principal)
             _assert_transition_authority(
                 runtime,
                 context,
                 operation="resolve-qualification-review",
-                resource=obligation_id,
+                resource=review_id,
             )
             updated = runtime.qualification.resolve_review(
-                obligation_id,
+                review_id,
                 resolution_ref=command.resolution_ref,
                 basis_refs=tuple(command.basis_refs),
             )
@@ -631,25 +623,24 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
 
     @app.post("/v1/qualification/dependencies/{dependency_id}/advance")
     async def advance_qualification_dependency(
-        dependency_id: str,
+        binding_id: str,
         command: QualificationAdvanceCommand,
         request: Request,
     ) -> dict[str, object]:
         context = _authenticate(runtime, request)
         try:
-            current = runtime.qualification.get_dependency(dependency_id)
+            current = runtime.qualification.get_binding(dependency_id)
             runtime.identity.assert_claimed_principal(context, current.principal)
             _assert_transition_authority(
                 runtime,
                 context,
                 operation="advance-qualification-dependency",
-                resource=dependency_id,
+                resource=binding_id,
             )
-            item = runtime.qualification.supersede_dependency_after_review(
-                dependency_id,
-                obligation_id=command.obligation_id,
-                assessment_id=command.assessment_id,
-                new_version=command.new_version,
+            item = runtime.qualification.advance_binding_after_review(
+                binding_id,
+                review_id=command.review_id,
+                                new_version=command.new_version,
                 basis_refs=tuple(command.basis_refs),
                 successor_id=command.successor_id,
             )
@@ -666,7 +657,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             "dependency_ref": item.dependency_ref,
             "dependency_version": item.dependency_version,
             "status": item.status,
-            "supersedes_dependency_id": item.supersedes_dependency_id,
+            "supersedes_binding_id": item.supersedes_binding_id,
         }
 
 
@@ -677,7 +668,7 @@ __all__ = [
     "QualificationAdvanceCommand",
     "QualificationAssessmentCommand",
     "QualificationChangeCommand",
-    "QualificationDependencyCommand",
+    "QualificationBindingCommand",
     "QualificationResolutionCommand",
     "ResourceAllocationCommand",
     "ResourceBudgetLineCommand",
