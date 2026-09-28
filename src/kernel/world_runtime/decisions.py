@@ -1,27 +1,66 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from semantic_language import Decision, Revision, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from .identity import AuthenticatedRequestContext
 from .ledger import SemanticLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
 
 
-def _assert_decision_qualified_current(
+@dataclass(frozen=True, slots=True)
+class Decision:
+    """Decision payload owned by the decision subsystem."""
+
+    id: str
+    subject: str = ""
+    decided_by: str = ""
+    selected: Mapping[str, Any] = field(default_factory=dict)
+    proposal_refs: tuple[SemanticRef, ...] = ()
+    alternative_refs: tuple[SemanticRef, ...] = ()
+    basis_refs: tuple[SemanticRef, ...] = ()
+    authority_refs: tuple[SemanticRef, ...] = ()
+    review_triggers: tuple[Mapping[str, Any], ...] = ()
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(SemanticKind.DECISION, self.id)
+
+
+def _decision_identity(value: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: value.get(key)
+        for key in (
+            "id",
+            "subject",
+            "decided_by",
+            "selected",
+            "proposal_refs",
+            "alternative_refs",
+            "basis_refs",
+            "authority_refs",
+            "review_triggers",
+        )
+    }
+
+
+def _assert_decision_current(
     ledger: SemanticLedger,
     decision_id: str,
-) -> None:
+) -> Mapping[str, Any]:
     RevisionLineageService(ledger).assert_current(
         SemanticRef(SemanticKind.DECISION, decision_id)
     )
-    qualification = ledger.project_get("decision.qualification", decision_id)
-    if qualification is None:
-        # 在 institutional continuity 引入前记录的 Decision，历史上视为 active，
-        # 除非 supersession lineage 明确说明相反。
-        return
-    status = str(qualification[0].get("status", "active"))
+    row = ledger.project_get("decision.current", decision_id)
+    if row is None:
+        raise ValueError("required decision is not recorded")
+    value = row[0]
+    status = str(value.get("status", "active"))
     if status != "active":
         raise ValueError(f"decision is not current: {status}")
+    return value
 
 
 def assert_decision_applies(
@@ -32,11 +71,7 @@ def assert_decision_applies(
     operation: str,
     expected: Mapping[str, object] | None = None,
 ) -> Mapping[str, Any]:
-    _assert_decision_qualified_current(ledger, decision_id)
-    row = ledger.project_get("decision.current", decision_id)
-    if row is None:
-        raise ValueError("required decision is not recorded")
-    value = row[0]
+    value = _assert_decision_current(ledger, decision_id)
     selected = dict(value.get("selected", {}))
     if selected.get("target_ref") != target_ref:
         raise ValueError("decision does not apply to target")
@@ -90,12 +125,13 @@ class DecisionLedger:
             "basis_refs": [r.id for r in decision.basis_refs],
             "authority_refs": [r.id for r in decision.authority_refs],
             "review_triggers": [dict(x) for x in decision.review_triggers],
+            "status": "active",
         }
         existing = self.ledger.project_get("decision.current", decision.id)
         if existing is not None:
             existing_value = dict(existing[0])
-            existing_attestation = existing_value.pop("attestation", None)
-            if existing_value != value:
+            existing_attestation = existing_value.get("attestation")
+            if _decision_identity(existing_value) != _decision_identity(value):
                 raise ValueError("decision identity rebound")
             if attestation is not None:
                 if not isinstance(existing_attestation, Mapping):
@@ -118,15 +154,6 @@ class DecisionLedger:
                 value,
                 expected_version=0,
             )
-            self.ledger.project_put(
-                "decision.qualification",
-                decision.id,
-                {
-                    "decision_id": decision.id,
-                    "status": "active",
-                },
-                expected_version=0,
-            )
             self.ledger.append(
                 stream=f"decision:{decision.id}",
                 kind="decision.recorded",
@@ -146,12 +173,12 @@ class DecisionLedger:
             raise ValueError("Decision Revision must supersede the selected Decision")
         if revision.target_ref != successor.ref:
             raise ValueError("Decision Revision target must be the successor Decision")
-        self.get(previous_id)
-        _assert_decision_qualified_current(self.ledger, previous_id)
-        previous_qualification = self.ledger.project_get(
-            "decision.qualification",
-            previous_id,
-        )
+
+        previous_row = self.ledger.project_get("decision.current", previous_id)
+        if previous_row is None:
+            raise KeyError(previous_id)
+        previous, previous_version = previous_row
+        _assert_decision_current(self.ledger, previous_id)
 
         with self.ledger.transaction():
             if context is None:
@@ -159,32 +186,32 @@ class DecisionLedger:
             else:
                 self.record_attested(successor, context=context)
             self.lineage.record(revision)
-            superseded = {
-                "decision_id": previous_id,
-                "status": "superseded",
-                "successor_id": successor.id,
-                "revision_id": revision.id,
-                "reason": revision.reason,
-                "basis_refs": [ref.id for ref in revision.basis_refs],
-            }
-            if previous_qualification is None:
-                self.ledger.project_put(
-                    "decision.qualification",
-                    previous_id,
-                    superseded,
-                    expected_version=0,
-                )
-            else:
-                self.ledger.project_put(
-                    "decision.qualification",
-                    previous_id,
-                    superseded,
-                    expected_version=previous_qualification[1],
-                )
+            updated = dict(previous)
+            updated.update(
+                {
+                    "status": "superseded",
+                    "successor_id": successor.id,
+                    "revision_id": revision.id,
+                    "supersession_reason": revision.reason,
+                    "supersession_basis_refs": [ref.id for ref in revision.basis_refs],
+                }
+            )
+            self.ledger.project_put(
+                "decision.current",
+                previous_id,
+                updated,
+                expected_version=previous_version,
+            )
             self.ledger.append(
                 stream=f"decision:{previous_id}",
                 kind="decision.superseded",
-                payload=superseded,
+                payload={
+                    "decision_id": previous_id,
+                    "successor_id": successor.id,
+                    "revision_id": revision.id,
+                    "reason": revision.reason,
+                    "basis_refs": [ref.id for ref in revision.basis_refs],
+                },
             )
 
     def revoke(
@@ -198,45 +225,44 @@ class DecisionLedger:
             raise ValueError("decision revocation requires reason")
         if not basis_refs:
             raise ValueError("decision revocation requires basis refs")
-        self.get(decision_id)
-        _assert_decision_qualified_current(self.ledger, decision_id)
-        current = self.ledger.project_get("decision.qualification", decision_id)
-        value = {
-            "decision_id": decision_id,
-            "status": "revoked",
-            "reason": reason,
-            "basis_refs": list(basis_refs),
-        }
+        current = self.ledger.project_get("decision.current", decision_id)
+        if current is None:
+            raise KeyError(decision_id)
+        value, version = current
+        _assert_decision_current(self.ledger, decision_id)
+        updated = dict(value)
+        updated.update(
+            {
+                "status": "revoked",
+                "revocation_reason": reason,
+                "revocation_basis_refs": list(basis_refs),
+            }
+        )
         with self.ledger.transaction():
-            if current is None:
-                self.ledger.project_put(
-                    "decision.qualification",
-                    decision_id,
-                    value,
-                    expected_version=0,
-                )
-            else:
-                self.ledger.project_put(
-                    "decision.qualification",
-                    decision_id,
-                    value,
-                    expected_version=current[1],
-                )
+            self.ledger.project_put(
+                "decision.current",
+                decision_id,
+                updated,
+                expected_version=version,
+            )
             self.ledger.append(
                 stream=f"decision:{decision_id}",
                 kind="decision.revoked",
-                payload=value,
+                payload={
+                    "decision_id": decision_id,
+                    "reason": reason,
+                    "basis_refs": list(basis_refs),
+                },
             )
 
     def get_current(self, decision_id: str) -> Mapping[str, Any]:
         current = self.lineage.resolve_current(
             SemanticRef(SemanticKind.DECISION, decision_id)
         )
-        _assert_decision_qualified_current(self.ledger, current.id)
-        return self.get(current.id)
+        return _assert_decision_current(self.ledger, current.id)
 
     def assert_current(self, decision_id: str) -> None:
-        _assert_decision_qualified_current(self.ledger, decision_id)
+        _assert_decision_current(self.ledger, decision_id)
 
     def assert_attested(
         self,
@@ -259,4 +285,4 @@ class DecisionLedger:
         return row[0]
 
 
-__all__ = ["DecisionLedger", "assert_decision_applies"]
+__all__ = ["Decision", "DecisionLedger", "assert_decision_applies"]
