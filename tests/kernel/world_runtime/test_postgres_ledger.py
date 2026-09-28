@@ -28,6 +28,7 @@ from world_runtime.ledger import ProjectionVersionConflict
 
 
 DSN_ENV = "WORLD_RUNTIME_TEST_POSTGRES_DSN"
+pytestmark = pytest.mark.postgres
 
 
 def _dsn() -> str:
@@ -62,8 +63,8 @@ def _create_run(runtime: WorldRuntime, key: str):
             id=f"responsibility:{key}",
             principal="service:test",
             subject=key,
+            domain="test",
         ),
-        domain="test",
     )
     work = runtime.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -92,8 +93,8 @@ def _attested_effect(
             id=f"responsibility:{key}",
             principal=principal,
             subject=key,
+            domain="test",
         ),
-        domain="test",
     )
     work = runtime.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -396,8 +397,8 @@ def test_state_bundle_round_trips_between_sqlite_and_postgres(tmp_path: Path) ->
                 id="responsibility:cross-backend",
                 principal="service:test",
                 subject="cross-backend",
+                domain="test",
             ),
-            domain="test",
         )
         work = source.execution.admit_work(
             responsibility_id="responsibility:cross-backend",
@@ -436,16 +437,16 @@ def test_postgres_schemas_isolate_agency_state_with_same_ids() -> None:
                 id="responsibility:same-id",
                 principal="principal:agency-a",
                 subject="agency a",
+                domain="test",
             ),
-            domain="test",
         )
         second.responsibility.create(
             Responsibility(
                 id="responsibility:same-id",
                 principal="principal:agency-b",
                 subject="agency b",
+                domain="test",
             ),
-            domain="test",
         )
 
         assert (
@@ -624,8 +625,8 @@ def test_postgres_1_0_agency_state_survives_reopen_and_sqlite_round_trip(
                     id=identifier,
                     principal=principal,
                     subject=identifier,
+                    domain=domain,
                 ),
-                domain=domain,
             )
         _record_plain_decision(
             first,
@@ -688,9 +689,9 @@ def test_postgres_1_0_agency_state_survives_reopen_and_sqlite_round_trip(
             portfolio_id="portfolio:pg",
         )
 
-        first.qualification.register_dependency(
-            dependency_id="qualification-dependency:pg",
+        first.qualification.register_binding(
             principal=principal,
+            binding_id="qualification-binding:pg",
             subject_ref="portfolio:pg",
             dependency_ref="policy:pg",
             dependency_version="v1",
@@ -721,7 +722,7 @@ def test_postgres_1_0_agency_state_survives_reopen_and_sqlite_round_trip(
             "responsibility-relation:pg"
         ).target_responsibility_id == "responsibility:pg-child"
         assert reopened.portfolio.get_portfolio("portfolio:pg").status == "active"
-        pending = reopened.qualification.pending_obligations(principal=principal)
+        pending = reopened.qualification.pending_reviews(principal=principal)
         assert len(pending) == 1
         assert pending[0].status == "assessed"
 
@@ -732,7 +733,7 @@ def test_postgres_1_0_agency_state_survives_reopen_and_sqlite_round_trip(
         assert restored.portfolio.get_portfolio("portfolio:pg").resource_budget[
             "cash"
         ].unit == "CNY"
-        assert restored.qualification.get_obligation(pending[0].id).status == "assessed"
+        assert restored.qualification.get_review(pending[0].id).status == "assessed"
     finally:
         reopened.close()
         restored.close()
@@ -748,8 +749,8 @@ def test_two_runtime_nodes_cannot_overallocate_one_portfolio_budget() -> None:
                 id="responsibility:portfolio-budget",
                 principal=principal,
                 subject="bounded allocation",
+                domain="operations",
             ),
-            domain="operations",
         )
         first.governance.register_mandate(
             Mandate(

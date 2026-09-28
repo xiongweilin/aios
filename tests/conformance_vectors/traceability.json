@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "source_path": "src/kernel/world_runtime/contracts/vectors.json",
+  "suite_version": "world-runtime-conformance-v11",
+  "source_sha256": "4833ebe2d398ce9869cdf83e0874652544d5c717e6c8965ec28d4af3aca54fad",
+  "vector_count": 65,
+  "traceability": {
+    "responsibility-terminal-assessment-requires-basis": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_terminal_responsibility_assessment_requires_basis"
+    ],
+    "responsibility-discharge-requires-satisfied-and-decision": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_goal_transition_and_discharge_require_the_specific_applicable_decision"
+    ],
+    "authorization-requires-active-mandate-and-decision": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_governance_enforces_current_mandate_ceiling_expiry_conditions_and_decision_scope"
+    ],
+    "authorization-use-is-exact-scope": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_governance_enforces_current_mandate_ceiling_expiry_conditions_and_decision_scope"
+    ],
+    "ambiguous-effect-never-blind-redispatches": [
+      "tests/kernel/world_runtime/test_service.py::test_ambiguous_attempt_reconciles_without_redispatch"
+    ],
+    "reconciliation-contract-drift-fails-closed": [
+      "tests/kernel/world_runtime/test_recovery.py::test_recovery_fails_closed_when_reconciliation_contract_drifts"
+    ],
+    "runtime-state-survives-restart": [
+      "tests/kernel/world_runtime/test_long_horizon_agency.py::test_long_horizon_agency_survives_restart_and_state_bundle_migration"
+    ],
+    "portable-state-rejects-dangling-graph": [
+      "tests/kernel/world_runtime/test_state_bundle.py::test_state_bundle_rejects_dangling_semantic_graph"
+    ],
+    "decision-applicability-is-required": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_goal_transition_and_discharge_require_the_specific_applicable_decision"
+    ],
+    "identity-rebound-is-rejected": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_canonical_identity_rejects_rebinding_and_does_not_reactivate"
+    ],
+    "expired-mandate-is-not-current": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_governance_enforces_current_mandate_ceiling_expiry_conditions_and_decision_scope"
+    ],
+    "expired-authorization-is-not-usable": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_governance_enforces_current_mandate_ceiling_expiry_conditions_and_decision_scope"
+    ],
+    "empty-authority-ceiling-delegates-no-effect": [
+      "tests/kernel/world_runtime/test_service.py::test_empty_authority_ceiling_is_fail_closed"
+    ],
+    "discharged-responsibility-rejects-work": [
+      "tests/kernel/world_runtime/test_integrity_closure.py::test_discharged_responsibility_cannot_reopen_admit_work_or_receive_assignment"
+    ],
+    "discharged-responsibility-rejects-effect": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_discharged_responsibility_rejects_fresh_effect"
+    ],
+    "effectful-invocation-requires-work": [
+      "tests/kernel/world_runtime/test_service.py::test_public_invoke_requires_work_for_effects_and_enforces_required_context"
+    ],
+    "run-must-belong-to-work": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_invocation_run_must_belong_to_the_referenced_work"
+    ],
+    "authorization-required-context-is-enforced": [
+      "tests/kernel/world_runtime/test_service.py::test_public_invoke_requires_work_for_effects_and_enforces_required_context"
+    ],
+    "effectful-invocation-requires-durable-identity": [
+      "tests/kernel/world_runtime/test_service.py::test_public_invoke_requires_durable_identity_and_rejects_rebound"
+    ],
+    "effect-identity-rebound-is-rejected": [
+      "tests/kernel/world_runtime/test_service.py::test_public_invoke_requires_durable_identity_and_rejects_rebound"
+    ],
+    "capability-request-unknown-field-rejected": [
+      "tests/kernel/world_runtime/test_service.py::test_capability_request_schema_is_closed"
+    ],
+    "effect-identity-cannot-rebind-through-extension-field": [
+      "tests/kernel/world_runtime/test_service.py::test_extension_field_cannot_rebind_durable_effect_identity"
+    ],
+    "authority-bearing-http-requires-authentication": [
+      "tests/kernel/world_runtime/test_service.py::test_authority_bearing_http_writes_require_authentication_and_principal_match"
+    ],
+    "claimed-principal-cannot-override-authenticated-identity": [
+      "tests/kernel/world_runtime/test_service.py::test_authority_bearing_http_writes_require_authentication_and_principal_match",
+      "tests/kernel/world_runtime/test_service.py::test_decision_attestation_rejects_historical_and_wrong_principal"
+    ],
+    "revoked-delegation-cannot-act": [
+      "tests/kernel/world_runtime/test_service.py::test_delegation_http_route_separates_authenticated_and_effective_principal"
+    ],
+    "unattested-decision-cannot-be-adopted": [
+      "tests/kernel/world_runtime/test_service.py::test_decision_attestation_rejects_historical_and_wrong_principal"
+    ],
+    "unattested-authorization-cannot-execute-over-http": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_effect_http_fails_closed_across_identity_and_reconciliation_edges"
+    ],
+    "delegation-cannot-widen-authority": [
+      "tests/kernel/world_runtime/test_identity.py::test_delegation_chain_establishes_root_effective_principal_and_cannot_widen"
+    ],
+    "revoked-credential-cannot-authenticate": [
+      "tests/kernel/world_runtime/test_identity.py::test_revoked_credential_is_rejected_and_revocation_is_idempotent"
+    ],
+    "bounded-subdelegation-preserves-root-authority": [
+      "tests/kernel/world_runtime/test_identity.py::test_delegation_chain_establishes_root_effective_principal_and_cannot_widen"
+    ],
+    "stable-work-identity-is-replayable": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_work_identity_replays_only_identical_semantics"
+    ],
+    "domain-effect-requires-start-before-dispatch": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_owned_effect_executes_only_through_runtime_grant"
+    ],
+    "domain-effect-start-is-single-use": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_owned_effect_executes_only_through_runtime_grant"
+    ],
+    "ambiguous-domain-effect-blocks-redispatch": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_effect_http_fails_closed_across_identity_and_reconciliation_edges"
+    ],
+    "domain-effect-result-identity-is-bound": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_effect_http_fails_closed_across_identity_and_reconciliation_edges"
+    ],
+    "domain-effect-start-revalidates-current-authority": [
+      "tests/kernel/world_runtime/test_service.py::test_domain_effect_http_fails_closed_across_identity_and_reconciliation_edges"
+    ],
+    "projection-cas-cross-connection-single-winner": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_postgres_projection_cas_has_one_cross_connection_winner"
+    ],
+    "run-lease-cross-runtime-single-owner": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_two_runtime_nodes_compete_for_one_run_lease"
+    ],
+    "domain-effect-start-cross-runtime-single-dispatch": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_two_runtime_nodes_grant_one_domain_provider_dispatch"
+    ],
+    "provider-attempt-cross-runtime-single-dispatch": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_two_runtime_nodes_dispatch_runtime_provider_once"
+    ],
+    "institutional-lineage-rejects-historical-branch": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_lineage_is_append_only_single_head_and_rejects_branching"
+    ],
+    "superseded-decision-is-not-currently-applicable": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_decision_supersession_preserves_history_and_changes_current_applicability"
+    ],
+    "ontology-version-change-requires-revision": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_ontology_requires_revision_for_new_version_and_preserves_history"
+    ],
+    "experience-applicability-requires-qualified-current-head": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_memory_distinguishes_historical_experience_from_current_applicability"
+    ],
+    "superseded-mandate-cannot-qualify-current-authority": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_mandate_supersession_preserves_historical_authorization_but_removes_current_qualification"
+    ],
+    "goal-successor-requires-revision-required-and-explicit-decision": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_goal_supersession_requires_revision_required_state_and_explicit_admission_decision"
+    ],
+    "revoked-decision-is-not-currently-applicable": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_decision_revocation_preserves_history_but_removes_current_applicability"
+    ],
+    "revoked-authorization-is-not-usable": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_authorization_revocation_is_durable_and_blocks_future_use"
+    ],
+    "strategy-reassessment-requires-explicit-lineage": [
+      "tests/kernel/world_runtime/test_institutional_continuity.py::test_strategy_reassessment_requires_explicit_single_head_lineage"
+    ],
+    "shared-authorization-distinct-runtime-effects-survive-contention": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_shared_authorization_allows_distinct_runtime_effects_under_contention"
+    ],
+    "shared-authorization-distinct-domain-starts-survive-contention": [
+      "tests/kernel/world_runtime/test_postgres_ledger.py::test_shared_authorization_allows_distinct_domain_starts_under_contention"
+    ],
+    "responsibility-required-dependency-blocks-parent-satisfaction": [
+      "tests/kernel/world_runtime/test_responsibility_graph.py::test_hard_dependency_blocks_parent_until_required_responsibility_is_discharged"
+    ],
+    "responsibility-hard-dependency-cycle-rejected": [
+      "tests/kernel/world_runtime/test_responsibility_graph.py::test_requires_graph_rejects_cycles_across_domains"
+    ],
+    "strategic-portfolio-activation-requires-decision": [
+      "tests/kernel/world_runtime/test_strategic_portfolio.py::test_portfolio_activation_is_explicit_decision_not_option_ranking"
+    ],
+    "strategic-resource-budget-unit-is-bound": [
+      "tests/kernel/world_runtime/test_strategic_portfolio.py::test_resource_allocation_unit_is_part_of_budget_semantics"
+    ],
+    "qualification-change-creates-review-not-invalidation": [
+      "tests/kernel/world_runtime/test_continuous_qualification.py::test_dependency_change_creates_review_without_invalidating_binding"
+    ],
+    "qualification-action-assessment-remains-pending": [
+      "tests/kernel/world_runtime/test_continuous_qualification.py::test_assessment_and_resolution_are_distinct_states_on_one_review"
+    ],
+    "state-export-requires-direct-root-principal": [
+      "tests/kernel/world_runtime/test_protocol_3_acceptance.py::test_protocol_3_state_and_domain_reads_enforce_ownership_boundaries"
+    ],
+    "sensitive-runtime-read-requires-authentication": [
+      "tests/kernel/world_runtime/test_protocol_3_acceptance.py::test_protocol_3_state_and_domain_reads_enforce_ownership_boundaries"
+    ],
+    "public-command-unknown-field-rejected": [
+      "tests/kernel/world_runtime/test_service.py::test_public_invoke_rejects_unknown_top_level_field_before_provider"
+    ],
+    "delegated-transition-requires-operation-authority": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_delegated_transition_requires_operation_authority"
+    ],
+    "delegated-effect-use-respects-action-resource-ceiling": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_delegated_effect_use_respects_action_and_resource_ceiling"
+    ],
+    "terminal-work-rejects-fresh-run": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_terminal_work_rejects_a_fresh_run"
+    ],
+    "terminal-run-rejects-fresh-invocation-but-replay-survives": [
+      "tests/kernel/world_runtime/test_conformance_scenarios.py::test_terminal_run_replays_committed_effect_but_rejects_fresh_effect"
+    ],
+    "provider-result-read-is-principal-actor-bound": [
+      "tests/kernel/world_runtime/test_service.py::test_reconcile_and_result_endpoints_fail_closed_for_missing_state"
+    ]
+  }
+}

@@ -16,6 +16,21 @@ jobs:
   python:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aios_test
+          POSTGRES_USER: aios_test
+          # Ephemeral CI-only database on the private job service network.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aios_test -d aios_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -50,5 +65,15 @@ jobs:
           tests/kernel/world_runtime/test_continuous_qualification.py
           tests/kernel/world_runtime/test_contract_catalog.py
           tests/kernel/world_runtime/test_conformance.py
+      - name: Conformance vector traceability
+        run: pytest -q tests/conformance_vectors
       - name: Tests
         run: pytest -m "not postgres and not integration" --ignore=tests/acceptance
+      - name: PostgreSQL conformance
+        env:
+          WORLD_RUNTIME_TEST_POSTGRES_DSN: postgresql://aios_test@127.0.0.1:5432/aios_test
+          PERSONAL_WORLD_TEST_POSTGRES_URL: postgresql+psycopg://aios_test@127.0.0.1:5432/aios_test
+        run: >-
+          pytest -q -m postgres
+          tests/kernel/personal_world/test_postgres.py
+          tests/kernel/world_runtime/test_postgres_ledger.py
