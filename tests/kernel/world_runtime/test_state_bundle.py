@@ -16,8 +16,8 @@ def _populated_runtime() -> WorldRuntime:
             id="responsibility:bundle",
             principal="service:test",
             subject="bundle",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:bundle",
