@@ -20,7 +20,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..persistence import Base
 
-
 class SourceArtifactRow(Base):
     __tablename__ = "administrative_source_artifact"
     __table_args__ = (
@@ -52,7 +51,6 @@ class SourceArtifactRow(Base):
     authenticity_class: Mapped[str] = mapped_column(String(128), nullable=False)
     retention_class: Mapped[str] = mapped_column(String(128), nullable=False)
 
-
 class IntakeReceiptRow(Base):
     __tablename__ = "administrative_intake_receipt"
     __table_args__ = (
@@ -74,7 +72,6 @@ class IntakeReceiptRow(Base):
         ForeignKey("administrative_source_artifact.artifact_id"), nullable=True
     )
     delivery_digest: Mapped[str] = mapped_column(String(128), nullable=False)
-
 
 class EvidenceSpanRow(Base):
     __tablename__ = "administrative_evidence_span"
@@ -99,7 +96,6 @@ class EvidenceSpanRow(Base):
     locator_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     extractor_ref: Mapped[str] = mapped_column(String(512), nullable=False)
 
-
 class InterpretationRecordRow(Base):
     __tablename__ = "administrative_interpretation_record"
 
@@ -115,7 +111,6 @@ class InterpretationRecordRow(Base):
     evidence_span_refs_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     response_digest: Mapped[str] = mapped_column(String(128), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
-
 
 class CandidateFactAssertionRow(Base):
     __tablename__ = "administrative_candidate_fact_assertion"
@@ -137,7 +132,6 @@ class CandidateFactAssertionRow(Base):
     extractor_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-
 class CandidateAdministrativeRequestRow(Base):
     __tablename__ = "administrative_candidate_request"
 
@@ -152,7 +146,6 @@ class CandidateAdministrativeRequestRow(Base):
     supersedes_candidate_ref: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
 
-
 class CandidateCaseUpdateRow(Base):
     __tablename__ = "administrative_candidate_case_update"
 
@@ -166,7 +159,6 @@ class CandidateCaseUpdateRow(Base):
     source_refs_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(64), nullable=False)
-
 
 class IntakeAssessmentRow(Base):
     __tablename__ = "administrative_intake_assessment"
@@ -193,7 +185,6 @@ class IntakeAssessmentRow(Base):
     reviewer_principal_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-
 class PromotionRecordRow(Base):
     __tablename__ = "administrative_promotion_record"
     __table_args__ = (
@@ -210,7 +201,6 @@ class PromotionRecordRow(Base):
     ingress_receipt_ref: Mapped[str] = mapped_column(String(1000), nullable=False)
     promoted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     promotion_policy_ref: Mapped[str] = mapped_column(String(512), nullable=False)
-
 
 class DocumentRepresentationRow(Base):
     __tablename__ = "administrative_document_representation"
