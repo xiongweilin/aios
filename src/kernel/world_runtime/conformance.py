@@ -203,8 +203,8 @@ def _responsibility(runtime: WorldRuntime, identifier: str = "responsibility:con
             id=identifier,
             principal="service:conformance",
             subject="conformance",
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
 
 
@@ -1223,8 +1223,8 @@ def _attested_domain_effect_fixture(
             id=f"responsibility:{key}",
             principal="service:conformance",
             subject="domain effect conformance",
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -1509,8 +1509,8 @@ def _run_lease_cross_runtime() -> None:
                     id="responsibility:cross-runtime-lease",
                     principal="service:conformance",
                     subject="cross runtime lease",
-                ),
-                domain="conformance",
+                    domain="conformance",
+                )
             )
             work = first.execution.admit_work(
                 responsibility_id="responsibility:cross-runtime-lease",
@@ -1572,8 +1572,8 @@ def _shared_sqlite_effect_fixture(
             id=f"responsibility:{key}",
             principal=principal,
             subject=key,
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
     work = first.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -2358,8 +2358,8 @@ def _responsibility_dependency_gate() -> None:
                 id=identifier,
                 principal="service:conformance",
                 subject=identifier,
-            ),
-            domain=domain,
+                domain=domain,
+            )
         )
     _decision(
         runtime,
@@ -2426,8 +2426,8 @@ def _responsibility_cycle_gate() -> None:
                 id=identifier,
                 principal="service:conformance",
                 subject=identifier,
-            ),
-            domain=domain,
+                domain=domain,
+            )
         )
     for decision_id, source, target in (
         ("decision:a-b", "responsibility:a", "responsibility:b"),
@@ -2551,8 +2551,8 @@ def _strategic_resource_budget_gate() -> None:
             id="responsibility:budget",
             principal="service:conformance",
             subject="spend budget",
-        ),
-        domain="finance",
+            domain="finance",
+        )
     )
     _decision(
         runtime,
@@ -2742,8 +2742,8 @@ def _sensitive_read_requires_authentication() -> None:
             id="responsibility:sensitive-read",
             principal="principal:owner",
             subject="private durable state",
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
     client = TestClient(create_app(runtime))
     response = client.get("/v1/responsibilities/responsibility:sensitive-read")
@@ -2905,8 +2905,8 @@ async def _delegated_effect_ceiling() -> None:
             id="responsibility:effect-bounded",
             principal="principal:owner",
             subject="effect bounded",
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:effect-bounded",
@@ -3100,8 +3100,8 @@ async def _provider_result_read_isolation() -> None:
             id="responsibility:result-read",
             principal="principal:owner",
             subject="result read",
-        ),
-        domain="conformance",
+            domain="conformance",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:result-read",
