@@ -621,15 +621,15 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return _review_value(updated)
 
-    @app.post("/v1/qualification/dependencies/{dependency_id}/advance")
-    async def advance_qualification_dependency(
+    @app.post("/v1/qualification/bindings/{binding_id}/advance")
+    async def advance_qualification_binding(
         binding_id: str,
         command: QualificationAdvanceCommand,
         request: Request,
     ) -> dict[str, object]:
         context = _authenticate(runtime, request)
         try:
-            current = runtime.qualification.get_binding(dependency_id)
+            current = runtime.qualification.get_binding(binding_id)
             runtime.identity.assert_claimed_principal(context, current.principal)
             _assert_transition_authority(
                 runtime,
@@ -640,7 +640,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             item = runtime.qualification.advance_binding_after_review(
                 binding_id,
                 review_id=command.review_id,
-                                new_version=command.new_version,
+                new_version=command.new_version,
                 basis_refs=tuple(command.basis_refs),
                 successor_id=command.successor_id,
             )
