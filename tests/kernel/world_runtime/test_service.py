@@ -1,7 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -43,8 +47,6 @@ def _attested_authority(
     action: str,
     conditions: dict[str, object] | None = None,
 ):
-    from semantic_language import Decision, Mandate, SemanticKind, SemanticRef
-
     context = runtime.identity.authenticate_bearer(f"Bearer test-token:{principal}")
     runtime.decisions.record_attested(
         Decision(
@@ -359,8 +361,6 @@ def test_service_rejects_decision_without_basis() -> None:
 
 
 def test_public_invoke_requires_work_for_effects_and_enforces_required_context() -> None:
-    from semantic_language import Responsibility
-
     runtime = WorldRuntime.sqlite(runtime_id="service-invoke-integrity")
     provider = CountingProvider()
     provider._descriptor = provider.descriptor.model_copy(
@@ -372,8 +372,8 @@ def test_public_invoke_requires_work_for_effects_and_enforces_required_context()
             id="responsibility:http-effect",
             principal="principal:http",
             subject="effect",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:http-effect",
@@ -442,8 +442,6 @@ def test_public_invoke_requires_work_for_effects_and_enforces_required_context()
 
 
 def test_empty_authority_ceiling_is_fail_closed() -> None:
-    from semantic_language import Decision, Mandate, SemanticKind, SemanticRef
-
     runtime = WorldRuntime.sqlite()
     runtime.decisions.record(
         Decision(
@@ -472,8 +470,6 @@ def test_empty_authority_ceiling_is_fail_closed() -> None:
 
 
 def test_public_invoke_requires_durable_identity_and_rejects_rebound() -> None:
-    from semantic_language import Responsibility
-
     runtime = WorldRuntime.sqlite(runtime_id="service-effect-identity")
     provider = CountingProvider()
     provider._descriptor = provider.descriptor.model_copy(
@@ -485,8 +481,8 @@ def test_public_invoke_requires_durable_identity_and_rejects_rebound() -> None:
             id="responsibility:effect-identity",
             principal="principal:http",
             subject="effect identity",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:effect-identity",
@@ -582,8 +578,6 @@ def test_public_invoke_rejects_unknown_top_level_field_before_provider() -> None
 
 
 def test_extension_field_cannot_rebind_durable_effect_identity() -> None:
-    from semantic_language import Responsibility
-
     runtime = WorldRuntime.sqlite(runtime_id="service-extension-rebound")
     provider = CountingProvider()
     provider._descriptor = provider.descriptor.model_copy(
@@ -595,8 +589,8 @@ def test_extension_field_cannot_rebind_durable_effect_identity() -> None:
             id="responsibility:extension-rebound",
             principal="principal:http",
             subject="extension rebound",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:extension-rebound",
@@ -834,8 +828,6 @@ def test_reconcile_and_result_endpoints_fail_closed_for_missing_state() -> None:
 
 
 def test_decision_attestation_rejects_historical_and_wrong_principal() -> None:
-    from semantic_language import Decision, SemanticKind, SemanticRef
-
     runtime = WorldRuntime.sqlite(runtime_id="decision-attestation")
     owner_client = _client(runtime, principal="principal:owner")
     del owner_client
@@ -1322,8 +1314,6 @@ def test_service_responsibility_graph_rejects_unattested_decision() -> None:
                 "scope": {},
             },
         ).status_code == 200
-
-    from semantic_language import Decision, SemanticKind, SemanticRef
 
     runtime.decisions.record(
         Decision(
