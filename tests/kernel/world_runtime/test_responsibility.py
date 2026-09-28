@@ -8,8 +8,8 @@ from world_runtime import WorldRuntime
 
 def test_work_completion_does_not_discharge_responsibility():
     rt = WorldRuntime.sqlite()
-    item = Responsibility(id="r:1", principal="controller", subject="onboard employee")
-    rt.responsibility.create(item, domain="administrative")
+    item = Responsibility(id="r:1", principal="controller", subject="onboard employee", domain="administrative")
+    rt.responsibility.create(item)
     work = rt.execution.admit_work(responsibility_id="r:1", kind="onboarding", payload={})
     rt.execution.mark_work_complete(work.id, evidence_refs=("evidence:hris",))
     assert rt.responsibility.get("r:1").status == "active"
