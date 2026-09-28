@@ -23,5 +23,10 @@ python tests/acceptance/autonomous_development/run_acceptance.py \
 
 The runner bootstraps the target into the temporary Autodev database, waits for runtime and target
 readiness, writes one task to target reality, restarts the target container, reads the task back
-through the HTTP contract and directly from the container filesystem, scans the image, and then
-removes the temporary target container, Compose project, images and state.
+through the HTTP contract and directly from the container filesystem, then gracefully stops and
+restarts Autodev and confirms readiness and target reality again. It scans the image and removes
+the temporary target container, Compose project, images and state.
+
+The Windows smoke workflow targets a `self-hosted`, `windows`, `x64` runner with Docker Desktop's
+Linux container engine, Docker Compose and Buildx available under the runner account. It runs on
+pushes to `main` and manual dispatch rather than untrusted pull-request code.

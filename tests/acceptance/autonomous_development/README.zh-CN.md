@@ -13,4 +13,6 @@ python tests/acceptance/autonomous_development/run_acceptance.py \
   --evidence-path /path/to/acceptance-evidence.json
 ```
 
-Runner 会把 target bootstrap 到临时 Autodev database，等待 runtime 和 target readiness，向 target reality 写入一个真实 task，重启 target container，通过 HTTP contract 和 container 文件系统分别读回 task，扫描 image，最后移除临时 target container、Compose project、images 和 state。
+Runner 会把 target bootstrap 到临时 Autodev database，等待 runtime 和 target readiness，向 target reality 写入一个真实 task，重启 target container，通过 HTTP contract 和 container 文件系统分别读回 task；随后优雅停止并重启 Autodev，验证 readiness 和 target reality 仍可用。Runner 扫描 image 后，移除临时 target container、Compose project、images 和 state。
+
+Windows smoke workflow 使用带 `self-hosted`、`windows`、`x64` 标签的 runner；该 runner 账户需能访问 Docker Desktop Linux container engine、Docker Compose 和 Buildx。它只在 push 到 `main` 或手动 dispatch 时运行，不执行不受信任的 pull request 代码。

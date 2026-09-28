@@ -852,6 +852,50 @@ def run_acceptance(evidence_path: Path | None) -> int:
             raise RuntimeError("API reality read-back differs from the task record in the target container.")
         mark("reality-readback", "passed")
 
+        stage = "autodev-graceful-shutdown"
+        autodev_container_id = _run(
+            [*compose_prefix, "ps", "--quiet", "autonomous-development"],
+            cwd=repo_root,
+            env=compose_env,
+            secrets_to_redact=secrets_to_redact,
+        )
+        _run(
+            [*compose_prefix, "stop", "--timeout", "30", "autonomous-development"],
+            cwd=repo_root,
+            env=compose_env,
+            secrets_to_redact=secrets_to_redact,
+        )
+        autodev_state = _run(
+            ["docker", "inspect", "--format", "{{.State.Status}}|{{.State.ExitCode}}", autodev_container_id],
+            env=compose_env,
+            secrets_to_redact=secrets_to_redact,
+        )
+        if autodev_state != "exited|0":
+            raise RuntimeError(f"Autodev did not shut down cleanly: {autodev_state}")
+        mark("autodev-graceful-shutdown", "passed", state=autodev_state)
+
+        stage = "autodev-restart-recovery"
+        _run(
+            [*compose_prefix, "start", "autonomous-development"],
+            cwd=repo_root,
+            env=compose_env,
+            secrets_to_redact=secrets_to_redact,
+        )
+        autodev_binding = _run(
+            [*compose_prefix, "port", "autonomous-development", "8765"],
+            cwd=repo_root,
+            env=compose_env,
+            secrets_to_redact=secrets_to_redact,
+        )
+        autodev_host_port = int(autodev_binding.splitlines()[0].rsplit(":", maxsplit=1)[1])
+        autodev_url = f"http://127.0.0.1:{autodev_host_port}"
+        _wait_for_status(autodev_url, "/health", expected_status="ok", timeout_seconds=120)
+        _wait_for_status(autodev_url, "/ready", expected_status="ready", timeout_seconds=120)
+        status_code, recovered = _http_json(f"{target_url}/reality/{task_id}")
+        if status_code != 200 or recovered != container_record:
+            raise RuntimeError("Task reality did not survive Autodev service restart.")
+        mark("autodev-restart-recovery", "passed")
+
         stage = "verify"
         if (
             readback.get("task_id") != task_id
@@ -877,6 +921,8 @@ def run_acceptance(evidence_path: Path | None) -> int:
             "runtime-health",
             "bootstrap-serving-release",
             "runtime-readiness",
+            "autodev-graceful-shutdown",
+            "autodev-restart-recovery",
         }:
             try:
                 diagnostics = _capture_autodev_logs(
