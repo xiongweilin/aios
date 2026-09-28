@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Any
 
 
-CATALOG_VERSION = "world-runtime-contracts-v11"
+CATALOG_VERSION = "world-runtime-contracts-v12"
 CATALOG_OWNER = "world-runtime/contracts"
 
 
