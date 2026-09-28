@@ -297,7 +297,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         registered = client.post(
             "/v1/qualification/bindings",
             json={
-                "id": "qualification-dependency:1",
+                "id": "qualification-binding:1",
                 "principal": "principal:owner",
                 "subject_ref": "decision:historical",
                 "dependency_ref": "policy:risk",
@@ -362,12 +362,12 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         assert pending[0]["status"] == "assessed"
 
         premature_advance = client.post(
-            "/v1/qualification/bindings/qualification-dependency:1/advance",
+            "/v1/qualification/bindings/qualification-binding:1/advance",
             json={
                 "review_id": review_id,
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
-                "successor_id": "qualification-dependency:2",
+                "successor_id": "qualification-binding:2",
             },
             headers=OWNER,
         )
@@ -385,12 +385,12 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         assert resolved.json()["status"] == "resolved"
 
         advanced = client.post(
-            "/v1/qualification/bindings/qualification-dependency:1/advance",
+            "/v1/qualification/bindings/qualification-binding:1/advance",
             json={
                 "review_id": review_id,
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
-                "successor_id": "qualification-dependency:2",
+                "successor_id": "qualification-binding:2",
             },
             headers=OWNER,
         )
