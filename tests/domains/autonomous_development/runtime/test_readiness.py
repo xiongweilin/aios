@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from aios.runtime_compat import WORLD_RUNTIME_PROTOCOL
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
 from pydantic import SecretStr
 from sqlalchemy import create_engine
 
@@ -282,7 +282,7 @@ def test_readiness_world_runtime_cutover_requires_contract_surface(
                 200,
                 json={
                     "runtime_protocol": WORLD_RUNTIME_PROTOCOL,
-                    "semantic_language": "0.3.0",
+                    "semantic_language": SEMANTIC_KERNEL_VERSION,
                     "contracts": {},
                 },
             )
