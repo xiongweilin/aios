@@ -104,3 +104,39 @@ index 41705aa..1f50dc9 100644
  class CandidateCommitmentStatus(StrEnum):
      ACTIVE = "active"
      SUPERSEDED = "superseded"
+diff --git a/src/domains/administrative_orchestrator/commitment_repository.py b/src/domains/administrative_orchestrator/commitment_repository.py
+index fc7f0cd..d37b45e 100644
+--- a/src/domains/administrative_orchestrator/commitment_repository.py
++++ b/src/domains/administrative_orchestrator/commitment_repository.py
+@@ -186,20 +186,6 @@ class CommitmentRepository:
+             row = db.get(CandidateCommitmentRow, candidate_id)
+             return None if row is None else self._candidate_from_row(row)
+ 
+-    def list_candidates(
+-        self,
+-        *,
+-        status: CandidateCommitmentStatus | None = None,
+-        limit: int = 200,
+-    ) -> list[CandidateCommitment]:
+-        with self.store.sessions() as db:
+-            statement = select(CandidateCommitmentRow).order_by(
+-                CandidateCommitmentRow.created_at.desc()
+-            ).limit(limit)
+-            if status is not None:
+-                statement = statement.where(CandidateCommitmentRow.status == status.value)
+-            return [self._candidate_from_row(row) for row in db.execute(statement).scalars()]
+-
+     def update_candidate_status(
+         self,
+         candidate_id: UUID,
+diff --git a/src/domains/administrative_orchestrator/commitment_service.py b/src/domains/administrative_orchestrator/commitment_service.py
+index ec96996..04d2170 100644
+--- a/src/domains/administrative_orchestrator/commitment_service.py
++++ b/src/domains/administrative_orchestrator/commitment_service.py
+@@ -23,11 +23,11 @@ from .commitment_lifecycle import CommitmentLifecycleCoordinator
+ from .commitment_models import (
+     CandidateCommitment,
+     CandidateCommitmentClassification,
++    MeetingInterpretationPayload,
+     CandidateCommitmentStatus,
+    
