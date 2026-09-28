@@ -10,12 +10,12 @@
 
 核心 non-substitution rule：
 
-- Source != Observation != Claim != current personal state。
-- Historical truth != current truth。
-- Context Projection != canonical truth。
+- Source != Observation != Claim != 当前已取得资格的个人记录状态。
+- 历史资格状态 != 当前资格状态。
+- Context Projection != Personal World 规范状态。
 - Personal context != execution authority。
 - Domain projection != domain ownership。
-- Model inference != accepted personal preference or fact。
+- Model inference != 当前已取得资格的个人偏好或事实。
 
 ## Runtime
 
