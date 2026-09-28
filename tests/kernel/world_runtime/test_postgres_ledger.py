@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 import asyncio
 import os
 import threading
@@ -10,7 +13,7 @@ from pathlib import Path
 import psycopg
 import pytest
 from psycopg import sql
-from semantic_language import Decision, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 from world_runtime.postgres_ledger import PostgresLedger
