@@ -125,8 +125,8 @@ async def test_mandate_to_reality_to_belief_and_strategy_survives_restart(
         id="responsibility:checkout",
         principal="controller:development",
         subject="reduce checkout latency",
-        goal_refs=(goal.ref,
-    domain="development",),
+        goal_refs=(goal.id,),
+        domain="development",
     )
     runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
