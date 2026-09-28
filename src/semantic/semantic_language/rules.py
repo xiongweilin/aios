@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-from .core import SemanticKind, SemanticObject
+from .core import SemanticKind, SemanticRef
 
 
-_DISTINCTIONS: frozenset[frozenset[SemanticKind]] = frozenset(
+KindLike = SemanticKind | str | SemanticRef
+
+
+_BOUNDARIES: frozenset[frozenset[str]] = frozenset(
     {
-        frozenset((SemanticKind.CLAIM, SemanticKind.EVIDENCE)),
-        frozenset((SemanticKind.GOAL, SemanticKind.CLAIM)),
-        frozenset((SemanticKind.CONSTRAINT, SemanticKind.GOAL)),
-        frozenset((SemanticKind.PROPOSAL, SemanticKind.DECISION)),
-        frozenset((SemanticKind.DECISION, SemanticKind.AUTHORIZATION)),
-        frozenset((SemanticKind.AUTHORIZATION, SemanticKind.EFFECT)),
-        frozenset((SemanticKind.ACTION, SemanticKind.EFFECT)),
-        frozenset((SemanticKind.EFFECT, SemanticKind.OUTCOME)),
-        frozenset((SemanticKind.OUTCOME, SemanticKind.ACCEPTANCE)),
-        frozenset((SemanticKind.RESPONSIBILITY, SemanticKind.ACTION)),
+        frozenset((SemanticKind.CLAIM.value, SemanticKind.EVIDENCE.value)),
+        frozenset((SemanticKind.DECISION.value, SemanticKind.AUTHORIZATION.value)),
+        frozenset((SemanticKind.AUTHORIZATION.value, SemanticKind.EFFECT.value)),
+        frozenset((SemanticKind.EFFECT.value, SemanticKind.OUTCOME.value)),
+        frozenset((SemanticKind.RESPONSIBILITY.value, SemanticKind.EFFECT.value)),
     }
 )
 
@@ -23,15 +21,25 @@ class NonSubstitutionError(ValueError):
     pass
 
 
-def distinction(left: SemanticKind, right: SemanticKind) -> bool:
-    return frozenset((left, right)) in _DISTINCTIONS
+def _kind_value(value: KindLike) -> str:
+    if isinstance(value, SemanticRef):
+        return value.kind_value
+    if isinstance(value, SemanticKind):
+        return value.value
+    return str(value)
 
 
-def assert_distinct(actual: SemanticObject, expected_kind: SemanticKind) -> None:
-    if actual.kind == expected_kind:
+def distinction(left: KindLike, right: KindLike) -> bool:
+    return frozenset((_kind_value(left), _kind_value(right))) in _BOUNDARIES
+
+
+def assert_distinct(actual: KindLike, expected: KindLike) -> None:
+    actual_value = _kind_value(actual)
+    expected_value = _kind_value(expected)
+    if actual_value == expected_value:
         return
-    if distinction(actual.kind, expected_kind):
+    if distinction(actual_value, expected_value):
         raise NonSubstitutionError(
-            f"{actual.kind.value} is not a valid substitute for {expected_kind.value}"
+            f"{actual_value} is not a valid substitute for {expected_value}"
         )
-    raise TypeError(f"expected {expected_kind.value}, received {actual.kind.value}")
+    raise TypeError(f"expected {expected_value}, received {actual_value}")
