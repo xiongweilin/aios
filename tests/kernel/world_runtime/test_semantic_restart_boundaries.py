@@ -147,8 +147,8 @@ def test_restart_after_outcome_report_before_strategy_assessment(tmp_path: Path)
         id="responsibility:outcome-restart",
         principal="controller:test",
         subject="produce outcome",
-        goal_refs=(goal.ref,
-    domain="test-domain",),
+        goal_refs=(goal.id,),
+        domain="test-domain",
     )
     runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
