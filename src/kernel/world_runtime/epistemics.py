@@ -1258,12 +1258,17 @@ class EpistemicLedger:
 __all__ = [
     "BeliefState",
     "BeliefVerdict",
+    "Claim",
     "ClaimRevision",
+    "Conflict",
     "EpistemicLedger",
+    "Evidence",
     "EvidenceAssessment",
     "EvidencePredicate",
     "EvidenceRelation",
     "EvidenceRequirement",
+    "EvaluatorKind",
     "FalsificationCondition",
+    "Unknown",
     "evaluate_predicate",
 ]
