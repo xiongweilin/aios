@@ -174,6 +174,187 @@ class WorldRuntimeBridge:
                 },
             )
             assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
+            self._post(
+                "/v1/domain-assignments",
+                {
+                    "id": assignment_ref,
+                    "responsibility_ref": responsibility_ref,
+                    "domain": "administrative",
+                    "controller": "controller:administrative-orchestrator",
+                    "authority_refs": [
+                        f"administrative-authorization:{effect.authorization_id}",
+                        f"governance-basis:{effect.governance_basis_id}",
+                    ],
+                    "evidence_requirements": [
+                        {
+                            "kind": "administrative-postcondition-readback",
+                            "expected": context["expected_postcondition"],
+                        }
+                    ],
+                    "review_conditions": [
+                        {
+                            "trigger": "authority-epoch-change",
+                            "authority_epoch": effect.authority_epoch,
+                        }
+                    ],
+                },
+            )
+            self._post(
+                f"/v1/domain-assignments/{assignment_ref}/reports",
+                {
+                    "id": f"{assignment_ref}:accepted",
+                    "kind": "accepted",
+                },
+            )
+            work = self._post(
+                "/v1/work",
+                {
+                    "responsibility_id": responsibility_ref,
+                    "kind": "administrative-effect",
+                    "payload": {
+                        "effect_id": str(effect.effect_id),
+                        "requested_capabilities": [capability],
+                        "expected_postcondition": context["expected_postcondition"],
+                        "metadata": {
+                            "administrative_case_id": str(effect.case_id),
+                            "authority_epoch": effect.authority_epoch,
+                            "obligation_id": str(effect.obligation_id),
+                        },
+                    },
+                },
+            )
+            run = self._post(
+                "/v1/runs",
+                {
+                    "work_id": work["id"],
+                    "workflow_id": "administrative-effect",
+                },
+            )
+            basis_refs = [
+                f"administrative-authorization:{effect.authorization_id}",
+                f"administrative-obligation:{effect.obligation_id}",
+                f"governance-basis:{effect.governance_basis_id}",
+            ]
+            self._post(
+                "/v1/decisions",
+                {
+                    "id": decision_ref,
+                    "subject": effect.subject_ref,
+                    "decided_by": self.settings.world_runtime_principal,
+                    "selected": {
+                        "target_ref": resource_ref,
+                        "operation": "authorize-effect",
+                        "action": capability,
+                        "effect_id": str(effect.effect_id),
+                        "administrative_issuer_principal_id": context["issuer_principal_id"],
+                    },
+                    "basis_refs": basis_refs,
+                },
+            )
+            self._post(
+                "/v1/mandates",
+                {
+                    "id": mandate_ref,
+                    "principal": self.settings.world_runtime_principal,
+                    "scope": {
+                        "case_id": str(effect.case_id),
+                        "authority_epoch": effect.authority_epoch,
+                        "obligation_id": str(effect.obligation_id),
+                    },
+                    "authority_ceiling": {
+                        "action": capability,
+                        "resource": resource_ref,
+                    },
+                },
+            )
+            runtime_auth = self._post(
+                "/v1/authorizations",
+                {
+                    "id": authorization_ref,
+                    "principal": self.settings.world_runtime_principal,
+                    "action": capability,
+                    "resource": resource_ref,
+                    "mandate_id": mandate_ref,
+                    "decision_id": decision_ref,
+                    "annotations": {
+                        "administrative_authorization_id": str(effect.authorization_id),
+                        "governance_basis_id": str(effect.governance_basis_id),
+                        "administrative_issuer_principal_id": context["issuer_principal_id"],
+                    },
+                },
+            )
+            result = self._post(
+                "/v1/invoke",
+                {
+                    "id": request_ref,
+                    "capability": capability,
+                    "work_id": work["id"],
+                    "run_id": run["id"],
+                    "parameters": {**payload, "subject_ref": effect.subject_ref},
+                    "idempotency_key": self.idempotency_key_for_effect(effect.effect_id),
+                    "actor_ref": self.settings.world_runtime_principal,
+                    "principal": self.settings.world_runtime_principal,
+                    "resource_ref": resource_ref,
+                    "resource": resource_ref,
+                    "subject_version_refs": [
+                        f"administrative-case:{effect.case_id}:v{effect.case_version}",
+                        f"authority-epoch:{effect.authority_epoch}",
+                    ],
+                    "authorization_id": runtime_auth["id"],
+                    "effect_class": "external-effect",
+                },
+            )
+        except (WorldRuntimeBoundaryError, ValueError) as exc:
+            return ProviderExecutionResult(
+                status=ProviderExecutionStatus.FAILED,
+                error=str(exc),
+                retryable=False,
+            )
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            return ProviderExecutionResult(
+                status=ProviderExecutionStatus.OUTCOME_UNKNOWN,
+                error=str(exc),
+                retryable=False,
+            )
+
+        status = str(result.get("status", "unknown"))
+        provider_ref = (
+            result.get("external_ref")
+            or result.get("external_operation_ref")
+            or f"world-runtime:{result.get('provider_id', 'unknown')}:{result.get('request_id', request_ref)}"
+        )
+        if status == "succeeded":
+            mapped = ProviderExecutionStatus.SUCCEEDED
+        elif status in {"unknown", "unavailable"}:
+            mapped = ProviderExecutionStatus.OUTCOME_UNKNOWN
+        else:
+            mapped = ProviderExecutionStatus.FAILED
+        return ProviderExecutionResult(
+            status=mapped,
+            provider_ref=str(provider_ref) if provider_ref else None,
+            error=None if mapped is ProviderExecutionStatus.SUCCEEDED else str(result.get("error") or status),
+            retryable=False,
+        )
+
+    def provision_responsibility(
+        self,
+        *,
+        responsibility_ref: str,
+        principal: str,
+        subject: str,
+        scope: dict[str, Any],
+    ) -> None:
+        self._post(
+            "/v1/responsibilities",
+            {
+                "id": responsibility_ref,
+                "principal": principal,
+                "subject": subject,
+                "domain": "administrative",
+                "scope": scope,
+            },
+        )
+        assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
         assignment_path = f"/v1/domain-assignments/{assignment_ref}"
         assignment = self.client.get_optional(assignment_path)
         if assignment is None:
