@@ -1,13 +1,33 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping
 
-from semantic_language import Goal, Revision, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from .common import new_id
 from .decisions import assert_decision_applies
 from .governance import assert_mandate_current
 from .ledger import SemanticLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
+
+
+STRATEGY_NAMESPACE = "world-runtime.strategy"
+GOAL_KIND = "goal"
+
+
+def goal_ref(goal_id: str) -> SemanticRef:
+    return SemanticRef(kind=GOAL_KIND, id=goal_id, namespace=STRATEGY_NAMESPACE)
+
+
+@dataclass(frozen=True, slots=True)
+class Goal:
+    id: str
+    subject: str
+    desired_state: Mapping[str, object] = field(default_factory=dict)
+    basis_refs: tuple[SemanticRef, ...] = ()
+
+    @property
+    def ref(self) -> SemanticRef:
+        return goal_ref(self.id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +62,21 @@ class GoalLifecycleTransition:
 
 
 class StrategyService:
+    ASSESSMENT_NAMESPACE = STRATEGY_NAMESPACE
+    ASSESSMENT_KIND = "strategy-assessment"
+
+    _GOAL_TRANSITIONS = {
+        "active": frozenset({"revision-required", "stopped"}),
+        "revision-required": frozenset({"active", "stopped", "retired"}),
+        "stopped": frozenset({"retired"}),
+        "retired": frozenset(),
+    }
+    _DISPOSITION_TARGETS = {
+        "continue": frozenset({"active"}),
+        "revise": frozenset({"revision-required"}),
+        "stop": frozenset({"stopped", "retired"}),
+    }
+
     def __init__(
         self,
         ledger: SemanticLedger,
@@ -49,9 +84,6 @@ class StrategyService:
     ) -> None:
         self.ledger = ledger
         self.lineage = lineage or RevisionLineageService(ledger)
-
-    ASSESSMENT_NAMESPACE = "world-runtime.strategy"
-    ASSESSMENT_KIND = "strategy-assessment"
 
     @classmethod
     def assessment_ref(cls, assessment_id: str) -> SemanticRef:
@@ -92,33 +124,26 @@ class StrategyService:
         }
         existing = self.ledger.project_get("strategy.goal", goal.id)
         if existing is not None:
-            existing_identity = {
-                key: existing[0].get(key)
-                for key in (
-                    "id",
-                    "subject",
-                    "desired_state",
-                    "basis_refs",
-                    "mandate_id",
-                    "decision_id",
-                )
-            }
-            incoming_identity = {
-                key: value.get(key)
-                for key in (
-                    "id",
-                    "subject",
-                    "desired_state",
-                    "basis_refs",
-                    "mandate_id",
-                    "decision_id",
-                )
-            }
-            if existing_identity != incoming_identity:
+            identity_keys = (
+                "id",
+                "subject",
+                "desired_state",
+                "basis_refs",
+                "mandate_id",
+                "decision_id",
+            )
+            if {k: existing[0].get(k) for k in identity_keys} != {
+                k: value.get(k) for k in identity_keys
+            }:
                 raise ValueError("goal identity rebound")
             return
         with self.ledger.transaction():
-            self.ledger.project_put("strategy.goal", goal.id, value)
+            self.ledger.project_put(
+                "strategy.goal",
+                goal.id,
+                value,
+                expected_version=0,
+            )
             self.ledger.append(
                 stream=f"goal:{goal.id}",
                 kind="strategy.goal.admitted",
@@ -162,8 +187,8 @@ class StrategyService:
         revision_reason: str = "",
         revision_basis_refs: tuple[str, ...] = (),
     ) -> StrategyAssessment:
-        self.lineage.assert_current(SemanticRef(SemanticKind.GOAL, goal_id))
-        if disposition not in {"continue", "revise", "stop"}:
+        self.lineage.assert_current(goal_ref(goal_id))
+        if disposition not in self._DISPOSITION_TARGETS:
             raise ValueError("strategy disposition must be continue, revise, or stop")
         if not basis_refs:
             raise ValueError("strategy assessment requires basis refs")
@@ -224,10 +249,7 @@ class StrategyService:
         with self.ledger.transaction():
             if current is not None:
                 current_id = str(current[0]["id"])
-                if self.ledger.project_get(
-                    "strategy.assessment-record",
-                    current_id,
-                ) is None:
+                if self.ledger.project_get("strategy.assessment-record", current_id) is None:
                     self.ledger.project_put(
                         "strategy.assessment-record",
                         current_id,
@@ -270,16 +292,13 @@ class StrategyService:
     ) -> GoalLifecycleTransition:
         if not basis_refs:
             raise ValueError("goal lifecycle transition requires basis refs")
-        self.lineage.assert_current(SemanticRef(SemanticKind.GOAL, goal_id))
+        self.lineage.assert_current(goal_ref(goal_id))
         goal_row = self.ledger.project_get("strategy.goal", goal_id)
         if goal_row is None:
             raise KeyError(goal_id)
         goal_value, goal_version = goal_row
         assessment_row = self.ledger.project_get("strategy.assessment", goal_id)
-        if (
-            assessment_row is None
-            or str(assessment_row[0].get("id")) != assessment_id
-        ):
+        if assessment_row is None or str(assessment_row[0].get("id")) != assessment_id:
             raise ValueError("goal lifecycle transition requires current strategy assessment")
         self.lineage.assert_current(self.assessment_ref(assessment_id))
         assert_decision_applies(
@@ -287,37 +306,21 @@ class StrategyService:
             decision_id,
             target_ref=goal_id,
             operation="transition-goal",
-            expected={
-                "to_status": to_status,
-                "assessment_id": assessment_id,
-            },
+            expected={"to_status": to_status, "assessment_id": assessment_id},
         )
 
         from_status = str(goal_value.get("status", "active"))
-        allowed = {
-            "active": {"revision-required", "stopped"},
-            "revision-required": {"active", "stopped", "retired"},
-            "stopped": {"retired"},
-            "retired": set(),
-        }
-        if to_status not in allowed.get(from_status, set()):
+        if to_status not in self._GOAL_TRANSITIONS.get(from_status, frozenset()):
             raise ValueError(
                 f"goal status {from_status} does not admit transition to {to_status}"
             )
 
         assessment_disposition = str(assessment_row[0].get("disposition", ""))
-        required_by_disposition = {
-            "continue": {"active"},
-            "revise": {"revision-required"},
-            "stop": {"stopped", "retired"},
-        }
-        if to_status not in required_by_disposition.get(
+        if to_status not in self._DISPOSITION_TARGETS.get(
             assessment_disposition,
-            set(),
+            frozenset(),
         ):
-            raise ValueError(
-                "goal lifecycle transition conflicts with strategy assessment"
-            )
+            raise ValueError("goal lifecycle transition conflicts with strategy assessment")
 
         transition = GoalLifecycleTransition(
             id=new_id("goal-transition"),
@@ -350,6 +353,7 @@ class StrategyService:
                 "strategy.goal-transition",
                 transition.id,
                 transition_value,
+                expected_version=0,
             )
             self.ledger.append(
                 stream=f"goal:{goal_id}",
@@ -367,7 +371,7 @@ class StrategyService:
         mandate_id: str,
         decision_id: str,
     ) -> None:
-        previous_ref = SemanticRef(SemanticKind.GOAL, previous_id)
+        previous_ref = goal_ref(previous_id)
         if revision.supersedes_ref != previous_ref:
             raise ValueError("Goal Revision must supersede the selected Goal")
         if revision.target_ref != successor.ref:
@@ -378,9 +382,7 @@ class StrategyService:
             raise KeyError(previous_id)
         previous, previous_version = previous_row
         if previous.get("status") != "revision-required":
-            raise ValueError(
-                "Goal must be revision-required before successor admission"
-            )
+            raise ValueError("Goal must be revision-required before successor admission")
         self.lineage.assert_current(previous_ref)
         assert_mandate_current(self.ledger, mandate_id)
         assert_decision_applies(
@@ -397,11 +399,7 @@ class StrategyService:
         retired_previous["revision_id"] = revision.id
 
         with self.ledger.transaction():
-            self.register_goal(
-                successor,
-                mandate_id=mandate_id,
-                decision_id=decision_id,
-            )
+            self.register_goal(successor, mandate_id=mandate_id, decision_id=decision_id)
             self.lineage.record(revision)
             self.ledger.project_put(
                 "strategy.goal",
@@ -421,9 +419,7 @@ class StrategyService:
             )
 
     def get_current_goal(self, goal_id: str) -> Mapping[str, object]:
-        current = self.lineage.resolve_current(
-            SemanticRef(SemanticKind.GOAL, goal_id)
-        )
+        current = self.lineage.resolve_current(goal_ref(goal_id))
         return self.get_goal(current.id)
 
     def get_assessment(self, assessment_id: str) -> StrategyAssessment:
@@ -450,8 +446,10 @@ class StrategyService:
 
 
 __all__ = [
+    "Goal",
     "GoalLifecycleTransition",
     "StrategicOption",
     "StrategyAssessment",
     "StrategyService",
+    "goal_ref",
 ]
