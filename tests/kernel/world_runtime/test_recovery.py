@@ -84,6 +84,42 @@ class OpaqueProvider:
         del request_id
 
 
+class InterruptedProvider(OpaqueProvider):
+    def __init__(self, failure: type[Exception]) -> None:
+        super().__init__()
+        self.failure = failure
+        self.calls = 0
+
+    async def invoke(
+        self,
+        request: CapabilityRequest,
+        context: InvocationContext,
+    ) -> CapabilityResult:
+        del request, context
+        self.calls += 1
+        raise self.failure("injected provider transport failure")
+
+
+class UnknownOutcomeProvider(OpaqueProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def invoke(
+        self,
+        request: CapabilityRequest,
+        context: InvocationContext,
+    ) -> CapabilityResult:
+        del context
+        self.calls += 1
+        return CapabilityResult(
+            request_id=request.id,
+            provider_id=self.descriptor.id,
+            status="unknown",
+            error={"code": "provider-outcome-unknown"},
+        )
+
+
 def _attempt(runtime: WorldRuntime, *, key: str, provider) -> None:
     contract = reconciliation_contract_for(provider.descriptor)
     runtime.ledger.project_put(
@@ -161,3 +197,56 @@ async def test_recovery_fails_closed_when_reconciliation_contract_drifts() -> No
     assert resolution is not None
     assert "drifted" in resolution.reason
     assert provider.reconcile_calls == 0
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [TimeoutError, ConnectionError],
+    ids=["request-timeout", "network-interruption"],
+)
+@pytest.mark.asyncio
+async def test_interrupted_dispatch_remains_unknown_without_redispatch(
+    failure: type[Exception],
+) -> None:
+    runtime = WorldRuntime.sqlite()
+    provider = InterruptedProvider(failure)
+    runtime.registry.register(provider)
+    request = CapabilityRequest(
+        capability="demo.effect",
+        idempotency_key=f"fault:{failure.__name__}",
+    )
+
+    with pytest.raises(failure, match="injected provider transport failure"):
+        await runtime.invoke(request)
+
+    attempt = runtime.ledger.project_get(
+        "execution.provider-attempt",
+        request.idempotency_key,
+    )
+    assert attempt is not None
+    assert attempt[0]["status"] == "started"
+
+    recovered = await runtime.invoke(request)
+    replayed = await runtime.invoke(request)
+
+    assert recovered.status == replayed.status == "unknown"
+    assert recovered.error["code"] == "ManualResolutionRequired"
+    assert provider.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_unknown_outcome_is_cached_without_redispatch() -> None:
+    runtime = WorldRuntime.sqlite()
+    provider = UnknownOutcomeProvider()
+    runtime.registry.register(provider)
+    request = CapabilityRequest(
+        capability="demo.effect",
+        idempotency_key="fault:provider-unknown",
+    )
+
+    first = await runtime.invoke(request)
+    replayed = await runtime.invoke(request)
+
+    assert first.status == replayed.status == "unknown"
+    assert first.error == replayed.error == {"code": "provider-outcome-unknown"}
+    assert provider.calls == 1
