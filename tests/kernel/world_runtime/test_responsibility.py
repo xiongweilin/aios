@@ -1,5 +1,7 @@
+from world_runtime.decisions import Decision
+from world_runtime.responsibility import Responsibility
 import pytest
-from semantic_language import Decision, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 
