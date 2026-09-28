@@ -1,0 +1,154 @@
+diff --git a/scripts/domains/administrative/production_preflight.py b/scripts/domains/administrative/production_preflight.py
+index b0e58f6..945acd0 100644
+--- a/scripts/domains/administrative/production_preflight.py
++++ b/scripts/domains/administrative/production_preflight.py
+@@ -50,7 +50,6 @@ def _validate_secret_references(settings) -> None:
+         settings.odoo_verifier_secret_env,
+         settings.odoo_financial_writer_secret_env,
+         settings.odoo_financial_verifier_secret_env,
+-        settings.keycloak_reader_secret_env,
+         settings.keycloak_writer_secret_env,
+         settings.keycloak_verifier_secret_env,
+     )
+diff --git a/scripts/domains/administrative/production_world_runtime_stack.py b/scripts/domains/administrative/production_world_runtime_stack.py
+index 2e08410..e7f751f 100644
+--- a/scripts/domains/administrative/production_world_runtime_stack.py
++++ b/scripts/domains/administrative/production_world_runtime_stack.py
+@@ -15,14 +15,12 @@ from world_runtime.execution import (
+ )
+ 
+ from administrative_orchestrator.config import get_settings
+-from administrative_orchestrator.integrations.credentials import (
+-    CredentialRef,
+-    EnvironmentOrFileCredentialResolver,
+-    read_credential_file,
+-)
+-from administrative_orchestrator.integrations.production_effects import (
++from administrative_orchestrator.integrations.credentials import CredentialRef
++from administrative_orchestrator.integrations.effect_common import (
+     ConnectorResult,
+     ConnectorStatus,
++)
++from administrative_orchestrator.integrations.keycloak_effects import (
+     KeycloakEffectConnection,
+     KeycloakIdentityDisableConnector,
+     KeycloakIdentityDisableVerifier,
+@@ -30,6 +28,8 @@ from administrative_orchestrator.integrations.production_effects import (
+     KeycloakIdentityVerifier,
+     KeycloakSessionRevokeConnector,
+     KeycloakSessionVerifier,
++)
++from administrative_orchestrator.integrations.odoo_effects import (
+     OdooEffectConnection,
+     OdooEmployeeDeactivateConnector,
+     OdooEmployeeDeactivateVerifier,
+diff --git a/src/domains/administrative_orchestrator/authority.py b/src/domains/administrative_orchestrator/authority.py
+index 9d0e13f..f787344 100644
+--- a/src/domains/administrative_orchestrator/authority.py
++++ b/src/domains/administrative_orchestrator/authority.py
+@@ -436,11 +436,6 @@ class AuthorityRepository:
+         with self.store.sessions.begin() as session:
+             return self._put_decision_binding_in_session(session, binding)
+ 
+-    def get_decision_binding(self, decision_id: UUID) -> DecisionAuthorityBinding | None:
+-        with self.store.sessions() as db:
+-            row = db.get(DecisionAuthorityBindingRow, decision_id)
+-            return None if row is None else self._decision_binding_from_row(row)
+-
+     def put_approval_satisfaction(
+         self,
+         satisfaction: ApprovalSatisfaction,
+diff --git a/src/domains/administrative_orchestrator/commitment_models.py b/src/domains/administrative_orchestrator/commitment_models.py
+index 41705aa..1f50dc9 100644
+--- a/src/domains/administrative_orchestrator/commitment_models.py
++++ b/src/domains/administrative_orchestrator/commitment_models.py
+@@ -5,7 +5,7 @@ from enum import StrEnum
+ from typing import Any
+ from uuid import UUID, uuid4
+ 
+-from pydantic import Field, model_validator
++from pydantic import BaseModel, ConfigDict, Field, model_validator
+ 
+ from .domain import UtcModel, utcnow
+ 
+@@ -19,6 +19,32 @@ class CandidateCommitmentClassification(StrEnum):
+     ASSIGNMENT_TO_OTHER = "assignment_to_other"
+ 
+ 
++class MeetingCommitmentDraft(BaseModel):
++    model_config = ConfigDict(extra="forbid")
++
++    speaker_label: str = Field(min_length=1, max_length=512)
++    candidate_action: str = Field(min_length=1, max_length=2000)
++    candidate_due_text: str | None = Field(default=None, max_length=512)
++    candidate_due_at: datetime | None = None
++    candidate_scope_ref: str | None = Field(default=None, max_length=1000)
++    candidate_beneficiary: str | None = Field(default=None, max_length=1000)
++    classification: CandidateCommitmentClassification
++    evidence_span_refs: tuple[UUID, ...] = ()
++
++    @model_validator(mode="after")
++    def validate_due_time(self) -> "MeetingCommitmentDraft":
++        if self.candidate_due_at is not None and self.candidate_due_at.tzinfo is None:
++            raise ValueError("candidate_due_at must be offset-aware")
++        return self
++
++
++class MeetingInterpretationPayload(BaseModel):
++    model_config = ConfigDict(extra="forbid")
++
++    candidate_commitments: tuple[MeetingCommitmentDraft, ...] = ()
++    evidence_span_refs: tuple[UUID, ...] = ()
++
++
+ class CandidateCommitmentStatus(StrEnum):
+     ACTIVE = "active"
+     SUPERSEDED = "superseded"
+diff --git a/src/domains/administrative_orchestrator/commitment_repository.py b/src/domains/administrative_orchestrator/commitment_repository.py
+index fc7f0cd..d37b45e 100644
+--- a/src/domains/administrative_orchestrator/commitment_repository.py
++++ b/src/domains/administrative_orchestrator/commitment_repository.py
+@@ -186,20 +186,6 @@ class CommitmentRepository:
+             row = db.get(CandidateCommitmentRow, candidate_id)
+             return None if row is None else self._candidate_from_row(row)
+ 
+-    def list_candidates(
+-        self,
+-        *,
+-        status: CandidateCommitmentStatus | None = None,
+-        limit: int = 200,
+-    ) -> list[CandidateCommitment]:
+-        with self.store.sessions() as db:
+-            statement = select(CandidateCommitmentRow).order_by(
+-                CandidateCommitmentRow.created_at.desc()
+-            ).limit(limit)
+-            if status is not None:
+-                statement = statement.where(CandidateCommitmentRow.status == status.value)
+-            return [self._candidate_from_row(row) for row in db.execute(statement).scalars()]
+-
+     def update_candidate_status(
+         self,
+         candidate_id: UUID,
+diff --git a/src/domains/administrative_orchestrator/commitment_service.py b/src/domains/administrative_orchestrator/commitment_service.py
+index ec96996..04d2170 100644
+--- a/src/domains/administrative_orchestrator/commitment_service.py
++++ b/src/domains/administrative_orchestrator/commitment_service.py
+@@ -23,11 +23,11 @@ from .commitment_lifecycle import CommitmentLifecycleCoordinator
+ from .commitment_models import (
+     CandidateCommitment,
+     CandidateCommitmentClassification,
++    MeetingInterpretationPayload,
+     CandidateCommitmentStatus,
+     CommitmentFulfillmentKind,
+     CommitmentRecord,
+     CommitmentState,
+-    CommunicationDraftRecord,
+     CommunicationEffectRecord,
+     SpeakerPrincipalResolution,
+ )
+@@ -48,7 +48,6 @@ from .domain import (
+ )
+ from .execution_repository import ExecutionRepository
+ from .intake.artifacts import ArtifactStore, FilesystemArtifactStore
+-from .intake.interpretation import MeetingInterpretationPayload
+ from .intake.models import EvidenceSpan, InterpretationRecord
