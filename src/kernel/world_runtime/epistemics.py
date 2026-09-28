@@ -5,10 +5,83 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Mapping
 
-from semantic_language import Claim, Conflict, Evidence, SemanticRef, Unknown
+from semantic_language import SemanticKind, SemanticRef
 
 from .common import new_id, utcnow
 from .ledger import SemanticLedger
+
+
+EPISTEMICS_NAMESPACE = "world-runtime.epistemics"
+
+
+@dataclass(frozen=True, slots=True)
+class EpistemicObject:
+    id: str
+    created_at: datetime = field(default_factory=utcnow)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class Claim(EpistemicObject):
+    subject: str = ""
+    proposition: str = ""
+
+    @property
+    def kind(self) -> SemanticKind:
+        return SemanticKind.CLAIM
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(self.kind, self.id)
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence(EpistemicObject):
+    subject: str = ""
+    content: Mapping[str, Any] = field(default_factory=dict)
+    source: str = ""
+    observed_at: datetime | None = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    derived_from: tuple[SemanticRef, ...] = ()
+
+    @property
+    def kind(self) -> SemanticKind:
+        return SemanticKind.EVIDENCE
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(self.kind, self.id)
+
+
+@dataclass(frozen=True, slots=True)
+class Unknown(EpistemicObject):
+    subject: str = ""
+    question: str = ""
+    blocks: tuple[SemanticRef, ...] = ()
+
+    @property
+    def kind(self) -> SemanticKind:
+        return SemanticKind.UNKNOWN
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(self.kind, self.id)
+
+
+@dataclass(frozen=True, slots=True)
+class Conflict(EpistemicObject):
+    subject: str = ""
+    members: tuple[SemanticRef, ...] = ()
+    description: str = ""
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(
+            kind="conflict",
+            id=self.id,
+            namespace=EPISTEMICS_NAMESPACE,
+        )
 
 
 class BeliefVerdict(StrEnum):
