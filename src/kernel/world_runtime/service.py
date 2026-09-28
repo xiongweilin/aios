@@ -14,8 +14,7 @@ from .governance import Mandate
 from .responsibility import Responsibility
 
 from .agency_protocol import register_agency_protocol_routes
-from .conformance import conformance_vectors
-from .contracts import contract_catalog
+from .contracts import conformance_vectors, contract_catalog
 from .domain_protocol import register_domain_protocol_routes
 from .execution import CapabilityRequest, CapabilityResult, EffectIdentityReboundError
 from .identity import AuthenticatedRequestContext, DelegationGrant

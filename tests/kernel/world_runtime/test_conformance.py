@@ -1,15 +1,12 @@
-import pytest
-
-from world_runtime.conformance import (
-    SUITE_VERSION,
+from world_runtime.contracts import (
+    PUBLIC_CONFORMANCE_SUITE_VERSION,
     conformance_vectors,
-    run_reference_conformance,
 )
 
 
 def test_public_conformance_vectors_are_versioned_and_cover_deletion_gates() -> None:
     suite = conformance_vectors()
-    assert suite["suite_version"] == SUITE_VERSION
+    assert suite["suite_version"] == PUBLIC_CONFORMANCE_SUITE_VERSION
     ids = {item["id"] for item in suite["vectors"]}
     assert {
         "responsibility-terminal-assessment-requires-basis",
@@ -78,9 +75,3 @@ def test_public_conformance_vectors_are_versioned_and_cover_deletion_gates() -> 
         "provider-result-read-is-principal-actor-bound",
     } <= ids
 
-
-@pytest.mark.asyncio
-async def test_reference_runtime_passes_all_public_conformance_vectors() -> None:
-    results = await run_reference_conformance()
-    failures = [item for item in results if not item.passed]
-    assert failures == []

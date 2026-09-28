@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from administrative_orchestrator.execution_repository import ExecutionRepository
 from administrative_orchestrator.domain import (
     AdministrativeRequest,
     Decision,
@@ -91,7 +92,7 @@ def test_case_policy_decision_and_audit_survive_store_roundtrip() -> None:
     authorized = record_decision(awaiting, decision)
     uow.apply_decision_transition(awaiting, authorized, decision)
 
-    assert store.get_decision(decision.decision_id) == decision
+    assert ExecutionRepository(store).get_latest_decision(decision.case_id) == decision
     assert store.get_case(authorized.case_id) == authorized
     assert authorized.authority_epoch == awaiting.authority_epoch
 

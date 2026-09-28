@@ -303,51 +303,6 @@ class WorldRuntime:
     def list_runs(self, work_id: str) -> list[Run]:
         return self.execution.list_runs(work_id)
 
-    async def run_capability(
-        self,
-        work_id: str,
-        capability: str,
-        *,
-        run_id: str | None = None,
-        instruction: str | None = None,
-        parameters: dict[str, object] | None = None,
-        constraints: dict[str, object] | None = None,
-        idempotency_key: str | None = None,
-        timeout_seconds: float | None = None,
-        subject_version_refs: list[str] | None = None,
-        resource_ref: str | None = None,
-        actor_ref: str | None = None,
-        preferred_provider_ids: list[str] | None = None,
-        excluded_provider_ids: list[str] | None = None,
-        effect_class: str = "read",
-        principal: str | None = None,
-        resource: str | None = None,
-        authorization_id: str | None = None,
-        lease_generation: int = 0,
-        lease_owner: str | None = None,
-    ) -> CapabilityResult:
-        request = CapabilityRequest(
-            capability=capability,
-            work_id=work_id,
-            run_id=run_id,
-            instruction=instruction,
-            parameters=dict(parameters or {}),
-            constraints=dict(constraints or {}),
-            idempotency_key=idempotency_key,
-            timeout_seconds=timeout_seconds,
-            subject_version_refs=list(subject_version_refs or []),
-            resource_ref=resource_ref,
-            actor_ref=actor_ref,
-            preferred_provider_ids=list(preferred_provider_ids or []),
-            excluded_provider_ids=list(excluded_provider_ids or []),
-            effect_class=effect_class,
-            principal=principal,
-            resource=resource,
-            authorization_id=authorization_id,
-            lease_generation=lease_generation,
-            lease_owner=lease_owner,
-        )
-        return await self.invoke(request)
 
     async def health(self) -> dict[str, object]:
         providers = [

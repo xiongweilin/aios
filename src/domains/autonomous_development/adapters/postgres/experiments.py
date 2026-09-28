@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from sqlalchemy import Engine, insert, select, update
-from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 
 from autonomous_development.domain.canary import CanaryStageDecision
-from autonomous_development.domain.enums import CanaryDecisionKind
-from autonomous_development.domain.models import CanaryStage, Experiment
+from autonomous_development.domain.models import Experiment
 from autonomous_development.ports.persistence import (
     ConcurrentUpdateError,
     ExperimentRepository,
@@ -14,6 +12,7 @@ from autonomous_development.ports.persistence import (
     OperationConflictError,
 )
 
+from .records import load_one, record_from_row, record_values
 from .schema import experiment_stage_operations, experiments
 
 
@@ -24,7 +23,7 @@ class SqlExperimentRepository(ExperimentRepository):
     def add(self, experiment: Experiment) -> Experiment:
         try:
             with self._engine.begin() as connection:
-                connection.execute(insert(experiments).values(**_experiment_values(experiment)))
+                connection.execute(insert(experiments).values(**record_values(experiments, experiment)))
         except IntegrityError as exc:
             if self.get(experiment.id) is not None:
                 raise ValueError(f"experiment already exists: {experiment.id}") from exc
@@ -32,28 +31,18 @@ class SqlExperimentRepository(ExperimentRepository):
         return experiment
 
     def get(self, experiment_id: str) -> Experiment | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(
-                    select(experiments).where(experiments.c.id == experiment_id)
-                )
-                .mappings()
-                .first()
-            )
-        return _experiment_from_row(row) if row is not None else None
+        return load_one(
+            self._engine, select(experiments).where(experiments.c.id == experiment_id), Experiment
+        )
 
     def get_stage_decision(self, operation_id: str) -> ExperimentStageReceipt | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(
-                    select(experiment_stage_operations).where(
-                        experiment_stage_operations.c.operation_id == operation_id
-                    )
-                )
-                .mappings()
-                .first()
-            )
-        return _receipt_from_row(row) if row is not None else None
+        return load_one(
+            self._engine,
+            select(experiment_stage_operations).where(
+                experiment_stage_operations.c.operation_id == operation_id
+            ),
+            ExperimentStageReceipt,
+        )
 
     def list_stage_decisions(
         self,
@@ -69,7 +58,7 @@ class SqlExperimentRepository(ExperimentRepository):
                 .mappings()
                 .all()
             )
-        return tuple(_receipt_from_row(row) for row in rows)
+        return tuple(record_from_row(ExperimentStageReceipt, row) for row in rows)
 
     def commit_stage_decision(
         self,
@@ -101,7 +90,7 @@ class SqlExperimentRepository(ExperimentRepository):
         try:
             with self._engine.begin() as connection:
                 connection.execute(
-                    insert(experiment_stage_operations).values(**_receipt_values(receipt))
+                    insert(experiment_stage_operations).values(**record_values(experiment_stage_operations, receipt))
                 )
                 result = connection.execute(
                     update(experiments)
@@ -138,76 +127,3 @@ def _validate_existing_receipt(
     return existing
 
 
-def _experiment_values(experiment: Experiment) -> dict[str, object]:
-    return {
-        "id": experiment.id,
-        "target_id": experiment.target_id,
-        "control_release_id": experiment.control_release_id,
-        "candidate_deployment_id": experiment.candidate_deployment_id,
-        "stages_json": [
-            {
-                "weight_percent": stage.weight_percent,
-                "min_duration_seconds": stage.min_duration_seconds,
-                "min_requests": stage.min_requests,
-            }
-            for stage in experiment.stages
-        ],
-        "current_stage_index": experiment.current_stage_index,
-    }
-
-
-def _receipt_values(receipt: ExperimentStageReceipt) -> dict[str, object]:
-    return {
-        "operation_id": receipt.operation_id,
-        "experiment_id": receipt.experiment_id,
-        "stage_index": receipt.stage_index,
-        "result_stage_index": receipt.result_stage_index,
-        "decision_kind": receipt.decision_kind.value,
-        "evidence_refs_json": list(receipt.evidence_refs),
-        "violated_guardrails_json": list(receipt.violated_guardrails),
-        "reason": receipt.reason,
-    }
-
-
-def _experiment_from_row(row: RowMapping) -> Experiment:
-    values = dict(row)
-    raw_stages = values["stages_json"]
-    if not isinstance(raw_stages, list):
-        raise RuntimeError("persisted experiment stages are malformed")
-    stages: list[CanaryStage] = []
-    for item in raw_stages:
-        if not isinstance(item, dict):
-            raise RuntimeError("persisted experiment stage is malformed")
-        stages.append(
-            CanaryStage(
-                weight_percent=int(item["weight_percent"]),
-                min_duration_seconds=int(item["min_duration_seconds"]),
-                min_requests=int(item["min_requests"]),
-            )
-        )
-    return Experiment(
-        id=str(values["id"]),
-        target_id=str(values["target_id"]),
-        control_release_id=str(values["control_release_id"]),
-        candidate_deployment_id=str(values["candidate_deployment_id"]),
-        stages=tuple(stages),
-        current_stage_index=int(values["current_stage_index"]),
-    )
-
-
-def _receipt_from_row(row: RowMapping) -> ExperimentStageReceipt:
-    values = dict(row)
-    evidence_refs = values["evidence_refs_json"]
-    violated = values["violated_guardrails_json"]
-    if not isinstance(evidence_refs, list) or not isinstance(violated, list):
-        raise RuntimeError("persisted canary decision receipt is malformed")
-    return ExperimentStageReceipt(
-        operation_id=str(values["operation_id"]),
-        experiment_id=str(values["experiment_id"]),
-        stage_index=int(values["stage_index"]),
-        result_stage_index=int(values["result_stage_index"]),
-        decision_kind=CanaryDecisionKind(str(values["decision_kind"])),
-        evidence_refs=tuple(str(item) for item in evidence_refs),
-        violated_guardrails=tuple(str(item) for item in violated),
-        reason=str(values["reason"]),
-    )

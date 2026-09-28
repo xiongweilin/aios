@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from sqlalchemy import Engine, insert, select, update
-from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 
-from autonomous_development.domain.enums import CycleState, ReleaseDecisionKind
+from autonomous_development.domain.enums import CycleState
 from autonomous_development.domain.models import DevelopmentCycle
 from autonomous_development.domain.transitions import TERMINAL_STATES
 from autonomous_development.ports.persistence import (
@@ -15,6 +14,7 @@ from autonomous_development.ports.persistence import (
     TransitionReceipt,
 )
 
+from .records import load_one, record_values
 from .schema import cycle_transitions, cycles
 
 
@@ -25,7 +25,7 @@ class SqlCycleRepository(CycleRepository):
     def add(self, cycle: DevelopmentCycle) -> DevelopmentCycle:
         try:
             with self._engine.begin() as connection:
-                connection.execute(insert(cycles).values(**_cycle_values(cycle)))
+                connection.execute(insert(cycles).values(**record_values(cycles, cycle, is_terminal=cycle.state in TERMINAL_STATES)))
         except IntegrityError as exc:
             if self.get(cycle.id) is not None:
                 raise ValueError(f"cycle already exists: {cycle.id}") from exc
@@ -38,32 +38,25 @@ class SqlCycleRepository(CycleRepository):
         return cycle
 
     def get(self, cycle_id: str) -> DevelopmentCycle | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(select(cycles).where(cycles.c.id == cycle_id))
-                .mappings()
-                .first()
-            )
-        return _cycle_from_row(row) if row is not None else None
+        return load_one(
+            self._engine, select(cycles).where(cycles.c.id == cycle_id), DevelopmentCycle
+        )
 
     def find_active_for_target(self, target_id: str) -> DevelopmentCycle | None:
-        with self._engine.connect() as connection:
-            row = connection.execute(
-                select(cycles).where(
-                    cycles.c.target_id == target_id,
-                    cycles.c.is_terminal.is_(False),
-                )
-            ).mappings().first()
-        return _cycle_from_row(row) if row is not None else None
+        return load_one(
+            self._engine,
+            select(cycles).where(
+                cycles.c.target_id == target_id, cycles.c.is_terminal.is_(False)
+            ),
+            DevelopmentCycle,
+        )
 
     def get_transition(self, operation_id: str) -> TransitionReceipt | None:
-        with self._engine.connect() as connection:
-            row = connection.execute(
-                select(cycle_transitions).where(
-                    cycle_transitions.c.operation_id == operation_id
-                )
-            ).mappings().first()
-        return _receipt_from_row(row) if row is not None else None
+        return load_one(
+            self._engine,
+            select(cycle_transitions).where(cycle_transitions.c.operation_id == operation_id),
+            TransitionReceipt,
+        )
 
     def commit_transition(
         self,
@@ -92,12 +85,12 @@ class SqlCycleRepository(CycleRepository):
         try:
             with self._engine.begin() as connection:
                 connection.execute(
-                    insert(cycle_transitions).values(**_receipt_values(receipt))
+                    insert(cycle_transitions).values(**record_values(cycle_transitions, receipt))
                 )
                 result = connection.execute(
                     update(cycles)
                     .where(cycles.c.id == cycle.id, cycles.c.version == expected_version)
-                    .values(**_cycle_values(cycle))
+                    .values(**record_values(cycles, cycle, is_terminal=cycle.state in TERMINAL_STATES))
                 )
                 if result.rowcount != 1:
                     raise ConcurrentUpdateError(
@@ -138,69 +131,3 @@ def _validate_existing_receipt(
     return receipt
 
 
-def _cycle_values(cycle: DevelopmentCycle) -> dict[str, object]:
-    return {
-        "id": cycle.id,
-        "target_id": cycle.target_id,
-        "objective_revision_id": cycle.objective_revision_id,
-        "baseline_release_id": cycle.baseline_release_id,
-        "state": cycle.state.value,
-        "version": cycle.version,
-        "evidence_window_id": cycle.evidence_window_id,
-        "diagnosis_id": cycle.diagnosis_id,
-        "change_proposal_id": cycle.change_proposal_id,
-        "candidate_id": cycle.candidate_id,
-        "verification_run_id": cycle.verification_run_id,
-        "artifact_id": cycle.artifact_id,
-        "candidate_deployment_id": cycle.candidate_deployment_id,
-        "experiment_id": cycle.experiment_id,
-        "release_decision": cycle.release_decision.value if cycle.release_decision else None,
-        "is_terminal": cycle.state in TERMINAL_STATES,
-    }
-
-
-def _receipt_values(receipt: TransitionReceipt) -> dict[str, object]:
-    return {
-        "operation_id": receipt.operation_id,
-        "cycle_id": receipt.cycle_id,
-        "from_version": receipt.from_version,
-        "result_version": receipt.result_version,
-        "to_state": receipt.to_state.value,
-    }
-
-
-def _cycle_from_row(row: RowMapping) -> DevelopmentCycle:
-    values = dict(row)
-    decision = values.get("release_decision")
-    return DevelopmentCycle(
-        id=str(values["id"]),
-        target_id=str(values["target_id"]),
-        objective_revision_id=str(values["objective_revision_id"]),
-        baseline_release_id=str(values["baseline_release_id"]),
-        state=CycleState(str(values["state"])),
-        version=int(values["version"]),
-        evidence_window_id=_optional_str(values.get("evidence_window_id")),
-        diagnosis_id=_optional_str(values.get("diagnosis_id")),
-        change_proposal_id=_optional_str(values.get("change_proposal_id")),
-        candidate_id=_optional_str(values.get("candidate_id")),
-        verification_run_id=_optional_str(values.get("verification_run_id")),
-        artifact_id=_optional_str(values.get("artifact_id")),
-        candidate_deployment_id=_optional_str(values.get("candidate_deployment_id")),
-        experiment_id=_optional_str(values.get("experiment_id")),
-        release_decision=ReleaseDecisionKind(str(decision)) if decision else None,
-    )
-
-
-def _receipt_from_row(row: RowMapping) -> TransitionReceipt:
-    values = dict(row)
-    return TransitionReceipt(
-        operation_id=str(values["operation_id"]),
-        cycle_id=str(values["cycle_id"]),
-        from_version=int(values["from_version"]),
-        result_version=int(values["result_version"]),
-        to_state=CycleState(str(values["to_state"])),
-    )
-
-
-def _optional_str(value: object) -> str | None:
-    return None if value is None else str(value)

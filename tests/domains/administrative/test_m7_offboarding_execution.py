@@ -39,7 +39,7 @@ from administrative_orchestrator.offboarding_execution import (
     OffboardingExecutionEngine,
     ProductionTrustOffboardingExecutionEngine,
 )
-from administrative_orchestrator.persistence import SqlStore
+from administrative_orchestrator.persistence import DecisionRow, PolicyEvaluationRow, SqlStore, utcnow
 from administrative_orchestrator.policy import OffboardingFacts
 from administrative_orchestrator.policy_plane import (
     PolicyRepository,
@@ -231,9 +231,6 @@ def _authorized_case(*, successor: str | None):
     )
     store.create_case(request, case)
     evaluation = compile_offboarding_policy(record).evaluate(typed_facts)
-    store.append_policy_evaluation(
-        case.case_id, case.version, case.authority_epoch, evaluation
-    )
     decision = Decision(
         case_id=case.case_id,
         case_version=case.version - 1,
@@ -245,7 +242,31 @@ def _authorized_case(*, successor: str | None):
         policy_ref=record.policy_ref,
         decided_at=_NOW,
     )
-    store.append_decision(decision)
+    with store.sessions.begin() as db:
+        db.add(
+            PolicyEvaluationRow(
+                case_id=case.case_id,
+                case_version=case.version,
+                authority_epoch=case.authority_epoch,
+                policy_json=evaluation.policy_ref.model_dump(mode="json"),
+                evaluation_json=evaluation.model_dump(mode="json"),
+                created_at=utcnow(),
+            )
+        )
+        db.add(
+            DecisionRow(
+                decision_id=decision.decision_id,
+                case_id=decision.case_id,
+                case_version=decision.case_version,
+                authority_epoch=decision.authority_epoch,
+                principal_id=decision.principal_id,
+                decision_role=decision.decision_role,
+                disposition=decision.disposition.value,
+                rationale=decision.rationale,
+                policy_json=decision.policy_ref.model_dump(mode="json"),
+                decided_at=decision.decided_at,
+            )
+        )
     authority.put_decision_binding(decision, organization_scope="org:finance")
     satisfaction = authority.put_approval_satisfaction(
         ApprovalSatisfaction(

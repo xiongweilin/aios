@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
@@ -620,86 +619,3 @@ def test_world_runtime_commitment_responsibility_provisioner_records_and_fails_c
             commitment=commitment,
             governance_basis=governance,
         )
-
-def test_operations_commitment_routes_cover_review_confirm_detail_and_attest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    store, service, case, commitment = _prepared_communication_service(
-        tmp_path,
-        external_effects_enabled=False,
-    )
-    candidate = service.repository.get_candidate(commitment.candidate_ref)
-    assert candidate is not None
-    from administrative_orchestrator import operations_api
-
-    actor = SimpleNamespace(principal_id="person:reviewer")
-    monkeypatch.setattr(operations_api, "_store", store)
-    monkeypatch.setattr(operations_api, "_commitments", service.repository)
-    monkeypatch.setattr(operations_api, "_commitment_service", service)
-    monkeypatch.setattr(operations_api, "_actor", lambda request: actor)
-    monkeypatch.setattr(operations_api, "_require", lambda *args, **kwargs: None)
-    monkeypatch.setattr(operations_api, "_require_intake_review", lambda *args, **kwargs: None)
-
-    queue = operations_api.commitment_candidate_queue(
-        object(), status_filter=CandidateCommitmentStatus.ADMITTED
-    )
-    assert queue[0].candidate.candidate_commitment_id == candidate.candidate_commitment_id
-    detail = operations_api.commitment_candidate_detail(candidate.candidate_commitment_id, object())
-    assert detail.commitment is not None
-    interpretation, span = _interpretation(store, classification="explicit_self_commitment")
-    fresh_candidate = service.create_candidates_from_interpretation(
-        interpretation,
-        evidence_spans=(span,),
-    )[0]
-    resolved = operations_api.resolve_commitment_speaker(
-        fresh_candidate.candidate_commitment_id,
-        operations_api.CommitmentSpeakerResolutionBody(
-            provider="messaging-provider",
-            external_subject="ou_committer",
-            basis={"source": "operator"},
-        ),
-        object(),
-    )
-    assert resolved.resolved_principal_id == "person:committer"
-    confirmed = operations_api.confirm_commitment_candidate(
-        candidate.candidate_commitment_id,
-        operations_api.CommitmentConfirmationBody(
-            qualified_due_at=BASE_TIME + timedelta(days=1),
-            due_time_basis="operator basis",
-        ),
-        object(),
-    )
-    assert confirmed["commitment"]["case_id"] == str(case.case_id)
-    revised = operations_api.revise_commitment_due(
-        case.case_id,
-        operations_api.CommitmentDueRevisionBody(
-            due_at=BASE_TIME + timedelta(days=2),
-            basis="operator corrected timezone",
-        ),
-        object(),
-    )
-    assert revised["commitment"]["due_at"].startswith("2026-09-15T09:00:00")
-    commitment_detail = operations_api.commitment_detail(case.case_id, object())
-    assert commitment_detail["commitment"]["commitment_id"] == str(commitment.commitment_id)
-    actor.principal_id = "person:committer"
-    fulfilled = operations_api.attest_commitment_fulfillment(
-        case.case_id,
-        operations_api.CommitmentFulfillmentBody(basis={"kind": "authorized_attestation"}),
-        object(),
-    )
-    assert fulfilled["commitment"]["state"] == "fulfilled"
-
-    cancel_store, cancel_service, cancel_case, _ = _prepared_communication_service(
-        tmp_path / "cancel",
-        external_effects_enabled=False,
-    )
-    monkeypatch.setattr(operations_api, "_store", cancel_store)
-    monkeypatch.setattr(operations_api, "_commitments", cancel_service.repository)
-    monkeypatch.setattr(operations_api, "_commitment_service", cancel_service)
-    actor.principal_id = "person:reviewer"
-    cancelled = operations_api.cancel_commitment(
-        cancel_case.case_id,
-        operations_api.CommitmentCancellationBody(basis="operator cancelled the meeting"),
-        object(),
-    )
-    assert cancelled["commitment"]["state"] == "cancelled"

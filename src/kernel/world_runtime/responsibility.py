@@ -66,36 +66,6 @@ class ResponsibilityService:
             )
         return responsibility
 
-    def assign(self, responsibility_id: str, *, controller: str) -> str:
-        current = self.get(responsibility_id)
-        if current.status != "active":
-            raise ValueError("domain assignment requires active responsibility")
-        assignment_id = f"domain-assignment:{responsibility_id}:{controller}"
-        value = {
-            "id": assignment_id,
-            "responsibility_id": responsibility_id,
-            "domain": current.domain,
-            "controller": controller,
-            "status": "offered",
-        }
-        existing = self.ledger.project_get("responsibility.assignment", assignment_id)
-        if existing is not None:
-            if existing[0] != value:
-                raise ValueError("responsibility assignment identity rebound")
-            return assignment_id
-        with self.ledger.transaction():
-            self.ledger.project_put(
-                "responsibility.assignment",
-                assignment_id,
-                value,
-                expected_version=0,
-            )
-            self.ledger.append(
-                stream=f"responsibility:{responsibility_id}",
-                kind="responsibility.assignment.offered",
-                payload=value,
-            )
-        return assignment_id
 
     def assess(
         self,

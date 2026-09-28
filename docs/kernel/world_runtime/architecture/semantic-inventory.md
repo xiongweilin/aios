@@ -19,7 +19,7 @@ persistence, and policy.
 | Mandate | owner-local namespace | world-runtime/governance | yes |
 | Conflict | owner-local namespace | world-runtime/epistemics | yes |
 | ClaimRevision / EvidenceAssessment / BeliefState | owner-local namespace | world-runtime/epistemics | yes |
-| CognitiveControllerState | owner-local namespace | world-runtime/cognition | yes |
+| CognitiveEpisode | owner-local namespace | world-runtime/cognition | yes |
 | Experience | owner-local namespace | world-runtime/memory | yes |
 | DomainAssignment / DomainReport | owner-local namespace | world-runtime/domains | yes |
 | StrategyAssessment | owner-local namespace | world-runtime/strategy | yes |
@@ -41,3 +41,5 @@ Rules:
 7. A QualificationBinding records a current-use dependency. A dependency change opens one ReviewCase rather than rewriting the historical subject.
 8. Review assessment and review resolution are distinct transitions on the same durable ReviewCase.
 9. Personal facts, UI projections, model-routing policy, and reusable cognitive procedures remain outside the Runtime semantic inventory.
+
+10. Reference conformance runners are not Runtime payload owners. Public conformance vectors remain contract data; executable behavior is validated through the owning Runtime subsystem tests.

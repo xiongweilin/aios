@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import Engine, insert, or_, select
-from sqlalchemy.engine import RowMapping
-from sqlalchemy.exc import IntegrityError
 
-from autonomous_development.domain.enums import FeedbackKind
 from autonomous_development.domain.models import UserFeedback
 from autonomous_development.ports.persistence import FeedbackRepository
 
+from .records import insert_once, load_one, record_from_row, record_values
 from .schema import user_feedback
 
 
@@ -18,33 +16,22 @@ class SqlFeedbackRepository(FeedbackRepository):
         self._engine = engine
 
     def add(self, feedback: UserFeedback) -> UserFeedback:
-        existing = self.get(feedback.id)
-        if existing is not None:
-            if existing != feedback:
-                raise ValueError(
-                    f"feedback id already exists with different content: {feedback.id}"
-                )
-            return existing
-        try:
-            with self._engine.begin() as connection:
-                connection.execute(insert(user_feedback).values(**_feedback_values(feedback)))
-        except IntegrityError:
-            existing = self.get(feedback.id)
-            if existing is None or existing != feedback:
-                raise
-            return existing
-        return feedback
+        return insert_once(
+            self._engine,
+            insert(user_feedback).values(**record_values(user_feedback, feedback)),
+            load=lambda: self.get(feedback.id),
+            expected=feedback,
+            conflict=lambda: ValueError(
+                f"feedback id already exists with different content: {feedback.id}"
+            ),
+        )
 
     def get(self, feedback_id: str) -> UserFeedback | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(
-                    select(user_feedback).where(user_feedback.c.id == feedback_id)
-                )
-                .mappings()
-                .first()
-            )
-        return _feedback_from_row(row) if row is not None else None
+        return load_one(
+            self._engine,
+            select(user_feedback).where(user_feedback.c.id == feedback_id),
+            UserFeedback,
+        )
 
     def list_attributable(
         self,
@@ -73,50 +60,4 @@ class SqlFeedbackRepository(FeedbackRepository):
                 .mappings()
                 .all()
             )
-        return tuple(_feedback_from_row(row) for row in rows)
-
-
-def _feedback_values(feedback: UserFeedback) -> dict[str, object]:
-    return {
-        "id": feedback.id,
-        "target_id": feedback.target_id,
-        "received_at": feedback.received_at,
-        "kind": feedback.kind.value,
-        "category": feedback.category,
-        "severity": feedback.severity,
-        "provenance": feedback.provenance,
-        "release_id": feedback.release_id,
-        "deployment_id": feedback.deployment_id,
-        "experiment_id": feedback.experiment_id,
-        "request_ref": feedback.request_ref,
-        "free_text": feedback.free_text,
-    }
-
-
-def _feedback_from_row(row: RowMapping) -> UserFeedback:
-    values = dict(row)
-    return UserFeedback(
-        id=str(values["id"]),
-        target_id=str(values["target_id"]),
-        received_at=_utc_datetime(values["received_at"]),
-        kind=FeedbackKind(str(values["kind"])),
-        category=str(values["category"]),
-        severity=int(values["severity"]),
-        provenance=str(values["provenance"]),
-        release_id=_optional_str(values.get("release_id")),
-        deployment_id=_optional_str(values.get("deployment_id")),
-        experiment_id=_optional_str(values.get("experiment_id")),
-        request_ref=_optional_str(values.get("request_ref")),
-        free_text=_optional_str(values.get("free_text")),
-    )
-
-
-def _optional_str(value: object) -> str | None:
-    return None if value is None else str(value)
-
-
-
-def _utc_datetime(value: object) -> datetime:
-    if not isinstance(value, datetime):
-        raise RuntimeError("persisted feedback received_at is not a datetime")
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return tuple(record_from_row(UserFeedback, row) for row in rows)

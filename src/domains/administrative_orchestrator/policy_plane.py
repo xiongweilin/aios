@@ -199,27 +199,6 @@ class PolicyRepository:
             db.flush()
             return self._from_row(row)
 
-    def set_status(
-        self,
-        policy_id: str,
-        version: str,
-        status: PolicyVersionStatus,
-    ) -> PolicyVersionRecord:
-        """Compatibility surface for tests and historical callers.
-
-        Production policy management should use activate()/retire(), which
-        record actor and reason.  ACTIVE still enforces non-overlap here.
-        """
-        with self.store.sessions.begin() as db:
-            row = db.get(PolicyVersionRow, (policy_id, version))
-            if row is None:
-                raise KeyError(f"policy version {policy_id}:{version} not found")
-            if status == PolicyVersionStatus.ACTIVE:
-                candidate = self._from_row(row).model_copy(update={"status": status})
-                self._assert_no_active_overlap(db, candidate, excluding_version=version)
-            row.status = status.value
-            db.flush()
-            return self._from_row(row)
 
     def get_version(self, policy_id: str, version: str) -> PolicyVersionRecord | None:
         with self.store.sessions() as db:

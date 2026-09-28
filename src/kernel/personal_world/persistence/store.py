@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from datetime import UTC, datetime
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Protocol, TypeVar
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from semantic_language import SemanticRef
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, String, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -20,14 +23,9 @@ from personal_world.model.contracts import (
     ObservationCreate,
     PersonalRecord,
     PersonalWorldBundle,
-    PreferenceOrigin,
-    QualificationStatus,
     RecordKind,
-    SensitivityClass,
-    SourceClass,
     SourceDescriptor,
     SourceDescriptorCreate,
-    TemporalScope,
 )
 from personal_world.persistence.database import (
     AccessProfileRow,
@@ -87,13 +85,65 @@ def _semantic_kwargs(ref: SemanticRef) -> dict[str, str]:
     }
 
 
-def _semantic_from_row(row: ObservationRow | ClaimRow | RecordRow) -> SemanticRef:
-    return SemanticRef(
-        kind=row.semantic_kind,
-        id=row.semantic_id,
-        namespace=row.semantic_namespace,
-        version=row.semantic_version,
-    )
+TModel = TypeVar("TModel", bound=BaseModel)
+
+
+def _row_dict(row: object) -> dict[str, Any]:
+    return {column.name: getattr(row, column.name) for column in row.__table__.columns}
+
+
+def _model_from_row(
+    model: type[TModel],
+    row: object,
+    *,
+    json_fields: tuple[str, ...] = (),
+    semantic: bool = False,
+) -> TModel:
+    data = _row_dict(row)
+    for key, value in tuple(data.items()):
+        if isinstance(value, datetime):
+            data[key] = _dt(value)
+    for field in json_fields:
+        data[field] = _load(data.pop(f"{field}_json"))
+    if semantic:
+        data["semantic"] = {
+            "namespace": data.pop("semantic_namespace"),
+            "kind": data.pop("semantic_kind"),
+            "id": data.pop("semantic_id"),
+            "version": data.pop("semantic_version"),
+        }
+    allowed = model.model_fields
+    return model.model_validate({key: value for key, value in data.items() if key in allowed})
+
+
+def _row_values(
+    row_type: type,
+    value: BaseModel,
+    *,
+    json_fields: tuple[str, ...] = (),
+    semantic: bool = False,
+) -> dict[str, Any]:
+    data = value.model_dump(mode="python")
+    if semantic:
+        ref = value.semantic
+        data.pop("semantic", None)
+        data.update(_semantic_kwargs(ref))
+    for field in json_fields:
+        data[f"{field}_json"] = _dump(data.pop(field))
+    columns = {column.name: column for column in row_type.__table__.columns}
+    result: dict[str, Any] = {}
+    for key, item in data.items():
+        column = columns.get(key)
+        if column is None:
+            continue
+        if isinstance(item, UUID):
+            item = str(item)
+        elif isinstance(item, Enum):
+            item = item.value
+        elif isinstance(item, float) and isinstance(column.type, String):
+            item = str(item)
+        result[key] = item
+    return result
 
 
 class SqlAlchemyPersonalWorldStore:
@@ -107,17 +157,7 @@ class SqlAlchemyPersonalWorldStore:
     def create_source(self, value: SourceDescriptorCreate) -> SourceDescriptor:
         item = SourceDescriptor(**value.model_dump())
         with self.sessions.begin() as session:
-            session.add(
-                SourceRow(
-                    id=str(item.id),
-                    source_class=item.source_class.value,
-                    external_ref=item.external_ref,
-                    actor_ref=item.actor_ref,
-                    description=item.description,
-                    metadata_json=_dump(item.metadata),
-                    created_at=item.created_at,
-                )
-            )
+            session.add(SourceRow(**_row_values(SourceRow, item, json_fields=("metadata",))))
         return item
 
     def get_source(self, source_id: UUID) -> SourceDescriptor:
@@ -133,14 +173,12 @@ class SqlAlchemyPersonalWorldStore:
         with self.sessions.begin() as session:
             session.add(
                 ObservationRow(
-                    id=str(item.id),
-                    subject_id=str(item.subject_id),
-                    source_id=str(item.source_id),
-                    **_semantic_kwargs(item.semantic),
-                    value_json=_dump(item.value),
-                    temporal_json=_dump(item.temporal),
-                    sensitivity=int(item.sensitivity),
-                    metadata_json=_dump(item.metadata),
+                    **_row_values(
+                        ObservationRow,
+                        item,
+                        json_fields=("value", "temporal", "metadata"),
+                        semantic=True,
+                    )
                 )
             )
         return item
@@ -162,16 +200,12 @@ class SqlAlchemyPersonalWorldStore:
         with self.sessions.begin() as session:
             session.add(
                 ClaimRow(
-                    id=str(item.id),
-                    subject_id=str(item.subject_id),
-                    source_id=str(item.source_id),
-                    **_semantic_kwargs(item.semantic),
-                    value_json=_dump(item.value),
-                    observation_refs_json=_dump([str(item) for item in item.observation_refs]),
-                    temporal_json=_dump(item.temporal),
-                    confidence=None if item.confidence is None else str(item.confidence),
-                    sensitivity=int(item.sensitivity),
-                    metadata_json=_dump(item.metadata),
+                    **_row_values(
+                        ClaimRow,
+                        item,
+                        json_fields=("value", "observation_refs", "temporal", "metadata"),
+                        semantic=True,
+                    )
                 )
             )
         return item
@@ -325,25 +359,17 @@ class SqlAlchemyPersonalWorldStore:
             row = session.get(AccessProfileRow, service_identity)
             if row is None:
                 return None
-            return DataAccessProfile(
-                service_identity=row.service_identity,
-                allowed_purposes=tuple(_load(row.allowed_purposes_json)),
-                allowed_kinds=tuple(RecordKind(item) for item in _load(row.allowed_kinds_json)),
-                max_sensitivity=SensitivityClass(row.max_sensitivity),
+            return _model_from_row(
+                DataAccessProfile,
+                row,
+                json_fields=("allowed_purposes", "allowed_kinds"),
             )
 
     def record_disclosure(self, audit: DisclosureAudit) -> DisclosureAudit:
         with self.sessions.begin() as session:
             session.add(
                 DisclosureAuditRow(
-                    id=str(audit.id),
-                    service_identity=audit.service_identity,
-                    purpose=audit.purpose,
-                    subject_id=str(audit.subject_id),
-                    action=audit.action,
-                    record_refs_json=_dump([str(item) for item in audit.record_refs]),
-                    excluded_count=audit.excluded_count,
-                    occurred_at=audit.occurred_at,
+                    **_row_values(DisclosureAuditRow, audit, json_fields=("record_refs",))
                 )
             )
         return audit
@@ -355,19 +381,7 @@ class SqlAlchemyPersonalWorldStore:
                 stmt = stmt.where(DisclosureAuditRow.subject_id == str(subject_id))
             rows = list(session.scalars(stmt))
         return [
-            DisclosureAudit(
-                id=UUID(row.id),
-                service_identity=row.service_identity,
-                purpose=row.purpose,
-                subject_id=UUID(row.subject_id),
-                action=cast(
-                    Literal["current", "history", "projection", "search"],
-                    row.action,
-                ),
-                record_refs=tuple(UUID(item) for item in _load(row.record_refs_json)),
-                excluded_count=row.excluded_count,
-                occurred_at=_dt(row.occurred_at) or datetime.now(UTC),
-            )
+            _model_from_row(DisclosureAudit, row, json_fields=("record_refs",))
             for row in rows
         ]
 
@@ -540,12 +554,12 @@ class SqlAlchemyPersonalWorldStore:
 
     def export_bundle(self) -> PersonalWorldBundle:
         with self.sessions() as session:
-            sources = [self._source_dict(row) for row in session.scalars(select(SourceRow))]
+            sources = [_row_dict(row) for row in session.scalars(select(SourceRow))]
             observations = [
-                self._observation_dict(row) for row in session.scalars(select(ObservationRow))
+                _row_dict(row) for row in session.scalars(select(ObservationRow))
             ]
-            claims = [self._claim_dict(row) for row in session.scalars(select(ClaimRow))]
-            records = [self._record_dict(row) for row in session.scalars(select(RecordRow))]
+            claims = [_row_dict(row) for row in session.scalars(select(ClaimRow))]
+            records = [_row_dict(row) for row in session.scalars(select(RecordRow))]
             profiles = [
                 {
                     "service_identity": row.service_identity,
@@ -622,137 +636,39 @@ class SqlAlchemyPersonalWorldStore:
 
     @staticmethod
     def _source(row: SourceRow) -> SourceDescriptor:
-        created_at = _dt(row.created_at)
-        if created_at is None:
-            raise ValueError("source created_at must not be null")
-        return SourceDescriptor(
-            id=UUID(row.id),
-            source_class=SourceClass(row.source_class),
-            external_ref=row.external_ref,
-            actor_ref=row.actor_ref,
-            description=row.description,
-            metadata=_load(row.metadata_json),
-            created_at=created_at,
-        )
+        return _model_from_row(SourceDescriptor, row, json_fields=("metadata",))
 
     @staticmethod
     def _observation(row: ObservationRow) -> Observation:
-        return Observation(
-            id=UUID(row.id),
-            subject_id=UUID(row.subject_id),
-            source_id=UUID(row.source_id),
-            semantic=_semantic_from_row(row),
-            value=_load(row.value_json),
-            temporal=TemporalScope.model_validate(_load(row.temporal_json)),
-            sensitivity=SensitivityClass(row.sensitivity),
-            metadata=_load(row.metadata_json),
+        return _model_from_row(
+            Observation, row, json_fields=("value", "temporal", "metadata"), semantic=True
         )
 
     @staticmethod
     def _claim(row: ClaimRow) -> Claim:
-        return Claim(
-            id=UUID(row.id),
-            subject_id=UUID(row.subject_id),
-            source_id=UUID(row.source_id),
-            semantic=_semantic_from_row(row),
-            value=_load(row.value_json),
-            observation_refs=tuple(UUID(item) for item in _load(row.observation_refs_json)),
-            temporal=TemporalScope.model_validate(_load(row.temporal_json)),
-            confidence=None if row.confidence is None else float(row.confidence),
-            sensitivity=SensitivityClass(row.sensitivity),
-            metadata=_load(row.metadata_json),
+        return _model_from_row(
+            Claim,
+            row,
+            json_fields=("value", "observation_refs", "temporal", "metadata"),
+            semantic=True,
         )
 
     @staticmethod
     def _record(row: RecordRow) -> PersonalRecord:
-        return PersonalRecord(
-            id=UUID(row.id),
-            lineage_id=UUID(row.lineage_id),
-            revision=row.revision,
-            kind=RecordKind(row.kind),
-            subject_id=UUID(row.subject_id),
-            semantic=_semantic_from_row(row),
-            value=_load(row.value_json),
-            source_refs=tuple(UUID(item) for item in _load(row.source_refs_json)),
-            claim_refs=tuple(UUID(item) for item in _load(row.claim_refs_json)),
-            temporal=TemporalScope.model_validate(_load(row.temporal_json)),
-            sensitivity=SensitivityClass(row.sensitivity),
-            status=QualificationStatus(row.status),
-            context=_load(row.context_json),
-            metadata=_load(row.metadata_json),
-            supersedes_id=None if row.supersedes_id is None else UUID(row.supersedes_id),
-            preference_origin=(
-                None if row.preference_origin is None else PreferenceOrigin(row.preference_origin)
-            ),
-            strength=None if row.strength is None else float(row.strength),
-            target_ref=row.target_ref,
-            relation_namespace=row.relation_namespace,
-            resource_ref=row.resource_ref,
-            domain=row.domain,
-            relation=row.relation,
-            credential_ref=row.credential_ref,
-            qualified_at=_dt(row.qualified_at),
-            qualification_reason=row.qualification_reason,
-            deleted_at=_dt(row.deleted_at),
+        return _model_from_row(
+            PersonalRecord,
+            row,
+            json_fields=("value", "source_refs", "claim_refs", "temporal", "context", "metadata"),
+            semantic=True,
         )
 
     @staticmethod
     def _record_row(record: PersonalRecord) -> RecordRow:
         return RecordRow(
-            id=str(record.id),
-            lineage_id=str(record.lineage_id),
-            revision=record.revision,
-            kind=record.kind.value,
-            subject_id=str(record.subject_id),
-            **_semantic_kwargs(record.semantic),
-            value_json=_dump(record.value),
-            source_refs_json=_dump([str(item) for item in record.source_refs]),
-            claim_refs_json=_dump([str(item) for item in record.claim_refs]),
-            temporal_json=_dump(record.temporal),
-            sensitivity=int(record.sensitivity),
-            status=record.status.value,
-            context_json=_dump(record.context),
-            metadata_json=_dump(record.metadata),
-            supersedes_id=None if record.supersedes_id is None else str(record.supersedes_id),
-            preference_origin=(
-                None if record.preference_origin is None else record.preference_origin.value
-            ),
-            strength=None if record.strength is None else str(record.strength),
-            target_ref=record.target_ref,
-            relation_namespace=record.relation_namespace,
-            resource_ref=record.resource_ref,
-            domain=record.domain,
-            relation=record.relation,
-            credential_ref=record.credential_ref,
-            qualified_at=record.qualified_at,
-            qualification_reason=record.qualification_reason,
-            deleted_at=record.deleted_at,
+            **_row_values(
+                RecordRow,
+                record,
+                json_fields=("value", "source_refs", "claim_refs", "temporal", "context", "metadata"),
+                semantic=True,
+            )
         )
-
-    @staticmethod
-    def _source_dict(row: SourceRow) -> dict[str, Any]:
-        return {
-            "id": row.id,
-            "source_class": row.source_class,
-            "external_ref": row.external_ref,
-            "actor_ref": row.actor_ref,
-            "description": row.description,
-            "metadata_json": row.metadata_json,
-            "created_at": row.created_at,
-            "deleted_at": row.deleted_at,
-        }
-
-    @staticmethod
-    def _observation_dict(row: ObservationRow) -> dict[str, Any]:
-        return {
-            column.name: getattr(row, column.name)
-            for column in ObservationRow.__table__.columns
-        }
-
-    @staticmethod
-    def _claim_dict(row: ClaimRow) -> dict[str, Any]:
-        return {column.name: getattr(row, column.name) for column in ClaimRow.__table__.columns}
-
-    @staticmethod
-    def _record_dict(row: RecordRow) -> dict[str, Any]:
-        return {column.name: getattr(row, column.name) for column in RecordRow.__table__.columns}

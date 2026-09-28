@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import Engine, delete, func, insert, select, update
-from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 
-from autonomous_development.domain.enums import (
-    DevelopmentRequestStatus,
-    HumanInterventionStatus,
-)
+from autonomous_development.domain.enums import HumanInterventionStatus
 from autonomous_development.domain.models import (
     DevelopmentRequest,
     HumanIntervention,
@@ -18,6 +14,7 @@ from autonomous_development.domain.models import (
 )
 from autonomous_development.ports.persistence import OperatorRepository
 
+from .records import record_from_row, record_values
 from .schema import development_requests, human_interventions, operator_events, requirement_analyses
 
 
@@ -33,7 +30,7 @@ class SqlOperatorRepository(OperatorRepository):
             return existing
         try:
             with self._engine.begin() as connection:
-                connection.execute(insert(development_requests).values(**_request_values(request)))
+                connection.execute(insert(development_requests).values(**record_values(development_requests, request)))
         except IntegrityError as exc:
             by_external = self._get_by_external_digest(request.external_reference_digest)
             if by_external is not None:
@@ -54,14 +51,14 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .first()
             )
-        return None if row is None else _request_from_row(row)
+        return None if row is None else record_from_row(DevelopmentRequest, row)
 
     def update_request(self, request: DevelopmentRequest) -> DevelopmentRequest:
         with self._engine.begin() as connection:
             result = connection.execute(
                 update(development_requests)
                 .where(development_requests.c.id == request.id)
-                .values(**_request_values(request))
+                .values(**record_values(development_requests, request))
             )
         if result.rowcount != 1:
             raise KeyError(f"unknown development request: {request.id}")
@@ -76,7 +73,7 @@ class SqlOperatorRepository(OperatorRepository):
         try:
             with self._engine.begin() as connection:
                 connection.execute(
-                    insert(requirement_analyses).values(**_analysis_values(analysis))
+                    insert(requirement_analyses).values(**record_values(requirement_analyses, analysis))
                 )
         except IntegrityError:
             existing = self.get_analysis(analysis.request_id)
@@ -96,7 +93,7 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .first()
             )
-        return None if row is None else _analysis_from_row(row)
+        return None if row is None else record_from_row(RequirementAnalysis, row)
 
     def replace_analysis(self, analysis: RequirementAnalysis) -> RequirementAnalysis:
         """Re-derive the stored analysis after a human clarification entered the requirement.
@@ -110,7 +107,7 @@ class SqlOperatorRepository(OperatorRepository):
                     requirement_analyses.c.request_id == analysis.request_id
                 )
             )
-            connection.execute(insert(requirement_analyses).values(**_analysis_values(analysis)))
+            connection.execute(insert(requirement_analyses).values(**record_values(requirement_analyses, analysis)))
         stored = self.get_analysis(analysis.request_id)
         if stored is None:
             raise RuntimeError("requirement analysis was not readable after replacement")
@@ -125,7 +122,7 @@ class SqlOperatorRepository(OperatorRepository):
         try:
             with self._engine.begin() as connection:
                 connection.execute(
-                    insert(human_interventions).values(**_intervention_values(intervention))
+                    insert(human_interventions).values(**record_values(human_interventions, intervention))
                 )
         except IntegrityError:
             existing = self.get_intervention(intervention.id)
@@ -143,7 +140,7 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .first()
             )
-        return None if row is None else _intervention_from_row(row)
+        return None if row is None else record_from_row(HumanIntervention, row)
 
     def list_responded_interventions(
         self,
@@ -163,7 +160,7 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .all()
             )
-        return tuple(_intervention_from_row(row) for row in rows)
+        return tuple(record_from_row(HumanIntervention, row) for row in rows)
 
     def respond_intervention(
         self,
@@ -197,7 +194,7 @@ class SqlOperatorRepository(OperatorRepository):
             connection.execute(
                 update(human_interventions)
                 .where(human_interventions.c.id == intervention_id)
-                .values(**_intervention_values(updated))
+                .values(**record_values(human_interventions, updated))
             )
         return updated
 
@@ -210,7 +207,7 @@ class SqlOperatorRepository(OperatorRepository):
         if event.sequence is not None:
             raise ValueError("new operator events must not specify a sequence")
         with self._engine.begin() as connection:
-            connection.execute(insert(operator_events).values(**_event_values(event)))
+            connection.execute(insert(operator_events).values(**record_values(operator_events, event)))
         stored = self._event_by_id(event.id)
         if stored is None:
             raise RuntimeError("operator event was not readable after insert")
@@ -230,7 +227,7 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .all()
             )
-        return tuple(_event_from_row(row) for row in rows)
+        return tuple(record_from_row(OperatorEvent, row) for row in rows)
 
     def acknowledge_event(self, event_id: str, acknowledged_at: datetime) -> OperatorEvent:
         existing = self._event_by_id(event_id)
@@ -283,7 +280,7 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .first()
             )
-        return None if row is None else _request_from_row(row)
+        return None if row is None else record_from_row(DevelopmentRequest, row)
 
     def _event_by_id(self, event_id: str) -> OperatorEvent | None:
         with self._engine.connect() as connection:
@@ -292,168 +289,6 @@ class SqlOperatorRepository(OperatorRepository):
                 .mappings()
                 .first()
             )
-        return None if row is None else _event_from_row(row)
+        return None if row is None else record_from_row(OperatorEvent, row)
 
 
-def _request_values(request: DevelopmentRequest) -> dict[str, object]:
-    return {
-        "id": request.id,
-        "target_id": request.target_id,
-        "source": request.source,
-        "external_reference_digest": request.external_reference_digest,
-        "title": request.title,
-        "normalized_requirement_text": request.normalized_requirement_text,
-        "content_sha256": request.content_sha256,
-        "created_at": request.created_at,
-        "status": request.status.value,
-        "cycle_id": request.cycle_id,
-        "pending_intervention_id": request.pending_intervention_id,
-        "workflow_attempt": request.workflow_attempt,
-        "active_workflow_id": request.active_workflow_id,
-    }
-
-
-def _analysis_values(analysis: RequirementAnalysis) -> dict[str, object]:
-    return {
-        "id": analysis.id,
-        "request_id": analysis.request_id,
-        "summary": analysis.summary,
-        "acceptance_criteria_json": list(analysis.acceptance_criteria),
-        "requested_paths_json": list(analysis.requested_paths),
-        "expected_behavior_json": list(analysis.expected_behavior),
-        "risks_json": list(analysis.risks),
-        "missing_information_json": list(analysis.missing_information),
-        "ambiguity_json": list(analysis.ambiguity),
-        "validation_expectations_json": list(analysis.validation_expectations),
-        "personal_context_projection_ref": analysis.personal_context_projection_ref,
-        "personal_context_basis_refs_json": list(analysis.personal_context_basis_refs),
-        "personal_context_revalidation_refs_json": list(
-            analysis.personal_context_revalidation_refs
-        ),
-        "created_at": analysis.created_at,
-    }
-
-
-def _intervention_values(intervention: HumanIntervention) -> dict[str, object]:
-    return {
-        "id": intervention.id,
-        "request_id": intervention.request_id,
-        "cycle_id": intervention.cycle_id,
-        "kind": intervention.kind,
-        "question": intervention.question,
-        "choices_json": list(intervention.choices),
-        "status": intervention.status.value,
-        "created_at": intervention.created_at,
-        "response": intervention.response,
-        "responded_at": intervention.responded_at,
-    }
-
-
-def _event_values(event: OperatorEvent) -> dict[str, object]:
-    return {
-        "id": event.id,
-        "request_id": event.request_id,
-        "cycle_id": event.cycle_id,
-        "event_type": event.event_type,
-        "payload_json": dict(event.payload),
-        "created_at": event.created_at,
-        "acknowledged_at": event.acknowledged_at,
-    }
-
-
-def _request_from_row(row: RowMapping) -> DevelopmentRequest:
-    values = dict(row)
-    return DevelopmentRequest(
-        id=str(values["id"]),
-        target_id=str(values["target_id"]),
-        source=str(values["source"]),
-        external_reference_digest=str(values["external_reference_digest"]),
-        title=str(values["title"]),
-        normalized_requirement_text=str(values["normalized_requirement_text"]),
-        content_sha256=str(values["content_sha256"]),
-        created_at=_utc(values["created_at"]),
-        status=DevelopmentRequestStatus(str(values["status"])),
-        cycle_id=_optional_str(values.get("cycle_id")),
-        pending_intervention_id=_optional_str(values.get("pending_intervention_id")),
-        workflow_attempt=int(values.get("workflow_attempt") or 0),
-        active_workflow_id=_optional_str(values.get("active_workflow_id")),
-    )
-
-
-def _analysis_from_row(row: RowMapping) -> RequirementAnalysis:
-    values = dict(row)
-    return RequirementAnalysis(
-        id=str(values["id"]),
-        request_id=str(values["request_id"]),
-        summary=str(values["summary"]),
-        acceptance_criteria=_strings(values["acceptance_criteria_json"]),
-        requested_paths=_strings(values["requested_paths_json"]),
-        expected_behavior=_strings(values["expected_behavior_json"]),
-        risks=_strings(values["risks_json"]),
-        missing_information=_strings(values["missing_information_json"]),
-        ambiguity=_strings(values["ambiguity_json"]),
-        validation_expectations=_strings(values["validation_expectations_json"]),
-        created_at=_utc(values["created_at"]),
-        personal_context_projection_ref=_optional_str(
-            values.get("personal_context_projection_ref")
-        ),
-        personal_context_basis_refs=_strings(
-            values.get("personal_context_basis_refs_json") or []
-        ),
-        personal_context_revalidation_refs=_strings(
-            values.get("personal_context_revalidation_refs_json") or []
-        ),
-    )
-
-
-def _intervention_from_row(row: RowMapping) -> HumanIntervention:
-    values = dict(row)
-    return HumanIntervention(
-        id=str(values["id"]),
-        request_id=str(values["request_id"]),
-        cycle_id=_optional_str(values.get("cycle_id")),
-        kind=str(values["kind"]),
-        question=str(values["question"]),
-        choices=_strings(values["choices_json"]),
-        status=HumanInterventionStatus(str(values["status"])),
-        created_at=_utc(values["created_at"]),
-        response=_optional_str(values.get("response")),
-        responded_at=_optional_datetime(values.get("responded_at")),
-    )
-
-
-def _event_from_row(row: RowMapping) -> OperatorEvent:
-    values = dict(row)
-    payload = values["payload_json"]
-    if not isinstance(payload, dict):
-        raise RuntimeError("operator event payload is malformed")
-    return OperatorEvent(
-        id=str(values["id"]),
-        request_id=_optional_str(values.get("request_id")),
-        cycle_id=_optional_str(values.get("cycle_id")),
-        event_type=str(values["event_type"]),
-        sequence=int(values["sequence"]),
-        payload=dict(payload),
-        created_at=_utc(values["created_at"]),
-        acknowledged_at=_optional_datetime(values.get("acknowledged_at")),
-    )
-
-
-def _strings(value: object) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        raise RuntimeError("operator JSON list is malformed")
-    return tuple(str(item) for item in value)
-
-
-def _optional_str(value: object) -> str | None:
-    return None if value is None else str(value)
-
-
-def _utc(value: object) -> datetime:
-    if not isinstance(value, datetime):
-        raise RuntimeError("operator timestamp is malformed")
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-
-
-def _optional_datetime(value: object) -> datetime | None:
-    return None if value is None else _utc(value)

@@ -51,6 +51,20 @@ def contract_schema(name: str) -> dict[str, Any]:
         raise FileNotFoundError(f"canonical schema is unavailable for {name}") from exc
 
 
+
+PUBLIC_CONFORMANCE_SUITE_VERSION = "world-runtime-conformance-v11"
+
+
+@lru_cache(maxsize=1)
+def conformance_vectors() -> dict[str, Any]:
+    resource = _contracts_root().joinpath("vectors.json")
+    value = json.loads(resource.read_text(encoding="utf-8"))
+    if value.get("suite_version") != PUBLIC_CONFORMANCE_SUITE_VERSION:
+        raise ValueError("World Runtime conformance suite version mismatch")
+    if not isinstance(value.get("vectors"), list) or not value["vectors"]:
+        raise ValueError("World Runtime conformance vectors are unavailable")
+    return value
+
 def domain_conformance_vectors() -> dict[str, Any]:
     resource = _contracts_root().joinpath("domain", "vectors-v3.json")
     value = json.loads(resource.read_text(encoding="utf-8"))
@@ -62,8 +76,10 @@ def domain_conformance_vectors() -> dict[str, Any]:
 __all__ = [
     "CATALOG_OWNER",
     "CATALOG_VERSION",
+    "PUBLIC_CONFORMANCE_SUITE_VERSION",
     "contract_catalog",
     "contract_descriptor",
     "contract_schema",
+    "conformance_vectors",
     "domain_conformance_vectors",
 ]
