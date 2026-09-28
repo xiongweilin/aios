@@ -78,24 +78,34 @@ class WorldRuntimeHttpClient:
     def get(self, path: str, *, verify: bool = True) -> dict[str, Any]:
         if verify:
             self._ensure_contracts()
-        return self._request("GET", path)
+        return self._object_response(path, self._send("GET", path))
+
+    def get_optional(self, path: str) -> dict[str, Any] | None:
+        self._ensure_contracts()
+        response = self._send("GET", path)
+        if response.status_code == 404:
+            return None
+        return self._object_response(path, response)
 
     def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         self._ensure_contracts()
-        return self._request("POST", path, payload)
+        return self._object_response(path, self._send("POST", path, payload))
 
-    def _request(
+    def _send(
         self,
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> httpx.Response:
         try:
-            response = self.client.request(method, path, json=payload)
+            return self.client.request(method, path, json=payload)
         except httpx.HTTPError as exc:
             raise WorldRuntimeBoundaryError(
                 f"World Runtime request failed for {path}: {type(exc).__name__}"
             ) from exc
+
+    @staticmethod
+    def _object_response(path: str, response: httpx.Response) -> dict[str, Any]:
         if response.status_code >= 400:
             raise WorldRuntimeBoundaryError(
                 f"World Runtime rejected {path}: HTTP {response.status_code}"
