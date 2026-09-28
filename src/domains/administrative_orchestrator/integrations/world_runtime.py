@@ -5,7 +5,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 
-from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+from integrations.world_runtime_client import WorldRuntimeBoundaryError, WorldRuntimeHttpClient
 
 from ..config import Settings
 from ..domain import AdministrativeCase, CaseStatus, EffectRecord
@@ -20,10 +20,6 @@ from ..governance import GovernanceRepository
 from ..obligations import ObligationRepository
 from ..persistence import SqlStore
 from .runtime_capabilities import WORLD_RUNTIME_EFFECT_CAPABILITIES
-
-
-class WorldRuntimeBoundaryError(RuntimeError):
-    pass
 
 
 def capability_for_effect(effect: EffectRecord) -> str:
@@ -60,8 +56,6 @@ def _effect_matches_current_execution(
 class WorldRuntimeBridge:
     """Compile governed Administrative effects into the generic World Runtime surface."""
 
-    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
-    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",
@@ -97,18 +91,15 @@ class WorldRuntimeBridge:
             if settings.world_runtime_bearer_token is not None
             else ""
         )
-        headers: dict[str, str] = {}
-        if runtime_token:
-            headers["Authorization"] = f"Bearer {runtime_token}"
-        if settings.world_runtime_delegation_id:
-            headers["X-World-Runtime-Delegation"] = settings.world_runtime_delegation_id
-        self.client = httpx.Client(
-            base_url=settings.world_runtime_base_url.rstrip("/"),
-            timeout=settings.world_runtime_timeout_seconds,
+        self.client = WorldRuntimeHttpClient(
+            settings.world_runtime_base_url,
+            required_contracts=self.REQUIRED_CONTRACTS,
+            timeout_seconds=settings.world_runtime_timeout_seconds,
             transport=transport,
-            headers=headers,
+            bearer_token=runtime_token,
+            delegation_id=settings.world_runtime_delegation_id,
+            component="Administrative",
         )
-        self._contracts_verified = False
 
     @property
     def enabled(self) -> bool:
@@ -140,36 +131,7 @@ class WorldRuntimeBridge:
         }
 
     def ensure_contracts(self) -> None:
-        response = self.client.get("/v1/contracts")
-        if response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime rejected /v1/contracts: HTTP {response.status_code}"
-            )
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise WorldRuntimeBoundaryError("World Runtime contract catalog is malformed")
-        if str(payload.get("runtime_protocol", "")) != self.REQUIRED_RUNTIME_PROTOCOL:
-            raise WorldRuntimeBoundaryError(
-                "World Runtime protocol is incompatible with Administrative"
-            )
-        if str(payload.get("semantic_language", "")) != self.REQUIRED_SEMANTIC_LANGUAGE:
-            raise WorldRuntimeBoundaryError(
-                "World Runtime semantic-language version is incompatible with Administrative"
-            )
-        contracts = payload.get("contracts")
-        if not isinstance(contracts, dict):
-            raise WorldRuntimeBoundaryError("World Runtime contract catalog is malformed")
-        for name, expected in self.REQUIRED_CONTRACTS.items():
-            descriptor = contracts.get(name)
-            if not isinstance(descriptor, dict) or descriptor.get("current") != expected:
-                raise WorldRuntimeBoundaryError(
-                    f"World Runtime contract mismatch for {name}: expected {expected}"
-                )
-        self._contracts_verified = True
-
-    def _ensure_contracts(self) -> None:
-        if not self._contracts_verified:
-            self.ensure_contracts()
+        self.client.ensure_contracts()
 
     def execute_effect(
         self,
@@ -212,233 +174,9 @@ class WorldRuntimeBridge:
                 },
             )
             assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
-            self._post(
-                "/v1/domain-assignments",
-                {
-                    "id": assignment_ref,
-                    "responsibility_ref": responsibility_ref,
-                    "domain": "administrative",
-                    "controller": "controller:administrative-orchestrator",
-                    "authority_refs": [
-                        f"administrative-authorization:{effect.authorization_id}",
-                        f"governance-basis:{effect.governance_basis_id}",
-                    ],
-                    "evidence_requirements": [
-                        {
-                            "kind": "administrative-postcondition-readback",
-                            "expected": context["expected_postcondition"],
-                        }
-                    ],
-                    "review_conditions": [
-                        {
-                            "trigger": "authority-epoch-change",
-                            "authority_epoch": effect.authority_epoch,
-                        }
-                    ],
-                },
-            )
-            self._post(
-                f"/v1/domain-assignments/{assignment_ref}/reports",
-                {
-                    "id": f"{assignment_ref}:accepted",
-                    "kind": "accepted",
-                },
-            )
-            work = self._post(
-                "/v1/work",
-                {
-                    "responsibility_id": responsibility_ref,
-                    "kind": "administrative-effect",
-                    "payload": {
-                        "effect_id": str(effect.effect_id),
-                        "requested_capabilities": [capability],
-                        "expected_postcondition": context["expected_postcondition"],
-                        "metadata": {
-                            "administrative_case_id": str(effect.case_id),
-                            "authority_epoch": effect.authority_epoch,
-                            "obligation_id": str(effect.obligation_id),
-                        },
-                    },
-                },
-            )
-            run = self._post(
-                "/v1/runs",
-                {
-                    "work_id": work["id"],
-                    "workflow_id": "administrative-effect",
-                },
-            )
-            basis_refs = [
-                f"administrative-authorization:{effect.authorization_id}",
-                f"administrative-obligation:{effect.obligation_id}",
-                f"governance-basis:{effect.governance_basis_id}",
-            ]
-            self._post(
-                "/v1/decisions",
-                {
-                    "id": decision_ref,
-                    "subject": effect.subject_ref,
-                    "decided_by": self.settings.world_runtime_principal,
-                    "selected": {
-                        "target_ref": resource_ref,
-                        "operation": "authorize-effect",
-                        "action": capability,
-                        "effect_id": str(effect.effect_id),
-                        "administrative_issuer_principal_id": context["issuer_principal_id"],
-                    },
-                    "basis_refs": basis_refs,
-                },
-            )
-            self._post(
-                "/v1/mandates",
-                {
-                    "id": mandate_ref,
-                    "principal": self.settings.world_runtime_principal,
-                    "scope": {
-                        "case_id": str(effect.case_id),
-                        "authority_epoch": effect.authority_epoch,
-                        "obligation_id": str(effect.obligation_id),
-                    },
-                    "authority_ceiling": {
-                        "action": capability,
-                        "resource": resource_ref,
-                    },
-                },
-            )
-            runtime_auth = self._post(
-                "/v1/authorizations",
-                {
-                    "id": authorization_ref,
-                    "principal": self.settings.world_runtime_principal,
-                    "action": capability,
-                    "resource": resource_ref,
-                    "mandate_id": mandate_ref,
-                    "decision_id": decision_ref,
-                    "annotations": {
-                        "administrative_authorization_id": str(effect.authorization_id),
-                        "governance_basis_id": str(effect.governance_basis_id),
-                        "administrative_issuer_principal_id": context["issuer_principal_id"],
-                    },
-                },
-            )
-            result = self._post(
-                "/v1/invoke",
-                {
-                    "id": request_ref,
-                    "capability": capability,
-                    "work_id": work["id"],
-                    "run_id": run["id"],
-                    "parameters": {**payload, "subject_ref": effect.subject_ref},
-                    "idempotency_key": self.idempotency_key_for_effect(effect.effect_id),
-                    "actor_ref": self.settings.world_runtime_principal,
-                    "principal": self.settings.world_runtime_principal,
-                    "resource_ref": resource_ref,
-                    "resource": resource_ref,
-                    "subject_version_refs": [
-                        f"administrative-case:{effect.case_id}:v{effect.case_version}",
-                        f"authority-epoch:{effect.authority_epoch}",
-                    ],
-                    "authorization_id": runtime_auth["id"],
-                    "effect_class": "external-effect",
-                },
-            )
-        except (WorldRuntimeBoundaryError, ValueError) as exc:
-            return ProviderExecutionResult(
-                status=ProviderExecutionStatus.FAILED,
-                error=str(exc),
-                retryable=False,
-            )
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            return ProviderExecutionResult(
-                status=ProviderExecutionStatus.OUTCOME_UNKNOWN,
-                error=str(exc),
-                retryable=False,
-            )
-
-        status = str(result.get("status", "unknown"))
-        provider_ref = (
-            result.get("external_ref")
-            or result.get("external_operation_ref")
-            or f"world-runtime:{result.get('provider_id', 'unknown')}:{result.get('request_id', request_ref)}"
-        )
-        if status == "succeeded":
-            mapped = ProviderExecutionStatus.SUCCEEDED
-        elif status in {"unknown", "unavailable"}:
-            mapped = ProviderExecutionStatus.OUTCOME_UNKNOWN
-        else:
-            mapped = ProviderExecutionStatus.FAILED
-        return ProviderExecutionResult(
-            status=mapped,
-            provider_ref=str(provider_ref) if provider_ref else None,
-            error=None if mapped is ProviderExecutionStatus.SUCCEEDED else str(result.get("error") or status),
-            retryable=False,
-        )
-
-    def provision_responsibility(
-        self,
-        *,
-        responsibility_ref: str,
-        principal: str,
-        subject: str,
-        scope: dict[str, Any],
-    ) -> None:
-        self._post(
-            "/v1/responsibilities",
-            {
-                "id": responsibility_ref,
-                "principal": principal,
-                "subject": subject,
-                "domain": "administrative",
-                "scope": scope,
-            },
-        )
-        assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
-        self._post(
-            "/v1/domain-assignments",
-            {
-                "id": assignment_ref,
-                "responsibility_ref": responsibility_ref,
-                "domain": "administrative",
-                "controller": "controller:administrative-orchestrator",
-            },
-        )
-        self._post(
-            f"/v1/domain-assignments/{assignment_ref}/reports",
-            {"id": f"{assignment_ref}:accepted", "kind": "accepted"},
-        )
-
-    def request_ref_for_effect(self, effect_id: UUID) -> str:
-        return _stable_ref("request", effect_id)
-
-    def idempotency_key_for_effect(self, effect_id: UUID) -> str:
-        return f"administrative-effect:{effect_id}"
-
-    def reconcile_effect(self, effect_id: UUID) -> dict[str, Any]:
-        return self._post(
-            f"/v1/reconcile/{self.idempotency_key_for_effect(effect_id)}",
-            {},
-        )
-
-    def responsibility_ref_for_effect(self, effect_id: UUID) -> str:
-        return _stable_ref("responsibility", effect_id)
-
-    def responsibility_status(self, responsibility_ref: str) -> str:
-        return str(self._get(f"/v1/responsibilities/{responsibility_ref}")["status"])
-
-    def discharge_responsibility(
-        self,
-        responsibility_ref: str,
-        *,
-        decision_ref: str,
-        decided_by: str,
-        subject_ref: str,
-        basis_refs: tuple[str, ...],
-    ) -> tuple[str, str, str]:
-        assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
         assignment_path = f"/v1/domain-assignments/{assignment_ref}"
-        self._ensure_contracts()
-        response = self.client.get(assignment_path)
-        if response.status_code == 404:
+        assignment = self.client.get_optional(assignment_path)
+        if assignment is None:
             assignment = self._post(
                 "/v1/domain-assignments",
                 {
@@ -448,18 +186,6 @@ class WorldRuntimeBridge:
                     "controller": "controller:administrative-orchestrator",
                 },
             )
-        elif response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                "World Runtime rejected "
-                f"{assignment_path}: HTTP {response.status_code} {response.text[:500]}"
-            )
-        else:
-            raw_assignment = response.json()
-            if not isinstance(raw_assignment, dict):
-                raise WorldRuntimeBoundaryError(
-                    "World Runtime returned non-object domain assignment"
-                )
-            assignment = raw_assignment
 
         if (
             str(assignment.get("id", "")) != assignment_ref
@@ -578,28 +304,10 @@ class WorldRuntimeBridge:
         }
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        self._ensure_contracts()
-        response = self.client.post(path, json=payload)
-        if response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime rejected {path}: HTTP {response.status_code} {response.text[:500]}"
-            )
-        raw = response.json()
-        if not isinstance(raw, dict):
-            raise WorldRuntimeBoundaryError(f"World Runtime returned non-object response for {path}")
-        return raw
+        return self.client.post(path, payload)
 
     def _get(self, path: str) -> dict[str, Any]:
-        self._ensure_contracts()
-        response = self.client.get(path)
-        if response.status_code >= 400:
-            raise WorldRuntimeBoundaryError(
-                f"World Runtime rejected {path}: HTTP {response.status_code} {response.text[:500]}"
-            )
-        raw = response.json()
-        if not isinstance(raw, dict):
-            raise WorldRuntimeBoundaryError(f"World Runtime returned non-object response for {path}")
-        return raw
+        return self.client.get(path)
 
 
 class WorldRuntimeEffectProvider:
