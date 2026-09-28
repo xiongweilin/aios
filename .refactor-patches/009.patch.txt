@@ -1,0 +1,142 @@
+.intake import document_repository as _document_repository  # noqa: E402, F401
+-from .intake import repository as _intake_repository  # noqa: E402, F401
++from .intake import rows as _intake_rows  # noqa: E402, F401
+diff --git a/src/domains/administrative_orchestrator/policy_plane.py b/src/domains/administrative_orchestrator/policy_plane.py
+index 0dc5617..28b4987 100644
+--- a/src/domains/administrative_orchestrator/policy_plane.py
++++ b/src/domains/administrative_orchestrator/policy_plane.py
+@@ -450,30 +450,6 @@ def compile_onboarding_policy(record: PolicyVersionRecord) -> OnboardingPolicy:
+     return OnboardingPolicy(record.policy_ref, definition=record.definition)
+ 
+ 
+-def compile_procurement_policy(record: PolicyVersionRecord):
+-    from .financial import ProcurementPolicy
+-
+-    if record.policy_id != "procurement-request":
+-        raise PolicyPlaneError("record is not a procurement-request policy")
+-    return ProcurementPolicy(record.policy_ref, definition=record.definition)
+-
+-
+-def compile_invoice_ap_policy(record: PolicyVersionRecord):
+-    from .financial import InvoiceAPPolicy
+-
+-    if record.policy_id != "invoice-ap-preparation":
+-        raise PolicyPlaneError("record is not an invoice-ap-preparation policy")
+-    return InvoiceAPPolicy(record.policy_ref, definition=record.definition)
+-
+-
+-def compile_expense_policy(record: PolicyVersionRecord):
+-    from .financial import ExpensePolicy
+-
+-    if record.policy_id != "expense-reimbursement":
+-        raise PolicyPlaneError("record is not an expense-reimbursement policy")
+-    return ExpensePolicy(record.policy_ref, definition=record.definition)
+-
+-
+ __all__ = [
+     "PolicyLifecycleEvent",
+     "PolicyLifecycleEventRow",
+@@ -484,9 +460,6 @@ __all__ = [
+     "PolicyVersionStatus",
+     "compile_onboarding_policy",
+     "compile_offboarding_policy",
+-    "compile_procurement_policy",
+-    "compile_invoice_ap_policy",
+-    "compile_expense_policy",
+     "default_onboarding_policy_version",
+     "default_offboarding_policy_version",
+     "default_procurement_policy_version",
+diff --git a/src/domains/administrative_orchestrator/production_readiness.py b/src/domains/administrative_orchestrator/production_readiness.py
+index c4aacaa..33cfeec 100644
+--- a/src/domains/administrative_orchestrator/production_readiness.py
++++ b/src/domains/administrative_orchestrator/production_readiness.py
+@@ -19,9 +19,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
+         raise ProductionReadinessError("production connectors require runtime_profile=production")
+     if settings.hris_source_kind != "odoo":
+         raise ProductionReadinessError("production onboarding requires ADMIN_HRIS_SOURCE_KIND=odoo")
+-    if settings.iam_source_kind != "keycloak":
+-        raise ProductionReadinessError("production onboarding requires ADMIN_IAM_SOURCE_KIND=keycloak")
+-
+     _require_https(settings.odoo_base_url, "Odoo")
+     _require_nonempty(settings.odoo_database, "ADMIN_ODOO_DATABASE")
+     _require_nonempty(settings.odoo_reader_username, "ADMIN_ODOO_READER_USERNAME")
+@@ -60,7 +57,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
+ 
+     _require_https(settings.keycloak_base_url, "Keycloak")
+     _require_nonempty(settings.keycloak_realm, "ADMIN_KEYCLOAK_REALM")
+-    _require_nonempty(settings.keycloak_reader_client_id, "ADMIN_KEYCLOAK_READER_CLIENT_ID")
+     _require_nonempty(settings.keycloak_writer_client_id, "ADMIN_KEYCLOAK_WRITER_CLIENT_ID")
+     _require_nonempty(settings.keycloak_verifier_client_id, "ADMIN_KEYCLOAK_VERIFIER_CLIENT_ID")
+     if settings.keycloak_writer_client_id == settings.keycloak_verifier_client_id:
+diff --git a/src/domains/administrative_orchestrator/transaction_repository.py b/src/domains/administrative_orchestrator/transaction_repository.py
+index f365c1e..a685fbf 100644
+--- a/src/domains/administrative_orchestrator/transaction_repository.py
++++ b/src/domains/administrative_orchestrator/transaction_repository.py
+@@ -1,19 +1,16 @@
+ from __future__ import annotations
+ 
+ from datetime import datetime
+-from typing import Any
+ from uuid import UUID
+ 
+ from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Uuid, select
+-from sqlalchemy.exc import IntegrityError
+ from sqlalchemy.orm import Mapped, mapped_column
+ 
+ from .financial import (
+-    AdministrativeCaseEvidenceLink,
+     TransactionQualificationAssessment,
+ )
+-from .persistence import Base, SqlStore
+-from .persistence_mapping import model_from_row, model_values
++from .persistence import Base
++from .persistence_mapping import model_from_row
+ 
+ 
+ class TransactionRecordConflict(RuntimeError):
+@@ -61,10 +58,6 @@ class TransactionQualificationAssessmentRow(Base):
+     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+ 
+ 
+-def _link_from_row(row: AdministrativeCaseEvidenceLinkRow) -> AdministrativeCaseEvidenceLink:
+-    return model_from_row(AdministrativeCaseEvidenceLink, row)
+-
+-
+ def _assessment_from_row(
+     row: TransactionQualificationAssessmentRow,
+ ) -> TransactionQualificationAssessment:
+@@ -76,253 +69,6 @@ def _assessment_from_row(
+     )
+ 
+ 
+-def _link_semantics(link: AdministrativeCaseEvidenceLink) -> dict[str, Any]:
+-    return link.model_dump(mode="json", exclude={"link_id"})
+-
+-
+-def _assessment_semantics(assessment: TransactionQualificationAssessment) -> dict[str, Any]:
+-    return assessment.model_dump(mode="json", exclude={"assessment_id"})
+-
+-
+-class TransactionRepository:
+-    """Persistence boundary for M8 transaction evidence and qualification."""
+-
+-    def __init__(self, store: SqlStore) -> None:
+-        self.store = store
+-
+-    def append_evidence_link(
+-        self, link: AdministrativeCaseEvidenceLink
+-    ) -> AdministrativeCaseEvidenceLink:
+-        with self.store.sessions.begin() as db:
+-            existing = db.get(AdministrativeCaseEvidenceLinkRow, link.link_id)
+-            if existing is not None:
+-                restored = _link_from_row(existing)
+-                if _link_semantics(restored) != _link_semantics(link):
+-                    raise TransactionRecordConflict(
+-                        "evidence link identity was reused with different semantics"
+-                    )
+-                return restored
+-            existing_semantic = (
+-                db.execute(
+-                    select(AdministrativeCaseEvidenceLinkRow).where(
+-                        AdministrativeCaseEvidenceLinkRow.case_id == link.case_id,
+-
