@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy import Engine, insert, select, update
-from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 
 from autonomous_development.domain.models import ReleasedVersion
@@ -13,6 +10,7 @@ from autonomous_development.ports.persistence import (
     ServingReleaseReceipt,
 )
 
+from .records import insert_once, load_one, record_from_row, record_values
 from .schema import (
     released_versions,
     serving_release_operations,
@@ -25,33 +23,22 @@ class SqlReleasedVersionRepository(ReleasedVersionRepository):
         self._engine = engine
 
     def add(self, release: ReleasedVersion) -> ReleasedVersion:
-        existing = self.get(release.id)
-        if existing is not None:
-            if existing != release:
-                raise ValueError(
-                    f"release id already exists with different identity: {release.id}"
-                )
-            return existing
-        try:
-            with self._engine.begin() as connection:
-                connection.execute(insert(released_versions).values(**_release_values(release)))
-        except IntegrityError:
-            existing = self.get(release.id)
-            if existing is None or existing != release:
-                raise
-            return existing
-        return release
+        return insert_once(
+            self._engine,
+            insert(released_versions).values(**record_values(released_versions, release)),
+            load=lambda: self.get(release.id),
+            expected=release,
+            conflict=lambda: ValueError(
+                f"release id already exists with different identity: {release.id}"
+            ),
+        )
 
     def get(self, release_id: str) -> ReleasedVersion | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(
-                    select(released_versions).where(released_versions.c.id == release_id)
-                )
-                .mappings()
-                .first()
-            )
-        return _release_from_row(row) if row is not None else None
+        return load_one(
+            self._engine,
+            select(released_versions).where(released_versions.c.id == release_id),
+            ReleasedVersion,
+        )
 
     def get_serving(self, target_id: str) -> ReleasedVersion | None:
         with self._engine.connect() as connection:
@@ -67,7 +54,7 @@ class SqlReleasedVersionRepository(ReleasedVersionRepository):
                 .mappings()
                 .first()
             )
-        return _release_from_row(row) if row is not None else None
+        return record_from_row(ReleasedVersion, row) if row is not None else None
 
     def set_serving(
         self,
@@ -155,25 +142,12 @@ class SqlReleasedVersionRepository(ReleasedVersionRepository):
         return _validate_receipt(persisted, target_id, release_id)
 
     def _get_operation(self, operation_id: str) -> ServingReleaseReceipt | None:
-        with self._engine.connect() as connection:
-            row = (
-                connection.execute(
-                    select(serving_release_operations).where(
-                        serving_release_operations.c.operation_id == operation_id
-                    )
-                )
-                .mappings()
-                .first()
-            )
-        if row is None:
-            return None
-        values = dict(row)
-        previous = values.get("previous_release_id")
-        return ServingReleaseReceipt(
-            operation_id=str(values["operation_id"]),
-            target_id=str(values["target_id"]),
-            release_id=str(values["release_id"]),
-            previous_release_id=str(previous) if previous is not None else None,
+        return load_one(
+            self._engine,
+            select(serving_release_operations).where(
+                serving_release_operations.c.operation_id == operation_id
+            ),
+            ServingReleaseReceipt,
         )
 
 
@@ -189,35 +163,3 @@ def _validate_receipt(
     return receipt
 
 
-def _release_values(release: ReleasedVersion) -> dict[str, object]:
-    return {
-        "id": release.id,
-        "target_id": release.target_id,
-        "source_commit": release.source_commit,
-        "source_tree": release.source_tree,
-        "artifact_digest": release.artifact_digest,
-        "objective_revision_id": release.objective_revision_id,
-        "deployment_id": release.deployment_id,
-        "promoted_at": release.promoted_at,
-    }
-
-
-def _release_from_row(row: RowMapping) -> ReleasedVersion:
-    values = dict(row)
-    promoted_at = values["promoted_at"]
-    if not isinstance(promoted_at, datetime):
-        raise RuntimeError("persisted release promoted_at is not a datetime")
-    return ReleasedVersion(
-        id=str(values["id"]),
-        target_id=str(values["target_id"]),
-        source_commit=str(values["source_commit"]),
-        source_tree=str(values["source_tree"]),
-        artifact_digest=str(values["artifact_digest"]),
-        objective_revision_id=str(values["objective_revision_id"]),
-        deployment_id=str(values["deployment_id"]),
-        promoted_at=_utc(promoted_at),
-    )
-
-
-def _utc(value: datetime) -> datetime:
-    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
