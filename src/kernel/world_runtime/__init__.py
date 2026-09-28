@@ -74,8 +74,8 @@ from .strategic_portfolio import (
 
 __all__ = [
     "Authorization", "BeliefState", "BeliefVerdict", "Claim", "ClaimRevision", "Conflict", "Candidate", "CapabilityRequest", "CapabilityResult",
-    "ClosureReadiness", "CognitionEngine", "DecisionLedger", "DomainAssignment",
-    "DomainProtocolService", "DomainReport", "EffectClass", "EpistemicLedger", "EvidenceAssessment",
+    "ClosureReadiness", "CognitionEngine", "Decision", "DecisionLedger", "DomainAssignment",
+    "DomainProtocolService", "DomainReport", "EffectClass", "EpistemicLedger", "Evidence", "EvidenceAssessment",
     "EvidencePredicate", "EvidenceRelation", "EvidenceRequirement", "EvaluatorKind",
     "FalsificationCondition",
     "Experience", "GovernanceService", "Goal", "GoalLifecycleTransition", "IdentityService",
