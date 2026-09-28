@@ -74,8 +74,12 @@ def test_canonical_identity_rejects_rebinding_and_does_not_reactivate() -> None:
     runtime.responsibility.create(responsibility)
     with pytest.raises(ValueError, match="responsibility identity rebound"):
         runtime.responsibility.create(
-            Responsibility(id=responsibility.id, principal="p", subject="other"),
-            domain="test",
+            Responsibility(
+                id=responsibility.id,
+                principal="p",
+                subject="other",
+                domain="test",
+            )
         )
 
 
