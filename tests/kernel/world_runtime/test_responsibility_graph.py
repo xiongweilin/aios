@@ -21,8 +21,9 @@ def _responsibility(
         principal="owner",
         subject=identifier,
         scope={"case": identifier},
+        domain=domain,
     )
-    runtime.responsibility.create(item, domain=domain)
+    runtime.responsibility.create(item)
     return item
 
 
@@ -299,8 +300,9 @@ def test_responsibility_relation_rejects_invalid_identity_and_cross_principal_ed
         id="responsibility:other-principal",
         principal="other-owner",
         subject="other-principal",
+        domain="finance",
     )
-    runtime.responsibility.create(other, domain="finance")
+    runtime.responsibility.create(other)
     other_decision = _decision(
         runtime,
         "decision:cross-principal",
