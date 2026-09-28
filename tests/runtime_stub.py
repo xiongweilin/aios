@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+from aios.runtime_compat import WORLD_RUNTIME_PROTOCOL
 
 RUNTIME_CONTRACTS = {
     "request_authentication": {"current": "request-authentication-v2"},
