@@ -74,7 +74,7 @@ def test_world_runtime_client_sends_authentication_and_delegation_headers() -> N
         return httpx.Response(
             200,
             json={
-                "runtime_protocol": "4.0",
+                "runtime_protocol": WorldRuntimeClient.REQUIRED_RUNTIME_PROTOCOL,
                 "semantic_language": "0.3.0",
                 "contracts": RUNTIME_CONTRACTS,
             },
