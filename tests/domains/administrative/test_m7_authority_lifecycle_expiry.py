@@ -204,6 +204,8 @@ def test_principal_deactivation_is_replay_stable_at_effective_time() -> None:
     assert second == first
     assert authority.get_principal("person:departing") is None
     assert len([item for item in lifecycle.list_events() if item.event_id == first.event_id]) == 1
+
+
 def test_expire_event_replay_with_different_reason_fails_closed() -> None:
     _, _, lifecycle, assignment, _ = _setup()
     effective_at = _BASELINE + timedelta(days=3)

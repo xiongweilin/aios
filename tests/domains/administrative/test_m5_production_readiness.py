@@ -41,13 +41,10 @@ def _production_settings(**overrides) -> Settings:
         "odoo_financial_verifier_username": "financial-verifier",
         "odoo_financial_writer_secret_env": "ADMIN_ODOO_FINANCIAL_WRITER_SECRET",
         "odoo_financial_verifier_secret_env": "ADMIN_ODOO_FINANCIAL_VERIFIER_SECRET",
-        "iam_source_kind": "keycloak",
         "keycloak_base_url": "https://keycloak.example.test",
         "keycloak_realm": "company",
-        "keycloak_reader_client_id": "admin-reader",
         "keycloak_writer_client_id": "runtime-writer",
         "keycloak_verifier_client_id": "runtime-verifier",
-        "keycloak_reader_secret_env": "ADMIN_KEYCLOAK_READER_SECRET",
         "keycloak_writer_secret_env": "ADMIN_KEYCLOAK_WRITER_SECRET",
         "keycloak_verifier_secret_env": "ADMIN_KEYCLOAK_VERIFIER_SECRET",
     }

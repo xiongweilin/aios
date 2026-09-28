@@ -372,17 +372,8 @@ class WorldRuntimeBridge:
                 {"id": f"{assignment_ref}:accepted", "kind": "accepted"},
             )
 
-    def request_ref_for_effect(self, effect_id: UUID) -> str:
-        return _stable_ref("request", effect_id)
-
     def idempotency_key_for_effect(self, effect_id: UUID) -> str:
         return f"administrative-effect:{effect_id}"
-
-    def reconcile_effect(self, effect_id: UUID) -> dict[str, Any]:
-        return self._post(
-            f"/v1/reconcile/{self.idempotency_key_for_effect(effect_id)}",
-            {},
-        )
 
     def responsibility_ref_for_effect(self, effect_id: UUID) -> str:
         return _stable_ref("responsibility", effect_id)

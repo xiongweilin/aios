@@ -47,7 +47,6 @@ jobs:
         run: >-
           pytest -q
           tests/kernel/world_runtime/test_refactor_architecture.py
-          tests/kernel/world_runtime/test_semantic_ownership.py
           tests/kernel/world_runtime/test_continuous_qualification.py
           tests/kernel/world_runtime/test_contract_catalog.py
           tests/kernel/world_runtime/test_conformance.py

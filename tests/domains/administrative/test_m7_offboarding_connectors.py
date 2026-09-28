@@ -6,20 +6,24 @@ import httpx
 import pytest
 
 from administrative_orchestrator.integrations.credentials import CredentialRef
-from administrative_orchestrator.integrations.production_effects import (
+from administrative_orchestrator.integrations.effect_common import (
     ConnectorStatus,
+    _ApplicationRejected,
+    _TransportUnknown,
+)
+from administrative_orchestrator.integrations.keycloak_effects import (
     KeycloakEffectConnection,
     KeycloakIdentityDisableConnector,
     KeycloakIdentityDisableVerifier,
     KeycloakIdentityEffectConnector,
     KeycloakSessionRevokeConnector,
     KeycloakSessionVerifier,
+)
+from administrative_orchestrator.integrations.odoo_effects import (
     OdooEffectConnection,
     OdooEmployeeDeactivateConnector,
     OdooEmployeeDeactivateVerifier,
     OdooEmployeeEffectConnector,
-    _ApplicationRejected,
-    _TransportUnknown,
 )
 
 

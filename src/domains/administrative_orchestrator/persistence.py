@@ -197,7 +197,7 @@ class SqlStore:
         # 在 metadata 创建前导入 optional domain row module，使
         # 直接 in-memory/test store 获得与
         # application entrypoint 相同的 table topology。
-        from . import investigation_repository as _investigation_repository  # noqa: F401
+        from . import investigation_rows as _investigation_rows  # noqa: F401
 
         Base.metadata.create_all(self.engine)
 
@@ -378,10 +378,6 @@ class SqlStore:
         )
 
 
-# 在 shared metadata 中注册 Intake Plane table，同时不移动
-# 本 module 中已经稳定的 M0-M5 persistence definition。Import
-# 发生在 Base 和 SqlStore 完全初始化之后，因此 intake/repository.py
-# 可以安全复用现有 database/session boundary。
+# Register owner-local tables in shared metadata without importing retired service layers.
 from . import transaction_repository as _transaction_repository  # noqa: E402, F401
-from .intake import document_repository as _document_repository  # noqa: E402, F401
-from .intake import repository as _intake_repository  # noqa: E402, F401
+from .intake import rows as _intake_rows  # noqa: E402, F401

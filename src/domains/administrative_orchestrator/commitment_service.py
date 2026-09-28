@@ -23,11 +23,11 @@ from .commitment_lifecycle import CommitmentLifecycleCoordinator
 from .commitment_models import (
     CandidateCommitment,
     CandidateCommitmentClassification,
+    MeetingInterpretationPayload,
     CandidateCommitmentStatus,
     CommitmentFulfillmentKind,
     CommitmentRecord,
     CommitmentState,
-    CommunicationDraftRecord,
     CommunicationEffectRecord,
     SpeakerPrincipalResolution,
 )
@@ -48,7 +48,6 @@ from .domain import (
 )
 from .execution_repository import ExecutionRepository
 from .intake.artifacts import ArtifactStore, FilesystemArtifactStore
-from .intake.interpretation import MeetingInterpretationPayload
 from .intake.models import EvidenceSpan, InterpretationRecord
 from .obligations import ObligationRepository
 from .policy import AuthorizedEffectTemplate, PolicyDisposition, PolicyEvaluation
@@ -360,17 +359,6 @@ class MeetingCommitmentService:
     def dispatch_communication(self, communication_event_id: UUID) -> CommunicationEffectRecord:
         return self._communication().dispatch(communication_event_id)
 
-    def _dispatch_communication_via_world_runtime(
-        self,
-        *,
-        communication: CommunicationEffectRecord,
-        draft: CommunicationDraftRecord,
-    ) -> CommunicationEffectRecord:
-        return self._communication().dispatch_via_world_runtime(
-            communication=communication,
-            draft=draft,
-        )
-
     def discharge_responsibility(self, case_id: UUID) -> CommitmentRecord:
         commitment = self.repository.get_commitment(case_id)
         case = self.store.get_case(case_id)
@@ -420,9 +408,6 @@ class MeetingCommitmentService:
             }
         )
         return self.repository.update_commitment(updated)
-
-    def _communication_secret(self) -> str:
-        return self._communication().communication_secret()
 
     def revise_due_at(
         self,

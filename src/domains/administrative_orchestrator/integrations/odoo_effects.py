@@ -13,6 +13,7 @@ from .effect_common import (
     ConnectorResult,
     ConnectorStatus,
     _ApplicationRejected,
+    _failed_result,
     _TransportUnknown,
     _unavailable_result,
     _unknown_result,
@@ -86,11 +87,10 @@ class OdooEmployeeEffectConnector:
         try:
             existing = await self._lookup(self.connection.request_ref_field, request_ref)
             if len(existing) > 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalRequestIdentity",
-                    error_message="multiple Odoo employees share the same request_ref",
-                )
+                return _failed_result(
+                           'DuplicateExternalRequestIdentity',
+                           'multiple Odoo employees share the same request_ref',
+                       )
             if existing:
                 return ConnectorResult(
                     ConnectorStatus.SUCCEEDED,
@@ -100,11 +100,10 @@ class OdooEmployeeEffectConnector:
 
             by_subject = await self._lookup(self.connection.subject_ref_field, subject_ref)
             if len(by_subject) > 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalSubjectIdentity",
-                    error_message="multiple Odoo employees share the same subject_ref",
-                )
+                return _failed_result(
+                           'DuplicateExternalSubjectIdentity',
+                           'multiple Odoo employees share the same subject_ref',
+                       )
             if by_subject:
                 return ConnectorResult(
                     ConnectorStatus.SUCCEEDED,
@@ -136,11 +135,7 @@ class OdooEmployeeEffectConnector:
 
             employee_id = await self._execute_kw("hr.employee", "create", [values], {})
             if not isinstance(employee_id, int) or employee_id <= 0:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="InvalidOdooCreateResult",
-                    error_message="Odoo did not return a valid employee id",
-                )
+                return _failed_result('InvalidOdooCreateResult', 'Odoo did not return a valid employee id')
             return ConnectorResult(
                 ConnectorStatus.SUCCEEDED,
                 external_operation_ref=f"odoo:hr.employee:{employee_id}",
@@ -152,11 +147,7 @@ class OdooEmployeeEffectConnector:
                 error_message=str(exc),
             )
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-            )
+            return _failed_result('OdooApplicationRejected', str(exc))
 
     async def reconcile(self, request_ref: str) -> ConnectorResult | None:
         try:
@@ -169,21 +160,15 @@ class OdooEmployeeEffectConnector:
                 reconciled=True,
             )
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-                reconciled=True,
-            )
+            return _failed_result('OdooApplicationRejected', str(exc), reconciled=True)
         if not rows:
             return None
         if len(rows) != 1:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="DuplicateExternalRequestIdentity",
-                error_message="reconciliation found multiple Odoo employee operations",
-                reconciled=True,
-            )
+            return _failed_result(
+                       'DuplicateExternalRequestIdentity',
+                       'reconciliation found multiple Odoo employee operations',
+                       reconciled=True,
+                   )
         return ConnectorResult(
             ConnectorStatus.SUCCEEDED,
             external_operation_ref=f"odoo:hr.employee:{rows[0]['id']}",
@@ -369,11 +354,10 @@ class OdooFinancialEffectConnector:
                     subject_ref=subject_ref,
                     parameters=parameters,
                 )
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="UnsupportedFinancialOperation",
-                error_message="the Odoo financial connector does not support this operation",
-            )
+            return _failed_result(
+                       'UnsupportedFinancialOperation',
+                       'the Odoo financial connector does not support this operation',
+                   )
 
         request_field = self.connection.transaction_request_ref_field
         subject_field = self.connection.transaction_subject_ref_field
@@ -385,11 +369,10 @@ class OdooFinancialEffectConnector:
                 fields=["id", request_field],
             )
             if len(existing) > 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalRequestIdentity",
-                    error_message="multiple Odoo transaction records share the request identity",
-                )
+                return _failed_result(
+                           'DuplicateExternalRequestIdentity',
+                           'multiple Odoo transaction records share the request identity',
+                       )
             if existing:
                 return self._success(model, int(existing[0]["id"]), reconciled=True)
 
@@ -401,11 +384,10 @@ class OdooFinancialEffectConnector:
                     fields=["id", request_field],
                 )
                 if len(by_subject) > 1:
-                    return ConnectorResult(
-                        ConnectorStatus.FAILED,
-                        error_code="DuplicateExternalSubjectIdentity",
-                        error_message="multiple Odoo transaction records share the subject identity",
-                    )
+                    return _failed_result(
+                               'DuplicateExternalSubjectIdentity',
+                               'multiple Odoo transaction records share the subject identity',
+                           )
                 if by_subject:
                     return self._success(model, int(by_subject[0]["id"]), reconciled=True)
 
@@ -415,11 +397,10 @@ class OdooFinancialEffectConnector:
                     invoice_number=str(parameters.get("invoice_number") or ""),
                 )
                 if duplicates:
-                    return ConnectorResult(
-                        ConnectorStatus.FAILED,
-                        error_code="DuplicateExternalInvoiceIdentity",
-                        error_message="the vendor and invoice identity already exists in Odoo",
-                    )
+                    return _failed_result(
+                               'DuplicateExternalInvoiceIdentity',
+                               'the vendor and invoice identity already exists in Odoo',
+                           )
 
             values = self._create_values(
                 operation,
@@ -429,20 +410,12 @@ class OdooFinancialEffectConnector:
             )
             external_id = await self.transport._execute_kw(model, "create", [values], {})
             if not isinstance(external_id, int) or external_id <= 0:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="InvalidOdooCreateResult",
-                    error_message="Odoo did not return a valid transaction id",
-                )
+                return _failed_result('InvalidOdooCreateResult', 'Odoo did not return a valid transaction id')
             return self._success(model, external_id)
         except _TransportUnknown as exc:
             return _unknown_result(exc)
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-            )
+            return _failed_result('OdooApplicationRejected', str(exc))
 
     async def reconcile(
         self,
@@ -468,22 +441,16 @@ class OdooFinancialEffectConnector:
             if not rows:
                 return None
             if len(rows) != 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalRequestIdentity",
-                    error_message="reconciliation found multiple Odoo transaction records",
-                    reconciled=True,
-                )
+                return _failed_result(
+                           'DuplicateExternalRequestIdentity',
+                           'reconciliation found multiple Odoo transaction records',
+                           reconciled=True,
+                       )
             return self._success(model, int(rows[0]["id"]), reconciled=True)
         except _TransportUnknown as exc:
             return _unknown_result(exc, reconciled=True)
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-                reconciled=True,
-            )
+            return _failed_result('OdooApplicationRejected', str(exc), reconciled=True)
 
     async def find_existing_vendor_bills(
         self,
@@ -530,21 +497,19 @@ class OdooFinancialEffectConnector:
         try:
             existing = await self._search(model, confirm_field, request_ref, fields=["id"])
             if len(existing) > 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalRequestIdentity",
-                    error_message="multiple purchase orders share the confirm identity",
-                )
+                return _failed_result(
+                           'DuplicateExternalRequestIdentity',
+                           'multiple purchase orders share the confirm identity',
+                       )
             order_id: int | None = int(existing[0]["id"]) if existing else None
             if order_id is None:
                 raw_ref = parameters.get("purchase_order_ref") or parameters.get("draft_ref")
                 order_id = _odoo_numeric_ref(raw_ref, "purchase.order")
             if order_id is None:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="MissingPurchaseOrderReference",
-                    error_message="purchase order confirmation requires an exact draft reference",
-                )
+                return _failed_result(
+                           'MissingPurchaseOrderReference',
+                           'purchase order confirmation requires an exact draft reference',
+                       )
             rows = await self.transport._execute_kw(
                 model,
                 "read",
@@ -553,11 +518,7 @@ class OdooFinancialEffectConnector:
             )
             row = rows[0] if isinstance(rows, list) and len(rows) == 1 else None
             if not isinstance(row, dict):
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="PurchaseOrderNotFound",
-                    error_message="the exact purchase order draft was not found",
-                )
+                return _failed_result('PurchaseOrderNotFound', 'the exact purchase order draft was not found')
             if row.get("state") in {"purchase", "done"}:
                 return self._success(model, order_id, reconciled=True)
             written = await self.transport._execute_kw(
@@ -567,27 +528,18 @@ class OdooFinancialEffectConnector:
                 {},
             )
             if written is not True:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="PurchaseOrderConfirmMarkerRejected",
-                    error_message="Odoo did not accept the purchase order confirmation marker",
-                )
+                return _failed_result(
+                           'PurchaseOrderConfirmMarkerRejected',
+                           'Odoo did not accept the purchase order confirmation marker',
+                       )
             result = await self.transport._execute_kw(model, "button_confirm", [[order_id]], {})
             if result is not True:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="PurchaseOrderConfirmRejected",
-                    error_message="Odoo did not confirm the purchase order",
-                )
+                return _failed_result('PurchaseOrderConfirmRejected', 'Odoo did not confirm the purchase order')
             return self._success(model, order_id)
         except _TransportUnknown as exc:
             return _unknown_result(exc)
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-            )
+            return _failed_result('OdooApplicationRejected', str(exc))
 
     async def _search(
         self,
@@ -774,27 +726,21 @@ class OdooEmployeeDeactivateConnector:
         employee_ref = str(parameters.get("employee_external_ref") or subject_ref)
         employee_id = _odoo_numeric_ref(employee_ref, "hr.employee")
         if employee_id is None:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="InvalidOdooEmployeeReference",
-                error_message="employee deactivation requires odoo:hr.employee:<id>",
-            )
+            return _failed_result(
+                       'InvalidOdooEmployeeReference',
+                       'employee deactivation requires odoo:hr.employee:<id>',
+                   )
         try:
             row = await self._read(employee_id)
             if not row:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="OdooEmployeeNotFound",
-                    error_message="the exact Odoo employee does not exist",
-                )
+                return _failed_result('OdooEmployeeNotFound', 'the exact Odoo employee does not exist')
             request_field = self.connector.connection.deactivate_request_ref_field
             recorded = str(row.get(request_field) or "").strip()
             if recorded and recorded != request_ref:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="ConflictingExternalRequestIdentity",
-                    error_message="Odoo employee records a different deactivate request",
-                )
+                return _failed_result(
+                           'ConflictingExternalRequestIdentity',
+                           'Odoo employee records a different deactivate request',
+                       )
             if recorded == request_ref and not bool(row.get("active", True)):
                 return self._success(employee_id, reconciled=True)
             written = await self.connector._execute_kw(
@@ -804,20 +750,12 @@ class OdooEmployeeDeactivateConnector:
                 {},
             )
             if written is not True:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="OdooDeactivateRejected",
-                    error_message="Odoo did not confirm the employee update",
-                )
+                return _failed_result('OdooDeactivateRejected', 'Odoo did not confirm the employee update')
             return self._success(employee_id)
         except _TransportUnknown as exc:
             return _unknown_result(exc)
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-            )
+            return _failed_result('OdooApplicationRejected', str(exc))
 
     async def reconcile(self, request_ref: str) -> ConnectorResult | None:
         try:
@@ -827,12 +765,11 @@ class OdooEmployeeDeactivateConnector:
             if not rows:
                 return None
             if len(rows) != 1:
-                return ConnectorResult(
-                    ConnectorStatus.FAILED,
-                    error_code="DuplicateExternalRequestIdentity",
-                    error_message="multiple Odoo employees share the deactivate request_ref",
-                    reconciled=True,
-                )
+                return _failed_result(
+                           'DuplicateExternalRequestIdentity',
+                           'multiple Odoo employees share the deactivate request_ref',
+                           reconciled=True,
+                       )
             employee_id = int(rows[0]["id"])
             row = await self._read(employee_id)
             if row and not bool(row.get("active", True)):
@@ -847,12 +784,7 @@ class OdooEmployeeDeactivateConnector:
         except _TransportUnknown as exc:
             return _unknown_result(exc, reconciled=True)
         except _ApplicationRejected as exc:
-            return ConnectorResult(
-                ConnectorStatus.FAILED,
-                error_code="OdooApplicationRejected",
-                error_message=str(exc),
-                reconciled=True,
-            )
+            return _failed_result('OdooApplicationRejected', str(exc), reconciled=True)
 
     async def _read(self, employee_id: int) -> dict[str, Any]:
         rows = await self.connector._execute_kw(

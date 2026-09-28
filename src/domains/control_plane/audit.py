@@ -37,45 +37,6 @@ def redact_value(value: Any) -> Any:
     return value
 
 
-def redact_args(args: list[str]) -> list[str]:
-    """Redact command-line arguments that carry secret values.
-
-    Handles ``--key=value``, ``--key value`` and ``Header: Authorization: Bearer x``
-    style arguments. Values themselves are never echoed.
-    """
-    redacted: list[str] = []
-    pending_sensitive = False
-    for arg in args:
-        if pending_sensitive:
-            redacted.append(REDACTED)
-            pending_sensitive = False
-            continue
-        match = re.match(r"^(--?[^=]+)=(.*)$", arg)
-        if match:
-            key, value = match.group(1), match.group(2)
-            if _key_is_sensitive(key) or ("authorization" in arg.lower() and value):
-                redacted.append(f"{key}={REDACTED}")
-            else:
-                redacted.append(arg)
-            continue
-        if _key_is_sensitive(arg):
-            if ":" in arg:
-                # `key: value` 形式的 argument 已经携带自己的 value
-                redacted.append(REDACTED)
-            else:
-                redacted.append(arg)
-                pending_sensitive = True
-            continue
-        lowered = arg.lower()
-        if "authorization" in lowered and ("bearer" in lowered or ":" in arg):
-            redacted.append(REDACTED)
-            continue
-        redacted.append(arg)
-    if pending_sensitive:
-        redacted.append(REDACTED)
-    return redacted
-
-
 def redact_text(text: str) -> str:
     """Redact JSON-document shaped text line by line (used for agent-sessions)."""
     out: list[str] = []

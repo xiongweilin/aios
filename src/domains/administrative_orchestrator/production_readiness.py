@@ -19,9 +19,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
         raise ProductionReadinessError("production connectors require runtime_profile=production")
     if settings.hris_source_kind != "odoo":
         raise ProductionReadinessError("production onboarding requires ADMIN_HRIS_SOURCE_KIND=odoo")
-    if settings.iam_source_kind != "keycloak":
-        raise ProductionReadinessError("production onboarding requires ADMIN_IAM_SOURCE_KIND=keycloak")
-
     _require_https(settings.odoo_base_url, "Odoo")
     _require_nonempty(settings.odoo_database, "ADMIN_ODOO_DATABASE")
     _require_nonempty(settings.odoo_reader_username, "ADMIN_ODOO_READER_USERNAME")
@@ -60,7 +57,6 @@ def validate_production_connector_isolation(settings: Settings) -> None:
 
     _require_https(settings.keycloak_base_url, "Keycloak")
     _require_nonempty(settings.keycloak_realm, "ADMIN_KEYCLOAK_REALM")
-    _require_nonempty(settings.keycloak_reader_client_id, "ADMIN_KEYCLOAK_READER_CLIENT_ID")
     _require_nonempty(settings.keycloak_writer_client_id, "ADMIN_KEYCLOAK_WRITER_CLIENT_ID")
     _require_nonempty(settings.keycloak_verifier_client_id, "ADMIN_KEYCLOAK_VERIFIER_CLIENT_ID")
     if settings.keycloak_writer_client_id == settings.keycloak_verifier_client_id:

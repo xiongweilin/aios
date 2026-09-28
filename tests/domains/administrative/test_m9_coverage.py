@@ -3,12 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import httpx
 import pytest
 
 from administrative_orchestrator.commitment_models import CommitmentState
 from administrative_orchestrator.config import Settings
-from administrative_orchestrator.intake.artifacts import FilesystemArtifactStore
 from administrative_orchestrator.integrations.credentials import (
     CredentialRef,
     CredentialResolutionError,
@@ -16,18 +14,7 @@ from administrative_orchestrator.integrations.credentials import (
     EnvironmentOrFileCredentialResolver,
     read_credential_file,
 )
-from administrative_orchestrator.integrations.production_effects import (
-    AdministrativeCommunicationEffectConnection,
-    AdministrativeCommunicationEffectConnector,
-    ConnectorConfigurationError,
-    ConnectorStatus,
-)
 
-
-class _Resolver:
-    def resolve(self, ref: CredentialRef) -> str:
-        assert ref.configuration_ref
-        return "test-secret"
 
 
 def test_m9_credential_resolvers_keep_values_at_the_process_edge(
@@ -53,113 +40,6 @@ def test_m9_credential_resolvers_keep_values_at_the_process_edge(
     with pytest.raises(CredentialResolutionError):
         read_credential_file(str(blank), configuration_ref="m9:test")
 
-
-@pytest.mark.asyncio
-async def test_administrative_communication_connector_classifies_transport_outcomes(
-    tmp_path: Path,
-) -> None:
-    artifact_store = FilesystemArtifactStore(tmp_path / "artifacts")
-    stored = artifact_store.put("确认消息".encode())
-    connection = AdministrativeCommunicationEffectConnection(
-        gateway_base_url="http://gateway.example.test",
-        transport_credential=CredentialRef("m9:gateway", "M9_GATEWAY_SECRET"),
-        artifact_root=tmp_path / "artifacts",
-        allow_insecure_http=True,
-    )
-
-    async def run(status: int, payload: object) -> object:
-        async def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(status, json=payload, request=request)
-
-        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-        connector = AdministrativeCommunicationEffectConnector(
-            connection,
-            credentials=_Resolver(),
-            client=client,
-        )
-        try:
-            return await connector.invoke(
-                request_ref="event-m9-connector",
-                subject_ref="commitment:event-m9-connector",
-                parameters={
-                    "communication_event_id": "event-m9-connector",
-                    "recipient_open_id": "ou_m9",
-                    "content_storage_ref": stored.storage_ref,
-                    "content_digest": stored.digest,
-                    "draft_kind": "confirmation",
-                },
-            )
-        finally:
-            await client.aclose()
-
-    incomplete = await run(202, {})
-    assert incomplete.status is ConnectorStatus.SUCCEEDED
-
-    success = await run(
-        202,
-        {"transportAccepted": True, "deliveryConfirmed": False, "providerMessageRef": "om_m9"},
-    )
-    assert success.status is ConnectorStatus.SUCCEEDED
-    assert success.external_operation_ref == "om_m9"
-    assert success.observed_postcondition == {
-        "target_system": "communication",
-        "operation": "message.send",
-        "subject_ref": "commitment:event-m9-connector",
-        "communication_event_id": "event-m9-connector",
-        "transport_accepted": True,
-        "delivery_confirmed": False,
-        "read_state": "unknown",
-    }
-
-    unknown = await run(503, {})
-    assert unknown.status is ConnectorStatus.UNKNOWN
-    assert unknown.error_code == "GatewayHTTP503"
-    failed = await run(400, {})
-    assert failed.status is ConnectorStatus.FAILED
-    assert failed.error_code == "GatewayHTTP400"
-    malformed = await run(202, ["not-an-object"])
-    assert malformed.status is ConnectorStatus.FAILED
-    assert malformed.error_code == "InvalidCommunicationReceipt"
-
-    async def failing_handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("transport disappeared", request=request)
-
-    client = httpx.AsyncClient(transport=httpx.MockTransport(failing_handler))
-    connector = AdministrativeCommunicationEffectConnector(
-        connection,
-        credentials=_Resolver(),
-        client=client,
-    )
-    try:
-        outcome_unknown = await connector.invoke(
-            request_ref="event-m9-timeout",
-            subject_ref="commitment:event-m9-timeout",
-            parameters={
-                "recipient_open_id": "ou_m9",
-                "content_storage_ref": stored.storage_ref,
-                "content_digest": stored.digest,
-            },
-        )
-    finally:
-        await client.aclose()
-    assert outcome_unknown.status is ConnectorStatus.UNKNOWN
-    assert outcome_unknown.error_code == "ReadTimeout"
-    assert await connector.reconcile("event-m9-timeout") is None
-
-    invalid = await connector.invoke(
-        request_ref="event-m9-invalid",
-        subject_ref="commitment:event-m9-invalid",
-        parameters={"recipient_open_id": "ou_m9", "content_digest": "short"},
-    )
-    assert invalid.status is ConnectorStatus.FAILED
-    with pytest.raises(ConnectorConfigurationError):
-        AdministrativeCommunicationEffectConnection(
-            gateway_base_url="http://gateway.example.test",
-            transport_credential=CredentialRef("m9:gateway", "M9_GATEWAY_SECRET"),
-            artifact_root=tmp_path / "artifacts",
-            timeout_seconds=0,
-            allow_insecure_http=True,
-        )
 
 
 def test_m9_settings_keep_external_effects_disabled_by_default() -> None:

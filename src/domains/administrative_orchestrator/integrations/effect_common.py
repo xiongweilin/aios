@@ -61,6 +61,22 @@ def _unavailable_result(exc: Exception) -> ConnectorResult:
     )
 
 
+def _failed_result(
+    error_code: str,
+    error_message: str,
+    *,
+    external_operation_ref: str | None = None,
+    reconciled: bool = False,
+) -> ConnectorResult:
+    return ConnectorResult(
+        ConnectorStatus.FAILED,
+        external_operation_ref=external_operation_ref,
+        error_code=error_code,
+        error_message=error_message,
+        reconciled=reconciled,
+    )
+
+
 __all__ = [
     "ConnectorConfigurationError",
     "ConnectorResult",

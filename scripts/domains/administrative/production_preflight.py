@@ -50,7 +50,6 @@ def _validate_secret_references(settings) -> None:
         settings.odoo_verifier_secret_env,
         settings.odoo_financial_writer_secret_env,
         settings.odoo_financial_verifier_secret_env,
-        settings.keycloak_reader_secret_env,
         settings.keycloak_writer_secret_env,
         settings.keycloak_verifier_secret_env,
     )

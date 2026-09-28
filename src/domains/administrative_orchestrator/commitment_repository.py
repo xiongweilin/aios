@@ -186,20 +186,6 @@ class CommitmentRepository:
             row = db.get(CandidateCommitmentRow, candidate_id)
             return None if row is None else self._candidate_from_row(row)
 
-    def list_candidates(
-        self,
-        *,
-        status: CandidateCommitmentStatus | None = None,
-        limit: int = 200,
-    ) -> list[CandidateCommitment]:
-        with self.store.sessions() as db:
-            statement = select(CandidateCommitmentRow).order_by(
-                CandidateCommitmentRow.created_at.desc()
-            ).limit(limit)
-            if status is not None:
-                statement = statement.where(CandidateCommitmentRow.status == status.value)
-            return [self._candidate_from_row(row) for row in db.execute(statement).scalars()]
-
     def update_candidate_status(
         self,
         candidate_id: UUID,

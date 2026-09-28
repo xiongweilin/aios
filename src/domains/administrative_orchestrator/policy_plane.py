@@ -450,30 +450,6 @@ def compile_onboarding_policy(record: PolicyVersionRecord) -> OnboardingPolicy:
     return OnboardingPolicy(record.policy_ref, definition=record.definition)
 
 
-def compile_procurement_policy(record: PolicyVersionRecord):
-    from .financial import ProcurementPolicy
-
-    if record.policy_id != "procurement-request":
-        raise PolicyPlaneError("record is not a procurement-request policy")
-    return ProcurementPolicy(record.policy_ref, definition=record.definition)
-
-
-def compile_invoice_ap_policy(record: PolicyVersionRecord):
-    from .financial import InvoiceAPPolicy
-
-    if record.policy_id != "invoice-ap-preparation":
-        raise PolicyPlaneError("record is not an invoice-ap-preparation policy")
-    return InvoiceAPPolicy(record.policy_ref, definition=record.definition)
-
-
-def compile_expense_policy(record: PolicyVersionRecord):
-    from .financial import ExpensePolicy
-
-    if record.policy_id != "expense-reimbursement":
-        raise PolicyPlaneError("record is not an expense-reimbursement policy")
-    return ExpensePolicy(record.policy_ref, definition=record.definition)
-
-
 __all__ = [
     "PolicyLifecycleEvent",
     "PolicyLifecycleEventRow",
@@ -484,9 +460,6 @@ __all__ = [
     "PolicyVersionStatus",
     "compile_onboarding_policy",
     "compile_offboarding_policy",
-    "compile_procurement_policy",
-    "compile_invoice_ap_policy",
-    "compile_expense_policy",
     "default_onboarding_policy_version",
     "default_offboarding_policy_version",
     "default_procurement_policy_version",

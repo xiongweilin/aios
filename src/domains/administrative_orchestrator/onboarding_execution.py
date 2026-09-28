@@ -31,7 +31,10 @@ from .service import (
     plan_effect,
     require_reopen,
 )
-from .transaction_repository import TransactionRecordConflict, TransactionRepository
+from .transaction_repository import (
+    TransactionRecordConflict,
+    current_assessments_in_session,
+)
 from .verification import verify_financial_observation, verify_onboarding_observation
 from .verified_obligation_execution import VerifiedObligationExecutor
 
@@ -213,9 +216,10 @@ class OnboardingExecutionEngine:
         }
         required = required_by_case.get(case.case_kind, set())
         try:
-            assessments = TransactionRepository(self.store).list_current_assessments(
-                case.case_id, case.authority_epoch
-            )
+            with self.store.sessions() as db:
+                assessments = current_assessments_in_session(
+                    db, case.case_id, case.authority_epoch
+                )
         except TransactionRecordConflict as exc:
             raise TransitionError(str(exc)) from exc
         qualified = {

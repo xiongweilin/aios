@@ -150,24 +150,6 @@ class StrategyService:
                 payload=value,
             )
 
-    def propose_option(
-        self,
-        *,
-        subject: str,
-        hypothesis: Mapping[str, object],
-        evaluation: Mapping[str, object],
-        basis_refs: tuple[str, ...],
-    ) -> StrategicOption:
-        if not basis_refs:
-            raise ValueError("strategic option requires basis")
-        return StrategicOption(
-            new_id("strategic-option"),
-            subject,
-            dict(hypothesis),
-            dict(evaluation),
-            basis_refs,
-        )
-
     def get_goal(self, goal_id: str) -> Mapping[str, object]:
         row = self.ledger.project_get("strategy.goal", goal_id)
         if row is None:

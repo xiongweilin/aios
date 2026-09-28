@@ -249,19 +249,3 @@ def test_odoo_reader_keeps_base_facts_when_field_introspection_fails() -> None:
     record = source.read_employee('odoo:hr.employee:42')
     assert record.value['present'] is True
     assert 'termination_status' not in record.value
-
-
-def _offboarding_refresh_context(monkeypatch):
-    from administrative_orchestrator import operations_api
-    from administrative_orchestrator.policy_plane import (
-        PolicyRepository,
-        default_offboarding_policy_version,
-    )
-    from administrative_orchestrator.unit_of_work import AdministrativeUnitOfWork
-
-    store, case = _offboarding_case_with_claims()
-    policies = PolicyRepository(store)
-    policies.put_version(default_offboarding_policy_version())
-    monkeypatch.setattr(operations_api, "_policies", policies)
-    monkeypatch.setattr(operations_api, "_uow", AdministrativeUnitOfWork(store))
-    return operations_api, case
