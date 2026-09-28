@@ -952,6 +952,7 @@ def run_acceptance(evidence_path: Path | None) -> int:
         )
     finally:
         teardown_ok = True
+        docker_teardown_safe = True
         target_container_name = f"autodev-{deployment_id}"
         try:
             if _resource_exists("container", target_container_name):
@@ -964,6 +965,7 @@ def run_acceptance(evidence_path: Path | None) -> int:
                 raise RuntimeError("Temporary target container remained after removal.")
         except Exception as error:
             teardown_ok = False
+            docker_teardown_safe = False
             cleanup_errors.append(f"target container cleanup: {type(error).__name__}")
 
         if compose_prefix is not None:
@@ -979,7 +981,47 @@ def run_acceptance(evidence_path: Path | None) -> int:
                     raise RuntimeError("Temporary Compose resources remained after teardown.")
             except Exception as error:
                 teardown_ok = False
+                docker_teardown_safe = False
                 cleanup_errors.append(f"Compose cleanup: {type(error).__name__}")
+
+        if temp_root is not None and temp_root.exists() and docker_teardown_safe:
+            try:
+                runner_temp = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())).resolve()
+                resolved_temp_root = temp_root.resolve()
+                if (
+                    resolved_temp_root.parent != runner_temp
+                    or not resolved_temp_root.name.startswith(f"{project_name}-")
+                ):
+                    raise RuntimeError("Refusing to remove a path outside the isolated acceptance temp root.")
+                try:
+                    shutil.rmtree(temp_root, onexc=_clear_readonly_and_retry)
+                except PermissionError:
+                    if os.name == "nt" or not _resource_exists("image", root_image):
+                        raise
+                    _run(
+                        [
+                            "docker",
+                            "run",
+                            "--rm",
+                            "--network",
+                            "none",
+                            "--user",
+                            "0:0",
+                            "--mount",
+                            f"type=bind,source={resolved_temp_root},target=/cleanup",
+                            "--entrypoint",
+                            "/bin/sh",
+                            root_image,
+                            "-c",
+                            "chmod -R u+rwX /cleanup && rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?*",
+                        ],
+                        env=compose_env,
+                        secrets_to_redact=secrets_to_redact,
+                    )
+                    shutil.rmtree(temp_root, onexc=_clear_readonly_and_retry)
+            except Exception as error:
+                teardown_ok = False
+                cleanup_errors.append(f"temporary directory cleanup: {type(error).__name__}")
 
         for image_tag in (target_image, root_image):
             try:
@@ -994,20 +1036,6 @@ def run_acceptance(evidence_path: Path | None) -> int:
             except Exception as error:
                 teardown_ok = False
                 cleanup_errors.append(f"image cleanup: {type(error).__name__}")
-
-        if temp_root is not None and temp_root.exists() and teardown_ok:
-            try:
-                runner_temp = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())).resolve()
-                resolved_temp_root = temp_root.resolve()
-                if (
-                    resolved_temp_root.parent != runner_temp
-                    or not resolved_temp_root.name.startswith(f"{project_name}-")
-                ):
-                    raise RuntimeError("Refusing to remove a path outside the isolated acceptance temp root.")
-                shutil.rmtree(temp_root, onexc=_clear_readonly_and_retry)
-            except OSError as error:
-                teardown_ok = False
-                cleanup_errors.append(f"temporary directory cleanup: {type(error).__name__}")
 
         report["cleanup_errors"] = cleanup_errors
         report["status"] = "failed" if cleanup_errors else report["status"]
