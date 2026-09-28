@@ -1,13 +1,11 @@
+from world_runtime.epistemics import Claim, Evidence
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
 import pytest
-from semantic_language import (
-    Claim,
-    Decision,
-    Evidence,
-    Goal,
-    Mandate,
-    Responsibility,
     SemanticKind,
     SemanticRef,
 )
