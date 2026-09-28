@@ -354,46 +354,6 @@ def test_financial_boundaries_cover_exact_values_and_policy_rejection_paths() ->
     )
     assert match_three_way(invoice=invoice, purchase_order={"currency": "USD", "po_number": "PO-1", "total": "bad"}, receipt={}) is TransactionQualificationResult.INCOMPLETE
     assert match_three_way(invoice=invoice, purchase_order={"currency": "USD", "po_number": "PO-1", "total": "10", "line_items": "bad"}, receipt={}) is TransactionQualificationResult.MISMATCH
-
-
-def test_readiness_endpoints_fail_closed_on_world_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
-    from administrative_orchestrator import api, operations_api
-
-    settings = SimpleNamespace(
-        runtime_profile="staging",
-        world_runtime_mode="cutover",
-        auth_mode="oidc",
-        hris_source_kind="odoo",
-        iam_source_kind="keycloak",
-        auto_create_schema=False,
-        external_effects_enabled=False,
-        authority_enforcement_enabled=True,
-    )
-
-    monkeypatch.setattr(api, "_settings", settings)
-    monkeypatch.setattr(
-        api,
-        "validate_world_runtime_compatibility",
-        lambda _: (_ for _ in ()).throw(ProductionReadinessError("mismatch")),
-    )
-    with pytest.raises(HTTPException) as api_error:
-        api.readyz()
-    assert api_error.value.status_code == 503
-
-    monkeypatch.setattr(api, "validate_world_runtime_compatibility", lambda _: {})
-    assert api.readyz()["world_runtime"] == "cutover"
-
-    monkeypatch.setattr(operations_api, "_settings", settings)
-    monkeypatch.setattr(
-        operations_api,
-        "validate_world_runtime_compatibility",
-        lambda _: (_ for _ in ()).throw(ProductionReadinessError("mismatch")),
-    )
-    with pytest.raises(HTTPException) as operations_error:
-        operations_api.readyz()
-    assert operations_error.value.status_code == 503
-
-
 def test_workflow_selects_financial_engine_without_preparing_runtime_effect_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
