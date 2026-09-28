@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from aios.runtime_compat import WORLD_RUNTIME_PROTOCOL
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
 
 RUNTIME_CONTRACTS = {
     "request_authentication": {"current": "request-authentication-v2"},
@@ -55,7 +55,7 @@ class RuntimeStub:
                 200,
                 json={
                     "runtime_protocol": WORLD_RUNTIME_PROTOCOL,
-                    "semantic_language": "0.3.0",
+                    "semantic_language": SEMANTIC_KERNEL_VERSION,
                     "contracts": RUNTIME_CONTRACTS,
                 },
             )
@@ -205,7 +205,7 @@ def contract_mismatch_transport() -> httpx.MockTransport:
                 200,
                 json={
                     "runtime_protocol": "1.1",
-                    "semantic_language": "0.3.0",
+                    "semantic_language": SEMANTIC_KERNEL_VERSION,
                     "contracts": RUNTIME_CONTRACTS,
                 },
             )
