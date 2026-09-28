@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from semantic_language import Revision, SemanticRef
+from semantic_language import SemanticRef
 
 from .common import new_id
 from .ledger import SemanticLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
 
 
 @dataclass(frozen=True, slots=True)
