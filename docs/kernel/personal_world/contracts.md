@@ -2,7 +2,7 @@
 
 Current package baseline: **1.0.0**  
 Contract manifest: **personal-world-contracts-v1**  
-Semantic language baseline: **0.2.0**
+Semantic language baseline: **0.3.0**
 
 ## Provenance contracts
 
@@ -166,7 +166,7 @@ suite exercises authenticated discovery, human-source admission, correction as a
 purpose-bound projection, and erasure across projection and export surfaces.
 
 The conformance suite does not make a projection authoritative. Consumers must continue to treat
-Personal World output as personal context, never Runtime Authorization or domain outcome truth.
+Personal World output as personal context, never Runtime Authorization or domain-owned Outcome state.
 
 ## Backup and erasure boundary
 
