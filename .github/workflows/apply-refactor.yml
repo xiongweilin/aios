@@ -22,14 +22,17 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          parts=(.refactor-payload.part.*)
-          [ ${#parts[@]} -gt 0 ] || exit 0
-          cat "${parts[@]}" > .refactor-payload.tar.gz
-          tar -xzf .refactor-payload.tar.gz
+          parts=(.refactor-payload.parts/*.b64)
+          [ "${#parts[@]}" -gt 0 ] || exit 0
+          cat "${parts[@]}" | base64 -d > /tmp/refactor-payload.tar.gz
+          gzip -t /tmp/refactor-payload.tar.gz
+          tar -xzf /tmp/refactor-payload.tar.gz
           while IFS= read -r path; do
             [ -z "$path" ] || rm -rf -- "$path"
           done < .refactor-deletions.txt
-          rm -f .refactor-payload.tar.gz .refactor-deletions.txt "${parts[@]}"
+          rm -rf .refactor-payload.parts
+          rm -f .refactor-payload.part.* .refactor-payload.tar.gz .refactor-deletions.txt
+          rm -f .github/workflows/apply-refactor.yml .github/workflows/export-refactor.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
