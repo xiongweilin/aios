@@ -357,17 +357,15 @@ class WorldRuntimeBridge:
             },
         )
         assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
-        assignment = self.client.get_optional(f"/v1/domain-assignments/{assignment_ref}")
-        if assignment is None:
-            assignment = self._post(
-                "/v1/domain-assignments",
-                {
-                    "id": assignment_ref,
-                    "responsibility_ref": responsibility_ref,
-                    "domain": "administrative",
-                    "controller": "controller:administrative-orchestrator",
-                },
-            )
+        assignment = self._post(
+            "/v1/domain-assignments",
+            {
+                "id": assignment_ref,
+                "responsibility_ref": responsibility_ref,
+                "domain": "administrative",
+                "controller": "controller:administrative-orchestrator",
+            },
+        )
         if str(assignment.get("status", "")) == "offered":
             self._post(
                 f"/v1/domain-assignments/{assignment_ref}/reports",
