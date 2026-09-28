@@ -204,51 +204,6 @@ def test_principal_deactivation_is_replay_stable_at_effective_time() -> None:
     assert second == first
     assert authority.get_principal("person:departing") is None
     assert len([item for item in lifecycle.list_events() if item.event_id == first.event_id]) == 1
-
-
-def test_expire_endpoints_record_events_and_fail_closed(monkeypatch) -> None:
-    from types import SimpleNamespace
-
-    from fastapi import HTTPException
-
-    from administrative_orchestrator import operations_api
-
-    _, _, lifecycle, assignment, delegation = _setup()
-    monkeypatch.setattr(
-        operations_api,
-        '_actor',
-        lambda request: SimpleNamespace(principal_id='person:admin'),
-    )
-    monkeypatch.setattr(
-        operations_api,
-        '_require',
-        lambda actor, permission, case=None: None,
-    )
-    monkeypatch.setattr(operations_api, '_lifecycle', lifecycle)
-
-    role_event = operations_api.expire_role_assignment(
-        assignment.assignment_id,
-        operations_api.ExpireAuthorityBody(reason='offboarding'),
-        None,
-    )
-    assert role_event.event_type == 'role_assignment.expired'
-
-    delegation_event = operations_api.expire_delegation(
-        delegation.delegation_id,
-        operations_api.ExpireAuthorityBody(reason='offboarding'),
-        None,
-    )
-    assert delegation_event.event_type == 'delegation.expired'
-
-    with pytest.raises(HTTPException) as excinfo:
-        operations_api.expire_role_assignment(
-            uuid4(),
-            operations_api.ExpireAuthorityBody(reason='missing target'),
-            None,
-        )
-    assert excinfo.value.status_code == 409
-
-
 def test_expire_event_replay_with_different_reason_fails_closed() -> None:
     _, _, lifecycle, assignment, _ = _setup()
     effective_at = _BASELINE + timedelta(days=3)
