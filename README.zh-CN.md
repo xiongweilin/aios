@@ -28,7 +28,7 @@ domains
 src/
   aios/                         runtime 组合
   semantic/
-    semantic_language/          跨领域语义
+    semantic_language/          跨领域角色词汇与引用边界
   kernel/
     personal_world/             个人连续性
     world_runtime/              agency 连续性
