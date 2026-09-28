@@ -280,7 +280,7 @@ def test_readiness_world_runtime_cutover_requires_contract_surface(
                 200,
                 json={
                     "runtime_protocol": "4.0",
-                    "semantic_language": "0.2.0",
+                    "semantic_language": "0.3.0",
                     "contracts": {},
                 },
             )
