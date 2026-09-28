@@ -62,8 +62,8 @@ def _create_run(runtime: WorldRuntime, key: str):
             id=f"responsibility:{key}",
             principal="service:test",
             subject=key,
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -92,8 +92,8 @@ def _attested_effect(
             id=f"responsibility:{key}",
             principal=principal,
             subject=key,
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id=f"responsibility:{key}",
@@ -396,8 +396,8 @@ def test_state_bundle_round_trips_between_sqlite_and_postgres(tmp_path: Path) ->
                 id="responsibility:cross-backend",
                 principal="service:test",
                 subject="cross-backend",
-            ),
-            domain="test",
+                domain="test",
+            )
         )
         work = source.execution.admit_work(
             responsibility_id="responsibility:cross-backend",
@@ -436,16 +436,16 @@ def test_postgres_schemas_isolate_agency_state_with_same_ids() -> None:
                 id="responsibility:same-id",
                 principal="principal:agency-a",
                 subject="agency a",
-            ),
-            domain="test",
+                domain="test",
+            )
         )
         second.responsibility.create(
             Responsibility(
                 id="responsibility:same-id",
                 principal="principal:agency-b",
                 subject="agency b",
-            ),
-            domain="test",
+                domain="test",
+            )
         )
 
         assert (
@@ -624,8 +624,8 @@ def test_postgres_1_0_agency_state_survives_reopen_and_sqlite_round_trip(
                     id=identifier,
                     principal=principal,
                     subject=identifier,
-                ),
-                domain=domain,
+                    domain=domain,
+                )
             )
         _record_plain_decision(
             first,
@@ -748,8 +748,8 @@ def test_two_runtime_nodes_cannot_overallocate_one_portfolio_budget() -> None:
                 id="responsibility:portfolio-budget",
                 principal=principal,
                 subject="bounded allocation",
-            ),
-            domain="operations",
+                domain="operations",
+            )
         )
         first.governance.register_mandate(
             Mandate(
