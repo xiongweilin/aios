@@ -1,5 +1,6 @@
+from world_runtime.responsibility import Responsibility
 import pytest
-from semantic_language import Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import DomainAssignment, WorldRuntime
 
