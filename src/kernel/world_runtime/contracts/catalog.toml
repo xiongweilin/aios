@@ -1,7 +1,7 @@
-catalog_version = "world-runtime-contracts-v11"
+catalog_version = "world-runtime-contracts-v12"
 owner = "world-runtime/contracts"
 runtime_protocol = "4.0"
-semantic_language = "0.2.0"
+semantic_language = "0.3.0"
 
 [contracts.request_authentication]
 current = "request-authentication-v2"
