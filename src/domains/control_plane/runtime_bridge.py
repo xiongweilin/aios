@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 import httpx
+
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
 from pydantic import BaseModel, ConfigDict, Field
 
 from .domain_controller import ControllerState, PersonalController
@@ -57,8 +59,8 @@ class PersonalResponsibilityContext:
 
 
 class WorldRuntimeClient:
-    REQUIRED_RUNTIME_PROTOCOL = "4.0"
-    REQUIRED_SEMANTIC_LANGUAGE = "0.3.0"
+    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS: ClassVar[dict[str, str]] = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",
