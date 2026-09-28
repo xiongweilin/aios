@@ -194,7 +194,7 @@ def test_domain_report_requires_typed_evidence_and_namespaced_outcome_refs() -> 
             assignment.id,
             kind="outcome-candidate",
             report_id="report:typed-refs:bad-evidence",
-            evidence_refs=(SemanticRef(SemanticKind.GOAL, "goal:not-evidence"),),
+            evidence_refs=(SemanticRef(SemanticKind.DECISION, "decision:not-evidence"),),
             outcome_refs=(
                 SemanticRef(
                     SemanticKind.OUTCOME,
