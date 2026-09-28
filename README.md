@@ -28,7 +28,7 @@ The names above are internal semantic owners, not separate products or repositor
 src/
   aios/                         runtime composition
   semantic/
-    semantic_language/          cross-domain semantics
+    semantic_language/          cross-domain role vocabulary and reference boundary
   kernel/
     personal_world/             personal continuity
     world_runtime/              agency continuity
