@@ -121,8 +121,8 @@ def _build_long_horizon_state(runtime: WorldRuntime) -> str:
         portfolio_id="portfolio:long-horizon",
     )
 
-    dependency = runtime.qualification.register_dependency(
-        dependency_id="qualification-dependency:policy",
+    binding = runtime.qualification.register_binding(
+        binding_id="qualification-binding:policy",
         principal=PRINCIPAL,
         subject_ref="portfolio:long-horizon",
         dependency_ref="policy:risk",
@@ -145,7 +145,7 @@ def _build_long_horizon_state(runtime: WorldRuntime) -> str:
         basis_refs=("evidence:review",),
         rationale="material policy change requires renewed evidence",
     )
-    assert dependency.status == "active"
+    assert binding.status == "active"
     return review.id
 
 
@@ -189,7 +189,7 @@ def test_long_horizon_agency_survives_restart_and_state_bundle_migration(
         assert portfolio.status == "active"
         assert portfolio.resource_budget["cash"].unit == "CNY"
 
-        pending = restarted.qualification.pending_obligations(
+        pending = restarted.qualification.pending_reviews(
             principal=PRINCIPAL,
         )
         assert len(pending) == 1
@@ -216,7 +216,7 @@ def test_long_horizon_agency_survives_restart_and_state_bundle_migration(
             assert migrated.portfolio.get_portfolio(
                 "portfolio:long-horizon"
             ).status == "active"
-            migrated_review = migrated.qualification.get_obligation(review_id)
+            migrated_review = migrated.qualification.get_review(review_id)
             assert migrated_review.status == "assessed"
             assert migrated_review.resolution_ref is None
         finally:
@@ -273,16 +273,16 @@ def test_state_bundle_rejects_dangling_1_0_agency_graph(tmp_path: Path) -> None:
             row
             for row in missing_dependency["projections"]
             if not (
-                row["namespace"] == "qualification.dependency"
-                and row["key"] == "qualification-dependency:policy"
+                row["namespace"] == "qualification.binding"
+                and row["key"] == "qualification-binding:policy"
             )
         ]
         _recompute_bundle(missing_dependency)
         validation = runtime.state_bundle.validate(missing_dependency)
         assert validation.valid is False
         assert any(
-            f"qualification.review-obligation/{review_id} references missing "
-            "qualification.dependency/qualification-dependency:policy"
+            f"qualification.review/{review_id} references missing "
+            "qualification.binding/qualification-binding:policy"
             in error
             for error in validation.errors
         )
