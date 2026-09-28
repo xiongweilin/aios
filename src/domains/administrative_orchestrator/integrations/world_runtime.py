@@ -54,6 +54,8 @@ def _effect_matches_current_execution(
 
 
 class WorldRuntimeBridge:
+    REQUIRED_RUNTIME_PROTOCOL = WorldRuntimeHttpClient.REQUIRED_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = WorldRuntimeHttpClient.REQUIRED_SEMANTIC_LANGUAGE
     """Compile governed Administrative effects into the generic World Runtime surface."""
 
     REQUIRED_CONTRACTS = {
