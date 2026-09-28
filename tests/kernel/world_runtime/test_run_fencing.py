@@ -1,6 +1,6 @@
+from world_runtime.responsibility import Responsibility
 import pytest
 
-from semantic_language import Responsibility
 
 from world_runtime import WorldRuntime
 from world_runtime.execution import (
