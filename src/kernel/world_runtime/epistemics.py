@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Mapping
 
-from semantic_language import SemanticKind, SemanticRef
+from semantic_language import SemanticRef
 
 from .common import new_id, utcnow
 from .epistemic_types import (
