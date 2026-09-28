@@ -6,7 +6,7 @@ Personal World 是一个人不断演化世界的 durable、user-owned representa
 
 它回答：
 
-- 关于这个人已知什么？
+- Personal World 当前接受或确认了关于这个人的哪些内容？
 - 为什么知道？
 - 现在是否仍有效？
 - authoritative source 在哪里？
@@ -22,12 +22,12 @@ Personal World 拥有：provenance、observation 和 claim、qualified personal 
 
 ## 核心 non-substitution rule
 
-1. Source != Observation != Claim != current personal state。
+1. Source != Observation != Claim != 当前已取得资格的个人记录状态。
 2. Historical validity != current validity。
-3. Projection != canonical truth。
+3. Projection != Personal World 规范状态。
 4. Personal context != authority。
 5. Domain projection != domain ownership。
-6. Model inference != accepted personal truth。
+6. Model inference != 当前已取得资格的 Personal World 状态。
 7. Derived retrieval index != canonical storage。
 
 ## Canonical data path
@@ -66,7 +66,7 @@ v1.0 baseline 只暴露 PersonalFact、Preference、Relationship、ResourceLink 
 
 Domain Controller 可以提交 `DomainPersonalProjection`。Personal World 记录 source、observation、claim 和 candidate personal fact，但不复制 domain lifecycle authority。
 
-World Runtime 与 Personal World 是独立 durable system：Personal World 回答“这个人的世界是什么”；World Runtime 回答“存在哪些 durable agency，以及为什么可以继续”。Runtime 可以引用 Personal World record 作为 basis material，但不能复制 ownership；Personal World 不能签发 Runtime authorization。
+World Runtime 与 Personal World 是独立 durable system：Personal World 回答“哪些个人情境已经被持久表示并取得资格”；World Runtime 回答“存在哪些 durable agency，以及为什么可以继续”。Runtime 可以引用 Personal World record 作为 basis material，但不能复制 ownership；Personal World 不能签发 Runtime authorization。
 
 ## Projection、Storage 与 Retrieval
 
@@ -74,7 +74,7 @@ Caller 请求 purpose-limited projection，而不是 unrestricted personal state
 
 SQLite 支持 local single-node；PostgreSQL 支持 shared durable operation。Revision write 使用 expected-revision CAS；PostgreSQL append 前还锁定 current lineage head。Bundle export 保持 stable ID/lineage；import 只用于 restore，并要求空 target store。
 
-内置 retrieval 从 canonical record 派生，结合 lexical overlap 和 deterministic hashed-vector similarity。它可以删除并重建而不丢失 truth；未来 external vector index 必须遵守同一规则。
+内置 retrieval 从 canonical record 派生，结合 lexical overlap 和 deterministic hashed-vector similarity。它可以删除并重建而不丢失 Personal World 规范状态；未来 external vector index 必须遵守同一规则。
 
 ## Deployment identity 与 root subject
 
