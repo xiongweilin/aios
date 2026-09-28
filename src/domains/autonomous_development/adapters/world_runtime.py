@@ -6,6 +6,8 @@ from typing import Any, ClassVar, TypeVar
 
 import httpx
 
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+
 from autonomous_development.domain.models import (
     BuildArtifact,
     CandidateRevision,
@@ -27,8 +29,8 @@ class WorldRuntimeBoundaryError(RuntimeError):
 class WorldRuntimeDevelopmentBridge:
     """HTTP-only adapter from Development semantics to generic World Runtime contracts."""
 
-    REQUIRED_RUNTIME_PROTOCOL = "4.0"
-    REQUIRED_SEMANTIC_LANGUAGE = "0.3.0"
+    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS: ClassVar[dict[str, str]] = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",
