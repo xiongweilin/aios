@@ -14,6 +14,8 @@ class WorldRuntimeBoundaryError(RuntimeError):
 class WorldRuntimeHttpClient:
     """Shared HTTP and contract-negotiation boundary for domain Runtime adapters."""
 
+    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS: Mapping[str, str] = {}
 
     def __init__(
@@ -87,8 +89,15 @@ class WorldRuntimeHttpClient:
             return None
         return self._object_response(path, response)
 
-    def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        self._ensure_contracts()
+    def post(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        verify: bool = True,
+    ) -> dict[str, Any]:
+        if verify:
+            self._ensure_contracts()
         return self._object_response(path, self._send("POST", path, payload))
 
     def _send(
