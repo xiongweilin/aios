@@ -55,6 +55,38 @@ class PersonalResponsibilityContext:
     verification_labels: dict[str, str]
 
 
+class DomainWork(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(default_factory=lambda: new_id("work"))
+    responsibility_ref: str
+    proposal_ref: str
+    kind: str
+    status: str = "running"
+    runtime_work_ref: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class DomainRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(default_factory=lambda: new_id("run"))
+    work_id: str
+    workflow_id: str
+    status: str = "running"
+    runtime_run_ref: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalResponsibilityContext:
+    title: str
+    description: str
+    kind: str
+    repo: str | None
+    project: str | None
+    verification_labels: dict[str, str]
 class WorldRuntimeClient(WorldRuntimeHttpClient):
     REQUIRED_CONTRACTS: ClassVar[dict[str, str]] = {
         "request_authentication": "request-authentication-v2",
