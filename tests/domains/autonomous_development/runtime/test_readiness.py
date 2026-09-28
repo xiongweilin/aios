@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
 from pydantic import SecretStr
 from sqlalchemy import create_engine
 
@@ -279,7 +281,7 @@ def test_readiness_world_runtime_cutover_requires_contract_surface(
             return httpx.Response(
                 200,
                 json={
-                    "runtime_protocol": "4.0",
+                    "runtime_protocol": WORLD_RUNTIME_PROTOCOL,
                     "semantic_language": "0.3.0",
                     "contracts": {},
                 },
