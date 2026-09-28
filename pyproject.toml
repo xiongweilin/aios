@@ -96,7 +96,7 @@ ignore = ["E501"]
 "src/domains/administrative_orchestrator/integrations/odoo_effects.py" = ["SIM114"]
 
 [tool.importlinter]
-root_packages = ["autonomous_development"]
+root_packages = ["autonomous_development", "semantic_language", "world_runtime"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -124,4 +124,28 @@ forbidden_modules = [
   "autonomous_development.api",
   "autonomous_development.cli",
   "autonomous_development.runtime",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "semantic kernel is independent from payload owners"
+type = "forbidden"
+source_modules = ["semantic_language"]
+forbidden_modules = [
+  "aios",
+  "world_runtime",
+  "personal_world",
+  "control_plane",
+  "administrative_orchestrator",
+  "autonomous_development",
+]
+
+[[tool.importlinter.contracts]]
+name = "world runtime kernel is independent from domain controllers"
+type = "forbidden"
+source_modules = ["world_runtime"]
+forbidden_modules = [
+  "control_plane",
+  "administrative_orchestrator",
+  "autonomous_development",
 ]
