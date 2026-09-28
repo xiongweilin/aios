@@ -365,7 +365,6 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
             "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
                 "review_id": review_id,
-                "assessment_id": "qualification-assessment:1",
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
                 "successor_id": "qualification-dependency:2",
@@ -389,7 +388,6 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
             "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
                 "review_id": review_id,
-                "assessment_id": "qualification-assessment:1",
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
                 "successor_id": "qualification-dependency:2",
