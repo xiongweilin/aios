@@ -1,0 +1,160 @@
+ycloakConnection(
+-            base_url="https://idp.example.test",
+-            realm="",
+-            client_id="reader",
+-            reader_credential=CredentialRef("keycloak:reader", "SECRET"),
+-        )
+ 
+ 
+-def test_keycloak_token_and_get_http_contracts() -> None:
+-    def handler(request: httpx.Request) -> httpx.Response:
+-        if request.url.path.endswith("/protocol/openid-connect/token"):
+-            return httpx.Response(200, json={"access_token": "reader-token"})
+-        if request.url.path.endswith("/users/missing"):
+-            return httpx.Response(404)
+-        return httpx.Response(200, json={"id": "user-42"})
+ 
+-    directory = _keycloak_directory(client=httpx.Client(transport=httpx.MockTransport(handler)))
+-    assert directory._token() == "reader-token"
+-    assert directory._get("/admin/realms/company/users/missing") is None
+-    assert directory._get("/admin/realms/company/users/user-42") == {"id": "user-42"}
+ 
+ 
+-def test_keycloak_token_and_get_fail_closed() -> None:
+-    def token_without_access(request: httpx.Request) -> httpx.Response:
+-        return httpx.Response(200, json={}, request=request)
+ 
+-    directory = _keycloak_directory(
+-        client=httpx.Client(transport=httpx.MockTransport(token_without_access))
+-    )
+-    with pytest.raises(KeycloakSourceError, match="lacks access_token"):
+-        directory._token()
+ 
+-    def server_error(request: httpx.Request) -> httpx.Response:
+-        return httpx.Response(503, request=request)
+ 
+-    directory = _keycloak_directory(client=httpx.Client(transport=httpx.MockTransport(server_error)))
+-    with pytest.raises(KeycloakSourceError, match="authentication failed"):
+-        directory._token()
+ 
+ 
+ def test_environment_credential_resolution(monkeypatch) -> None:
+diff --git a/tests/domains/administrative/test_m5_connector_edge_cases.py b/tests/domains/administrative/test_m5_connector_edge_cases.py
+index 7b31841..140c9ea 100644
+--- a/tests/domains/administrative/test_m5_connector_edge_cases.py
++++ b/tests/domains/administrative/test_m5_connector_edge_cases.py
+@@ -6,17 +6,21 @@ import httpx
+ import pytest
+ 
+ from administrative_orchestrator.integrations.credentials import CredentialRef
+-from administrative_orchestrator.integrations.production_effects import (
++from administrative_orchestrator.integrations.effect_common import (
+     ConnectorConfigurationError,
+     ConnectorStatus,
++    _ApplicationRejected,
++    _TransportUnknown,
++)
++from administrative_orchestrator.integrations.keycloak_effects import (
+     KeycloakEffectConnection,
+     KeycloakIdentityEffectConnector,
+     KeycloakIdentityVerifier,
++)
++from administrative_orchestrator.integrations.odoo_effects import (
+     OdooEffectConnection,
+     OdooEmployeeEffectConnector,
+     OdooEmployeeVerifier,
+-    _ApplicationRejected,
+-    _TransportUnknown,
+ )
+ 
+ 
+diff --git a/tests/domains/administrative/test_m5_production_connectors.py b/tests/domains/administrative/test_m5_production_connectors.py
+index aa153b3..deea077 100644
+--- a/tests/domains/administrative/test_m5_production_connectors.py
++++ b/tests/domains/administrative/test_m5_production_connectors.py
+@@ -6,14 +6,18 @@ import httpx
+ import pytest
+ 
+ from administrative_orchestrator.integrations.credentials import CredentialRef
+-from administrative_orchestrator.integrations.production_effects import (
++from administrative_orchestrator.integrations.effect_common import (
+     ConnectorStatus,
++    _TransportUnknown,
++)
++from administrative_orchestrator.integrations.keycloak_effects import (
+     KeycloakEffectConnection,
+     KeycloakIdentityEffectConnector,
+     KeycloakIdentityVerifier,
++)
++from administrative_orchestrator.integrations.odoo_effects import (
+     OdooEffectConnection,
+     OdooEmployeeEffectConnector,
+-    _TransportUnknown,
+ )
+ 
+ 
+diff --git a/tests/domains/administrative/test_m5_production_readiness.py b/tests/domains/administrative/test_m5_production_readiness.py
+index 4a2b359..047540c 100644
+--- a/tests/domains/administrative/test_m5_production_readiness.py
++++ b/tests/domains/administrative/test_m5_production_readiness.py
+@@ -41,13 +41,10 @@ def _production_settings(**overrides) -> Settings:
+         "odoo_financial_verifier_username": "financial-verifier",
+         "odoo_financial_writer_secret_env": "ADMIN_ODOO_FINANCIAL_WRITER_SECRET",
+         "odoo_financial_verifier_secret_env": "ADMIN_ODOO_FINANCIAL_VERIFIER_SECRET",
+-        "iam_source_kind": "keycloak",
+         "keycloak_base_url": "https://keycloak.example.test",
+         "keycloak_realm": "company",
+-        "keycloak_reader_client_id": "admin-reader",
+         "keycloak_writer_client_id": "runtime-writer",
+         "keycloak_verifier_client_id": "runtime-verifier",
+-        "keycloak_reader_secret_env": "ADMIN_KEYCLOAK_READER_SECRET",
+         "keycloak_writer_secret_env": "ADMIN_KEYCLOAK_WRITER_SECRET",
+         "keycloak_verifier_secret_env": "ADMIN_KEYCLOAK_VERIFIER_SECRET",
+     }
+diff --git a/tests/domains/administrative/test_m6_final_gates.py b/tests/domains/administrative/test_m6_final_gates.py
+index 8646fd3..5ec619c 100644
+--- a/tests/domains/administrative/test_m6_final_gates.py
++++ b/tests/domains/administrative/test_m6_final_gates.py
+@@ -1,34 +1,9 @@
+ from __future__ import annotations
+ 
+ import ast
+-import json
+ from pathlib import Path
+-from uuid import uuid4
+ 
+-import pytest
+-from pydantic import ValidationError
+ 
+-from administrative_orchestrator.domain import FactAuthority
+-from administrative_orchestrator.intake.artifacts import FilesystemArtifactStore
+-from administrative_orchestrator.intake.interpretation import (
+-    InterpretationClient,
+-    InterpretationProfile,
+-    ModelProvenance,
+-    ModelProviderUnavailable,
+-    StaticModelGateway,
+-)
+-from administrative_orchestrator.intake.models import (
+-    CandidateAuthority,
+-    CandidateFactAssertion,
+-    InterpretationRecord,
+-    InterpretationStatus,
+-    SourceArtifact,
+-)
+-from administrative_orchestrator.intake.repository import (
+-    IntakeRepository,
+-)
+-from administrative_orchestrator.intake.service import CandidateProjectionService
+-from administrative_orchestrator.persistence import SqlStore
+ 
+ _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+ _SOURCE_ROOT = _REPOSITORY_ROOT / "src" / "administrative_orchestrator"
+@@ -68,196 +43,19 @@ _FORBIDDEN_IMPORT_SUFFIXES = {
+ }
+ 
+ 
+-def _profile() -> InterpretationProfile:
+-    return InterpretationProfile(
+-        profile_ref="final-gate-test-profile-v1",
+-
