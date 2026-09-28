@@ -914,13 +914,6 @@ async def _provider_result_read_isolation() -> None:
         raise AssertionError("direct owning principal could not read provider result")
 
 
-__all__ = [
-    "ConformanceResult",
-    "SUITE_VERSION",
-    "conformance_vectors",
-    "run_reference_conformance",
-]
-
 CHECKS = {
     "shared-authorization-distinct-runtime-effects-survive-contention": _shared_authority_runtime_effects,
     "shared-authorization-distinct-domain-starts-survive-contention": _shared_authority_domain_starts,
