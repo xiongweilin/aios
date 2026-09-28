@@ -12,7 +12,6 @@ from sqlalchemy.pool import StaticPool
 from .domain import (
     AdministrativeCase,
     AdministrativeRequest,
-    Decision,
 )
 from .policy import PolicyEvaluation
 
