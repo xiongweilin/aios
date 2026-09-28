@@ -295,7 +295,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
     runtime, client = _runtime_client()
     try:
         registered = client.post(
-            "/v1/qualification/dependencies",
+            "/v1/qualification/bindings",
             json={
                 "id": "qualification-dependency:1",
                 "principal": "principal:owner",
@@ -312,7 +312,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         assert registered.status_code == 200, registered.text
 
         forged = client.post(
-            "/v1/qualification/dependencies",
+            "/v1/qualification/bindings",
             json={
                 "principal": "principal:owner",
                 "subject_ref": "decision:forged",
@@ -362,7 +362,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         assert pending[0]["status"] == "assessed"
 
         premature_advance = client.post(
-            "/v1/qualification/dependencies/qualification-dependency:1/advance",
+            "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
                 "obligation_id": review_id,
                 "assessment_id": "qualification-assessment:1",
@@ -386,7 +386,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         assert resolved.json()["status"] == "resolved"
 
         advanced = client.post(
-            "/v1/qualification/dependencies/qualification-dependency:1/advance",
+            "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
                 "obligation_id": review_id,
                 "assessment_id": "qualification-assessment:1",
