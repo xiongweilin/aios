@@ -1,5 +1,9 @@
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 import pytest
-from semantic_language import Decision, Goal, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 
