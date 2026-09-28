@@ -246,20 +246,14 @@ class StateBundleService:
                     owner,
                 )
                 require("decision.current", value.get("decision_id"), owner)
-            elif namespace == "qualification.dependency":
-                previous_id = value.get("supersedes_dependency_id")
+            elif namespace == "qualification.binding":
+                previous_id = value.get("supersedes_binding_id")
                 if previous_id:
-                    require("qualification.dependency", previous_id, owner)
-            elif namespace == "qualification.review-obligation":
+                    require("qualification.binding", previous_id, owner)
+            elif namespace == "qualification.review":
                 require(
-                    "qualification.dependency",
-                    value.get("dependency_id"),
-                    owner,
-                )
-            elif namespace == "qualification.revalidation-assessment":
-                require(
-                    "qualification.review-obligation",
-                    value.get("obligation_id"),
+                    "qualification.binding",
+                    value.get("binding_id"),
                     owner,
                 )
 
