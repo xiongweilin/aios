@@ -15,12 +15,12 @@ provider/model-routing infrastructure, secret stores, or ephemeral cognitive exe
 
 The central non-substitution rules are:
 
-- Source != Observation != Claim != current personal state.
-- Historical truth != current truth.
-- Context Projection != canonical truth.
+- Source != Observation != Claim != currently qualified personal record state.
+- Historical qualification != current qualification.
+- Context Projection != canonical Personal World state.
 - Personal context != execution authority.
 - Domain projection != domain ownership.
-- Model inference != accepted personal preference or fact.
+- Model inference != currently qualified personal preference or fact.
 
 ## Runtime
 
