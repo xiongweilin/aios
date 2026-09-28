@@ -1,0 +1,166 @@
+y_ref_for_effect(self, effect_id: UUID) -> str:
+         return _stable_ref("responsibility", effect_id)
+ 
+diff --git a/src/domains/administrative_orchestrator/observability.py b/src/domains/administrative_orchestrator/observability.py
+index cad1642..9aa41a8 100644
+--- a/src/domains/administrative_orchestrator/observability.py
++++ b/src/domains/administrative_orchestrator/observability.py
+@@ -36,11 +36,6 @@ GOVERNANCE_REVALIDATION = Counter(
+     "Governance revalidation outcomes before reality transitions.",
+     ("result",),
+ )
+-CONNECTOR_OUTCOME = Counter(
+-    "administrative_connector_outcome_total",
+-    "Production connector outcomes without request-identity cardinality.",
+-    ("system", "operation", "outcome"),
+-)
+ IDENTITY_LIFECYCLE = Counter(
+     "administrative_identity_lifecycle_total",
+     "Identity lifecycle semantic transitions.",
+@@ -51,37 +46,6 @@ RESPONSIBILITY_DISCHARGE = Counter(
+     "Kernel responsibility discharge workflow outcomes without case identity labels.",
+     ("result",),
+ )
+-INVESTIGATIONS = Counter(
+-    "administrative_investigations_total",
+-    "Bounded Administrative investigation lifecycle events.",
+-    ("trigger_type", "result"),
+-)
+-INVESTIGATION_FAILURES = Counter(
+-    "administrative_investigation_failures_total",
+-    "Administrative investigation advisory failures by bounded trigger type.",
+-    ("trigger_type",),
+-)
+-REOPEN_ASSESSMENTS = Counter(
+-    "administrative_reopen_assessments_total",
+-    "Administrative reopen assessments by bounded disposition.",
+-    ("disposition",),
+-)
+-REOPENS = Counter(
+-    "administrative_reopens_total",
+-    "Authorized Administrative reopen transitions.",
+-    (),
+-)
+-INVESTIGATION_DURATION = Histogram(
+-    "administrative_investigation_duration_seconds",
+-    "Bounded investigation advisory duration by trigger type.",
+-    ("trigger_type",),
+-)
+-
+-
+-def current_correlation_id() -> str:
+-    return _CORRELATION_ID.get()
+-
+-
+ def record_authoritative_refresh(*, success: bool) -> None:
+     AUTHORITATIVE_REFRESH.labels(result="success" if success else "failure").inc()
+ 
+@@ -90,10 +54,6 @@ def record_governance_revalidation(*, valid: bool) -> None:
+     GOVERNANCE_REVALIDATION.labels(result="valid" if valid else "stale").inc()
+ 
+ 
+-def record_connector_outcome(*, system: str, operation: str, outcome: str) -> None:
+-    CONNECTOR_OUTCOME.labels(system=system, operation=operation, outcome=outcome).inc()
+-
+-
+ def record_identity_lifecycle(event: str) -> None:
+     IDENTITY_LIFECYCLE.labels(event=event).inc()
+ 
+@@ -104,26 +64,6 @@ def record_responsibility_discharge(*, result: str) -> None:
+     RESPONSIBILITY_DISCHARGE.labels(result=result).inc()
+ 
+ 
+-def record_investigation_request(*, trigger_type: str, result: str) -> None:
+-    INVESTIGATIONS.labels(trigger_type=trigger_type, result=result).inc()
+-
+-
+-def record_investigation_failure(*, trigger_type: str) -> None:
+-    INVESTIGATION_FAILURES.labels(trigger_type=trigger_type).inc()
+-
+-
+-def record_reopen_assessment(*, disposition: str) -> None:
+-    REOPEN_ASSESSMENTS.labels(disposition=disposition).inc()
+-
+-
+-def record_reopen() -> None:
+-    REOPENS.inc()
+-
+-
+-def observe_investigation_duration(*, trigger_type: str, seconds: float) -> None:
+-    INVESTIGATION_DURATION.labels(trigger_type=trigger_type).observe(seconds)
+-
+-
+ def install_observability(app: FastAPI, *, service_name: str) -> None:
+     """Install bounded request telemetry and correlation propagation once per app."""
+ 
+@@ -196,16 +136,9 @@ def _record_operations_semantics(method: str, path: str, status_code: int) -> No
+ 
+ 
+ __all__ = [
+-    "current_correlation_id",
+     "install_observability",
+     "record_authoritative_refresh",
+-    "record_connector_outcome",
+     "record_governance_revalidation",
+     "record_identity_lifecycle",
+-    "record_investigation_failure",
+-    "record_investigation_request",
+-    "record_reopen",
+-    "record_reopen_assessment",
+     "record_responsibility_discharge",
+-    "observe_investigation_duration",
+ ]
+diff --git a/src/domains/administrative_orchestrator/onboarding_execution.py b/src/domains/administrative_orchestrator/onboarding_execution.py
+index 55a1ebb..1702bf6 100644
+--- a/src/domains/administrative_orchestrator/onboarding_execution.py
++++ b/src/domains/administrative_orchestrator/onboarding_execution.py
+@@ -31,7 +31,10 @@ from .service import (
+     plan_effect,
+     require_reopen,
+ )
+-from .transaction_repository import TransactionRecordConflict, TransactionRepository
++from .transaction_repository import (
++    TransactionRecordConflict,
++    current_assessments_in_session,
++)
+ from .verification import verify_financial_observation, verify_onboarding_observation
+ from .verified_obligation_execution import VerifiedObligationExecutor
+ 
+@@ -213,9 +216,10 @@ class OnboardingExecutionEngine:
+         }
+         required = required_by_case.get(case.case_kind, set())
+         try:
+-            assessments = TransactionRepository(self.store).list_current_assessments(
+-                case.case_id, case.authority_epoch
+-            )
++            with self.store.sessions() as db:
++                assessments = current_assessments_in_session(
++                    db, case.case_id, case.authority_epoch
++                )
+         except TransactionRecordConflict as exc:
+             raise TransitionError(str(exc)) from exc
+         qualified = {
+diff --git a/src/domains/administrative_orchestrator/persistence.py b/src/domains/administrative_orchestrator/persistence.py
+index 84ae159..92cfe98 100644
+--- a/src/domains/administrative_orchestrator/persistence.py
++++ b/src/domains/administrative_orchestrator/persistence.py
+@@ -197,7 +197,7 @@ class SqlStore:
+         # 在 metadata 创建前导入 optional domain row module，使
+         # 直接 in-memory/test store 获得与
+         # application entrypoint 相同的 table topology。
+-        from . import investigation_repository as _investigation_repository  # noqa: F401
++        from . import investigation_rows as _investigation_rows  # noqa: F401
+ 
+         Base.metadata.create_all(self.engine)
+ 
+@@ -378,10 +378,6 @@ class SqlStore:
+         )
+ 
+ 
+-# 在 shared metadata 中注册 Intake Plane table，同时不移动
+-# 本 module 中已经稳定的 M0-M5 persistence definition。Import
+-# 发生在 Base 和 SqlStore 完全初始化之后，因此 intake/repository.py
+-# 可以安全复用现有 database/session boundary。
++# Register owner-local tables in shared metadata without importing retired service layers.
+ from . import transaction_repository as _transaction_repository  # noqa: E402, F401
+-from 
