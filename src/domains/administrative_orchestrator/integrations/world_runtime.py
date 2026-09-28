@@ -355,8 +355,7 @@ class WorldRuntimeBridge:
             },
         )
         assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
-        assignment_path = f"/v1/domain-assignments/{assignment_ref}"
-        assignment = self.client.get_optional(assignment_path)
+        assignment = self.client.get_optional(f"/v1/domain-assignments/{assignment_ref}")
         if assignment is None:
             assignment = self._post(
                 "/v1/domain-assignments",
@@ -367,7 +366,51 @@ class WorldRuntimeBridge:
                     "controller": "controller:administrative-orchestrator",
                 },
             )
+        if str(assignment.get("status", "")) == "offered":
+            self._post(
+                f"/v1/domain-assignments/{assignment_ref}/reports",
+                {"id": f"{assignment_ref}:accepted", "kind": "accepted"},
+            )
 
+    def request_ref_for_effect(self, effect_id: UUID) -> str:
+        return _stable_ref("request", effect_id)
+
+    def idempotency_key_for_effect(self, effect_id: UUID) -> str:
+        return f"administrative-effect:{effect_id}"
+
+    def reconcile_effect(self, effect_id: UUID) -> dict[str, Any]:
+        return self._post(
+            f"/v1/reconcile/{self.idempotency_key_for_effect(effect_id)}",
+            {},
+        )
+
+    def responsibility_ref_for_effect(self, effect_id: UUID) -> str:
+        return _stable_ref("responsibility", effect_id)
+
+    def responsibility_status(self, responsibility_ref: str) -> str:
+        return str(self._get(f"/v1/responsibilities/{responsibility_ref}")["status"])
+
+    def discharge_responsibility(
+        self,
+        responsibility_ref: str,
+        *,
+        decision_ref: str,
+        decided_by: str,
+        subject_ref: str,
+        basis_refs: tuple[str, ...],
+    ) -> tuple[str, str, str]:
+        assignment_ref = self.assignment_ref_for_responsibility(responsibility_ref)
+        assignment = self.client.get_optional(f"/v1/domain-assignments/{assignment_ref}")
+        if assignment is None:
+            assignment = self._post(
+                "/v1/domain-assignments",
+                {
+                    "id": assignment_ref,
+                    "responsibility_ref": responsibility_ref,
+                    "domain": "administrative",
+                    "controller": "controller:administrative-orchestrator",
+                },
+            )
         if (
             str(assignment.get("id", "")) != assignment_ref
             or str(assignment.get("responsibility_ref", "")) != responsibility_ref
@@ -395,10 +438,7 @@ class WorldRuntimeBridge:
                         namespace="administrative",
                     )
                 ],
-                "evidence_refs": [
-                    self._ref("evidence", ref)
-                    for ref in basis_refs
-                ],
+                "evidence_refs": [self._ref("evidence", ref) for ref in basis_refs],
                 "detail": {"subject_ref": subject_ref},
             },
         )
