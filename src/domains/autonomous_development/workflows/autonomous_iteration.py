@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dbos import DBOS, DBOSConfiguredInstance
+from pydantic import TypeAdapter
 
 from autonomous_development.application.build import BuildService
 from autonomous_development.application.canary import CanaryService
@@ -21,9 +22,7 @@ from autonomous_development.domain.canary import CanaryGuardrails, CanaryStageDe
 from autonomous_development.domain.enums import (
     CanaryDecisionKind,
     CycleState,
-    DeploymentState,
     ReleaseDecisionKind,
-    VerificationStatus,
 )
 from autonomous_development.domain.models import (
     BuildArtifact,
@@ -877,233 +876,71 @@ def _terminal_result(cycle_doc: dict[str, object], reason: str) -> dict[str, obj
     }
 
 
+def _document(value: object) -> dict[str, object]:
+    document = TypeAdapter(type(value)).dump_python(value, mode="json")
+    if not isinstance(document, dict):
+        raise TypeError("workflow document must be an object")
+    return document
+
+
+def _restore(model: type, document: dict[str, object]):
+    return TypeAdapter(model).validate_python(document)
+
+
 def _proposal_to_document(proposal: ChangeProposal) -> dict[str, object]:
-    return {
-        "id": proposal.id,
-        "target_id": proposal.target_id,
-        "baseline_release_id": proposal.baseline_release_id,
-        "baseline_commit": proposal.baseline_commit,
-        "objective_revision_id": proposal.objective_revision_id,
-        "diagnosis_id": proposal.diagnosis_id,
-        "acceptance_criteria": list(proposal.acceptance_criteria),
-        "allowed_paths": list(proposal.allowed_paths),
-        "forbidden_paths": list(proposal.forbidden_paths),
-        "max_implementation_attempts": proposal.max_implementation_attempts,
-        "max_changed_files": proposal.max_changed_files,
-        "mandatory_gates": list(proposal.mandatory_gates),
-        "change_intent": proposal.change_intent,
-    }
+    return _document(proposal)
 
 
 def _proposal_from_document(document: dict[str, object]) -> ChangeProposal:
-    return ChangeProposal(
-        id=_string(document, "id"),
-        target_id=_string(document, "target_id"),
-        baseline_release_id=_string(document, "baseline_release_id"),
-        baseline_commit=_string(document, "baseline_commit"),
-        objective_revision_id=_string(document, "objective_revision_id"),
-        diagnosis_id=_optional_string(document.get("diagnosis_id")),
-        acceptance_criteria=_strings(document, "acceptance_criteria"),
-        allowed_paths=_strings(document, "allowed_paths"),
-        forbidden_paths=_strings(document, "forbidden_paths"),
-        max_implementation_attempts=_integer(document, "max_implementation_attempts"),
-        mandatory_gates=_strings(document, "mandatory_gates"),
-        change_intent=_optional_string(document.get("change_intent")),
-        max_changed_files=_integer(document, "max_changed_files"),
-    )
+    return _restore(ChangeProposal, document)
 
 
 def _candidate_to_document(candidate: CandidateRevision) -> dict[str, object]:
-    return {
-        "id": candidate.id,
-        "cycle_id": candidate.cycle_id,
-        "worktree_path": candidate.worktree_path,
-        "branch_name": candidate.branch_name,
-        "base_commit": candidate.base_commit,
-        "candidate_commit": candidate.candidate_commit,
-        "tree_hash": candidate.tree_hash,
-        "changed_paths": list(candidate.changed_paths),
-        "codex_thread_id": candidate.codex_thread_id,
-        "implementation_attempt": candidate.implementation_attempt,
-    }
+    return _document(candidate)
 
 
 def _candidate_from_document(document: dict[str, object]) -> CandidateRevision:
-    return CandidateRevision(
-        id=_string(document, "id"),
-        cycle_id=_string(document, "cycle_id"),
-        worktree_path=_string(document, "worktree_path"),
-        branch_name=_string(document, "branch_name"),
-        base_commit=_string(document, "base_commit"),
-        candidate_commit=_string(document, "candidate_commit"),
-        tree_hash=_string(document, "tree_hash"),
-        changed_paths=_strings(document, "changed_paths"),
-        codex_thread_id=_string(document, "codex_thread_id"),
-        implementation_attempt=_integer(document, "implementation_attempt"),
-    )
+    return _restore(CandidateRevision, document)
 
 
 def _verification_to_document(run: VerificationRun) -> dict[str, object]:
-    return {
-        "id": run.id,
-        "candidate_id": run.candidate_id,
-        "checks": [_check_to_document(check) for check in run.checks],
-    }
+    return _document(run)
 
 
 def _verification_from_document(document: dict[str, object]) -> VerificationRun:
-    raw_checks = document.get("checks")
-    if not isinstance(raw_checks, list):
-        raise ValueError("verification checks must be an array")
-    return VerificationRun(
-        id=_string(document, "id"),
-        candidate_id=_string(document, "candidate_id"),
-        checks=tuple(
-            _check_from_document(_mapping(item, "verification check"))
-            for item in raw_checks
-        ),
-    )
-
-
-def _check_to_document(check: VerificationCheck) -> dict[str, object]:
-    return {
-        "id": check.id,
-        "gate": check.gate,
-        "status": check.status.value,
-        "started_at": check.started_at.isoformat(),
-        "ended_at": check.ended_at.isoformat(),
-        "evidence_refs": list(check.evidence_refs),
-        "measurements": dict(check.measurements),
-    }
-
-
-def _check_from_document(document: dict[str, object]) -> VerificationCheck:
-    measurements = document.get("measurements")
-    if not isinstance(measurements, dict):
-        raise ValueError("verification measurements must be an object")
-    normalized: dict[str, float | int | str | bool] = {}
-    for key, value in measurements.items():
-        if not isinstance(key, str) or not isinstance(value, (float, int, str, bool)):
-            raise ValueError("verification measurements contain unsupported values")
-        normalized[key] = value
-    return VerificationCheck(
-        id=_string(document, "id"),
-        gate=_string(document, "gate"),
-        status=VerificationStatus(_string(document, "status")),
-        started_at=datetime.fromisoformat(_string(document, "started_at")),
-        ended_at=datetime.fromisoformat(_string(document, "ended_at")),
-        evidence_refs=_strings(document, "evidence_refs"),
-        measurements=normalized,
-    )
+    return _restore(VerificationRun, document)
 
 
 def _artifact_to_document(artifact: BuildArtifact) -> dict[str, object]:
-    return {
-        "id": artifact.id,
-        "candidate_id": artifact.candidate_id,
-        "image_digest": artifact.image_digest,
-        "source_tree_hash": artifact.source_tree_hash,
-        "build_definition_digest": artifact.build_definition_digest,
-        "dependency_lock_digest": artifact.dependency_lock_digest,
-        "build_evidence_ref": artifact.build_evidence_ref,
-        "sbom_digest": artifact.sbom_digest,
-        "sbom_ref": artifact.sbom_ref,
-        "vulnerability_scan_ref": artifact.vulnerability_scan_ref,
-    }
+    return _document(artifact)
 
 
 def _artifact_from_document(document: dict[str, object]) -> BuildArtifact:
-    return BuildArtifact(
-        id=_string(document, "id"),
-        candidate_id=_string(document, "candidate_id"),
-        image_digest=_string(document, "image_digest"),
-        source_tree_hash=_string(document, "source_tree_hash"),
-        build_definition_digest=_string(document, "build_definition_digest"),
-        dependency_lock_digest=_string(document, "dependency_lock_digest"),
-        build_evidence_ref=_string(document, "build_evidence_ref"),
-        sbom_digest=_string(document, "sbom_digest"),
-        sbom_ref=_string(document, "sbom_ref"),
-        vulnerability_scan_ref=_string(document, "vulnerability_scan_ref"),
-    )
+    return _restore(BuildArtifact, document)
 
 
 def _runtime_to_document(runtime: DeploymentRuntime) -> dict[str, object]:
-    return {
-        "deployment_id": runtime.deployment_id,
-        "container_id": runtime.container_id,
-        "base_url": runtime.base_url,
-        "evidence_ref": runtime.evidence_ref,
-    }
+    return _document(runtime)
 
 
 def _runtime_from_document(document: dict[str, object]) -> DeploymentRuntime:
-    return DeploymentRuntime(
-        deployment_id=_string(document, "deployment_id"),
-        container_id=_string(document, "container_id"),
-        base_url=_string(document, "base_url"),
-        evidence_ref=_string(document, "evidence_ref"),
-    )
+    return _restore(DeploymentRuntime, document)
 
 
 def _deployment_to_document(deployment: Deployment) -> dict[str, object]:
-    return {
-        "id": deployment.id,
-        "target_id": deployment.target_id,
-        "artifact_id": deployment.artifact_id,
-        "environment": deployment.environment,
-        "state": deployment.state.value,
-        "observed_at": (
-            deployment.observed_at.isoformat() if deployment.observed_at is not None else None
-        ),
-        "observation_refs": list(deployment.observation_refs),
-    }
+    return _document(deployment)
 
 
 def _deployment_from_document(document: dict[str, object]) -> Deployment:
-    observed_raw = document.get("observed_at")
-    observed_at = (
-        datetime.fromisoformat(observed_raw)
-        if isinstance(observed_raw, str) and observed_raw
-        else None
-    )
-    return Deployment(
-        id=_string(document, "id"),
-        target_id=_string(document, "target_id"),
-        artifact_id=_string(document, "artifact_id"),
-        environment=_string(document, "environment"),
-        state=DeploymentState(_string(document, "state")),
-        observed_at=observed_at,
-        observation_refs=_strings(document, "observation_refs"),
-    )
+    return _restore(Deployment, document)
 
 
 def _canary_decision_to_document(decision: CanaryStageDecision) -> dict[str, object]:
-    return {
-        "kind": decision.kind.value,
-        "experiment_id": decision.experiment_id,
-        "stage_index": decision.stage_index,
-        "next_stage_index": decision.next_stage_index,
-        "evidence_refs": list(decision.evidence_refs),
-        "violated_guardrails": list(decision.violated_guardrails),
-        "reason": decision.reason,
-    }
+    return _document(decision)
 
 
 def _canary_decision_from_document(document: dict[str, object]) -> CanaryStageDecision:
-    next_stage = document.get("next_stage_index")
-    if next_stage is not None and (
-        not isinstance(next_stage, int) or isinstance(next_stage, bool)
-    ):
-        raise ValueError("next canary stage index must be an integer or null")
-    return CanaryStageDecision(
-        kind=CanaryDecisionKind(_string(document, "kind")),
-        experiment_id=_string(document, "experiment_id"),
-        stage_index=_integer(document, "stage_index"),
-        next_stage_index=next_stage,
-        evidence_refs=_strings(document, "evidence_refs"),
-        violated_guardrails=_strings(document, "violated_guardrails"),
-        reason=_string(document, "reason"),
-    )
+    return _restore(CanaryStageDecision, document)
 
 
 def _cycle_to_document(cycle: DevelopmentCycle) -> dict[str, object]:
@@ -1127,39 +964,7 @@ def _cycle_to_document(cycle: DevelopmentCycle) -> dict[str, object]:
 
 
 def _cycle_state_from_document(document: dict[str, object]) -> CycleState:
-    return CycleState(_string(document, "state"))
-
-
-def _mapping(value: object, field: str) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{field} must be an object")
-    return {str(key): item for key, item in value.items()}
-
-
-def _string(document: dict[str, object], key: str) -> str:
-    value = document.get(key)
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{key} must be a non-empty string")
-    return value
-
-
-def _optional_string(value: object) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ValueError("optional string field is invalid")
-    return value
-
-
-def _integer(document: dict[str, object], key: str) -> int:
-    value = document.get(key)
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise ValueError(f"{key} must be an integer")
-    return value
-
-
-def _strings(document: dict[str, object], key: str) -> tuple[str, ...]:
-    value = document.get(key)
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(f"{key} must be a string array")
-    return tuple(value)
+    state = document.get("state")
+    if not isinstance(state, str) or not state:
+        raise ValueError("state must be a non-empty string")
+    return CycleState(state)
