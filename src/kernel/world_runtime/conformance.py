@@ -13,15 +13,13 @@ from typing import Any, Callable
 
 from pydantic import ValidationError
 
-from semantic_language import (
-    Decision,
-    Goal,
-    Mandate,
-    Responsibility,
-    Revision,
-    SemanticKind,
-    SemanticRef,
-)
+from semantic_language import SemanticKind, SemanticRef
+
+from .decisions import Decision
+from .governance import Mandate
+from .lineage import Revision
+from .responsibility import Responsibility
+from .strategy import Goal
 
 from .execution import (
     CapabilityRequest,
