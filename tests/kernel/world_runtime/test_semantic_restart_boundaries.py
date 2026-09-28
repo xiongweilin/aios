@@ -5,9 +5,7 @@ from world_runtime.governance import Mandate
 from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
-    SemanticKind,
-    SemanticRef,
-)
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import (
     BeliefVerdict,
