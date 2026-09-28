@@ -1,41 +1,43 @@
 # Semantic inventory and ownership
 
-World Runtime uses one canonical owner per semantic concept. Universal meaning is owned by
-`semantic-language`; Runtime owns durable lifecycle specializations; Domain Controllers own
-domain-specific lifecycle, Outcome qualification, Acceptance, and completion.
+World Runtime separates universal role vocabulary from concrete payload ownership.
 
-| Concept | Canonical owner | Durable |
-| --- | --- | --- |
-| Claim / Evidence / Unknown / Conflict | semantic-language | yes |
-| Goal / Constraint / Mandate | semantic-language | yes |
-| Decision / Authorization / Responsibility | semantic-language | yes |
-| Effect / Outcome / Acceptance | semantic-language | yes |
-| ClaimRevision / EvidenceAssessment / BeliefState | world-runtime/epistemics | yes |
-| CognitiveControllerState | world-runtime/cognition | yes |
-| Experience | world-runtime/memory | yes |
-| StandingResponsibility | world-runtime/responsibility | yes |
-| DomainAssignment / DomainReport | world-runtime/domains | yes |
-| StrategyAssessment | world-runtime/strategy | yes |
-| ResponsibilityRelation | world-runtime/responsibility | yes |
-| StrategicIssue / StrategicOption / PortfolioProposal / StrategicPortfolio | world-runtime/strategy | yes |
-| ResourceBudgetLine / ResourceAllocation | world-runtime/strategy | yes |
-| QualificationDependency / ReviewObligation / RevalidationAssessment | world-runtime/qualification | yes |
-| Work / Run / ProviderAttempt / ProviderResult | world-runtime/execution | yes |
-| Domain Outcome qualification / Domain Acceptance | Domain Controller | yes |
+`semantic-language` owns the closed cross-domain role set and non-substitution
+rules. Runtime subsystems and Domain Controllers own concrete schemas, lifecycle,
+persistence, and policy.
+
+| Concept / role | Role vocabulary owner | Concrete payload owner | Durable |
+| --- | --- | --- | --- |
+| Claim / Evidence / Unknown | semantic-language | world-runtime/epistemics | yes |
+| Decision | semantic-language | world-runtime/decisions | yes |
+| Authorization | semantic-language | world-runtime/governance | yes |
+| Responsibility | semantic-language | world-runtime/responsibility | yes |
+| Revision | semantic-language | world-runtime/lineage | yes |
+| Effect | semantic-language | world-runtime/execution / effect boundary | yes |
+| Outcome | semantic-language | Domain Controller | yes |
+| Goal | owner-local namespace | world-runtime/strategy | yes |
+| Mandate | owner-local namespace | world-runtime/governance | yes |
+| Conflict | owner-local namespace | world-runtime/epistemics | yes |
+| ClaimRevision / EvidenceAssessment / BeliefState | owner-local namespace | world-runtime/epistemics | yes |
+| CognitiveControllerState | owner-local namespace | world-runtime/cognition | yes |
+| Experience | owner-local namespace | world-runtime/memory | yes |
+| DomainAssignment / DomainReport | owner-local namespace | world-runtime/domains | yes |
+| StrategyAssessment | owner-local namespace | world-runtime/strategy | yes |
+| ResponsibilityRelation | owner-local namespace | world-runtime/responsibility | yes |
+| StrategicIssue / StrategicOption / PortfolioProposal / StrategicPortfolio | owner-local namespace | world-runtime/strategy | yes |
+| ResourceBudgetLine / ResourceAllocation | owner-local namespace | world-runtime/strategy | yes |
+| QualificationBinding / ReviewCase | owner-local namespace | world-runtime/qualification | yes |
+| Work / Run / ProviderAttempt / ProviderResult | owner-local namespace | world-runtime/execution | yes |
+| Domain Acceptance / completion | owner-local namespace | Domain Controller | yes |
 
 Rules:
 
-1. One semantic identity is referenced by multiple subsystems; it is not copied into subsystem-local
-   substitutes.
-2. Projection state is derived state and does not become a second semantic authority.
-3. Runtime may preserve lineage for a Domain Outcome reference, but it does not manufacture or
-   reinterpret the domain Outcome.
-Additional ownership rules:
-
-4. Runtime owns the generic Responsibility topology, not domain process graphs.
-5. StrategicOption evaluation is data/evidence, not Decision authority; Runtime
-   does not own a universal utility function.
-6. Qualification dependencies describe the basis for current use. A dependency
-   change creates review work rather than rewriting the historical subject.
-8. Personal facts, UI projections, model-routing policy, and reusable cognitive
-   procedures remain outside the Runtime.
+1. Universal role meaning is not the same thing as payload ownership.
+2. A concrete semantic identity has one payload owner; other subsystems reference it rather than copying it into competing owner models.
+3. Projection state is derived state and does not become a second semantic authority.
+4. Runtime may preserve lineage for a Domain Outcome reference, but it does not manufacture or reinterpret the domain Outcome.
+5. Runtime owns generic Responsibility topology, not domain process graphs.
+6. StrategicOption evaluation is evidence/context, not Decision authority; Runtime does not own a universal utility function.
+7. A QualificationBinding records a current-use dependency. A dependency change opens one ReviewCase rather than rewriting the historical subject.
+8. Review assessment and review resolution are distinct transitions on the same durable ReviewCase.
+9. Personal facts, UI projections, model-routing policy, and reusable cognitive procedures remain outside the Runtime semantic inventory.
