@@ -614,7 +614,7 @@ def _keycloak_duplicate_request(operation: str) -> ConnectorResult:
     return _failed_result(
                'DuplicateExternalRequestIdentity',
                f'multiple Keycloak users share the {operation} request_ref',
-              reconciled=True,
+               reconciled=True,
            )
 
 
