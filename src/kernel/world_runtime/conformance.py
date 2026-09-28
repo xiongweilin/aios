@@ -2597,8 +2597,8 @@ def _qualification_review_not_invalidation() -> None:
         basis_refs=(SemanticRef(SemanticKind.EVIDENCE, "evidence:decision"),),
     )
     runtime.decisions.record(decision)
-    runtime.qualification.register_dependency(
-        dependency_id="qualification-dependency:conformance",
+    runtime.qualification.register_binding(
+        binding_id="qualification-dependency:conformance",
         principal="service:conformance",
         subject_ref=decision.id,
         dependency_ref="policy:pricing",
@@ -2606,16 +2606,16 @@ def _qualification_review_not_invalidation() -> None:
         assumption="pricing policy remains applicable",
         basis_refs=("evidence:policy-v1",),
     )
-    obligations = runtime.qualification.observe_dependency_change(
+    reviews = runtime.qualification.observe_dependency_change(
         principal="service:conformance",
         dependency_ref="policy:pricing",
         observed_version="v2",
         basis_refs=("evidence:policy-v2",),
     )
-    if len(obligations) != 1:
+    if len(reviews) != 1:
         raise AssertionError("dependency change did not create targeted review")
     runtime.decisions.assert_current(decision.id)
-    if runtime.qualification.get_dependency(
+    if runtime.qualification.get_binding(
         "qualification-dependency:conformance"
     ).status != "active":
         raise AssertionError("dependency change silently invalidated current basis")
@@ -2623,8 +2623,8 @@ def _qualification_review_not_invalidation() -> None:
 
 def _qualification_action_remains_pending() -> None:
     runtime = WorldRuntime.sqlite()
-    runtime.qualification.register_dependency(
-        dependency_id="qualification-dependency:pending",
+    runtime.qualification.register_binding(
+        binding_id="qualification-dependency:pending",
         principal="service:conformance",
         subject_ref="mandate:pending",
         dependency_ref="authority-source:owner",
@@ -2633,28 +2633,28 @@ def _qualification_action_remains_pending() -> None:
         review_policy={"on_change": "reauthorize"},
         basis_refs=("evidence:epoch-1",),
     )
-    obligation = runtime.qualification.observe_dependency_change(
+    review = runtime.qualification.observe_dependency_change(
         principal="service:conformance",
         dependency_ref="authority-source:owner",
         observed_version="epoch-2",
         basis_refs=("evidence:epoch-2",),
     )[0]
     runtime.qualification.assess_review(
-        obligation.id,
+        review.id,
         disposition="reauthorize",
         basis_refs=("evidence:assessment",),
     )
-    pending = runtime.qualification.pending_obligations(
+    pending = runtime.qualification.pending_reviews(
         principal="service:conformance"
     )
     if len(pending) != 1 or pending[0].status != "assessed":
         raise AssertionError("action-requiring review disappeared before owning resolution")
     runtime.qualification.resolve_review(
-        obligation.id,
+        review.id,
         resolution_ref="mandate:replacement",
         basis_refs=("evidence:resolution",),
     )
-    if runtime.qualification.pending_obligations(principal="service:conformance"):
+    if runtime.qualification.pending_reviews(principal="service:conformance"):
         raise AssertionError("resolved qualification review remained pending")
 
 
