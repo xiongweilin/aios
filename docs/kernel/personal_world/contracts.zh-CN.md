@@ -1,6 +1,6 @@
 # Personal World Contracts
 
-> 权威英文原文：[contracts.md](contracts.md)。当前 package baseline：**1.0.0**；contract manifest：**personal-world-contracts-v1**；semantic-language baseline：**0.2.0**。
+> 权威英文原文：[contracts.md](contracts.md)。当前 package baseline：**1.0.0**；contract manifest：**personal-world-contracts-v1**；semantic-language baseline：**0.3.0**。
 
 ## Provenance contracts
 
@@ -64,7 +64,7 @@ Full-subject erasure 删除该 subject 的 personal content，只保留 storage 
 
 `as_of` 是 bitemporal：revision 同时满足 `recorded_at <= t` 与 valid-time window 才具资格。Late-arriving correction 即使 valid-time 回溯，也不能在其 `recorded_at` 之前出现在 as-of view。
 
-Consumer conformance 标识为 `personal-world-conformance-v1`。Consumer 必须验证 exact contract discovery 并保持 caller purpose；projection 仍只是 personal context，不是 Runtime Authorization 或 domain outcome truth。
+Consumer conformance 标识为 `personal-world-conformance-v1`。Consumer 必须验证 exact contract discovery 并保持 caller purpose；projection 仍只是 personal context，不是 Runtime Authorization，也不是领域自有 Outcome 状态。
 
 ## Backup 与 root-subject boundary
 
