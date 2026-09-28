@@ -53,7 +53,7 @@ class RuntimeStub:
                 200,
                 json={
                     "runtime_protocol": "4.0",
-                    "semantic_language": "0.2.0",
+                    "semantic_language": "0.3.0",
                     "contracts": RUNTIME_CONTRACTS,
                 },
             )
@@ -203,7 +203,7 @@ def contract_mismatch_transport() -> httpx.MockTransport:
                 200,
                 json={
                     "runtime_protocol": "1.1",
-                    "semantic_language": "0.2.0",
+                    "semantic_language": "0.3.0",
                     "contracts": RUNTIME_CONTRACTS,
                 },
             )
