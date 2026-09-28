@@ -7,7 +7,7 @@ It preserves personal continuity across models, agents, consoles, processes, and
 
 It answers:
 
-- What is known about this person?
+- What has Personal World currently accepted or qualified about this person?
 - Why is it known?
 - Is it still current?
 - Where is the authoritative source?
@@ -41,12 +41,12 @@ It does not own:
 
 ## Core non-substitution rules
 
-1. Source != Observation != Claim != current personal state.
+1. Source != Observation != Claim != currently qualified personal record state.
 2. Historical validity != current validity.
-3. Projection != canonical truth.
+3. Projection != canonical Personal World state.
 4. Personal context != authority.
 5. Domain projection != domain ownership.
-6. Model inference != accepted personal truth.
+6. Model inference != currently qualified Personal World state.
 7. Derived retrieval index != canonical storage.
 
 ## Canonical data path
@@ -127,7 +127,7 @@ World Runtime and Personal World are independent durable systems:
 
 ```text
 Personal World:
-What is the person's world?
+What personal context has been durably represented and qualified?
 
 World Runtime:
 What durable agency exists, and why may it continue?
@@ -164,7 +164,7 @@ an empty target store.
 ## Retrieval
 
 The built-in retrieval implementation is derived from canonical records. It combines lexical overlap
-with deterministic hashed-vector similarity. It can be discarded and rebuilt without loss of truth.
+with deterministic hashed-vector similarity. It can be discarded and rebuilt without loss of canonical Personal World state.
 
 A future external vector index must obey the same rule.
 
