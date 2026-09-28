@@ -70,7 +70,8 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert catalog["contracts"]["ontology_version_history"]["current"] == "ontology-version-history-v1"
     assert catalog["contracts"]["experience_memory"]["current"] == "experience-memory-v2"
     assert catalog["contracts"]["strategy"]["current"] == "strategy-v2"
-    assert catalog["contracts"]["qualification_review"]["current"] == "qualification-review-v2"\n    assert catalog["contracts"]["authorization_revocation"]["current"] == "authorization-revocation-v1"
+    assert catalog["contracts"]["qualification_review"]["current"] == "qualification-review-v2"
+    assert catalog["contracts"]["authorization_revocation"]["current"] == "authorization-revocation-v1"
     assert catalog["contracts"]["strategy_assessment"]["current"] == "strategy-assessment-v2"
 
 
