@@ -55,8 +55,8 @@ def _run(runtime: WorldRuntime):
             id="responsibility:lease-test",
             principal="service:test",
             subject="lease test",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:lease-test",
