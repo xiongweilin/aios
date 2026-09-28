@@ -475,7 +475,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             "status": item.status,
         }
 
-    @app.post("/v1/qualification/dependencies")
+    @app.post("/v1/qualification/bindings")
     async def register_qualification_binding(
         command: QualificationBindingCommand,
         request: Request,
@@ -486,7 +486,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             _assert_transition_authority(
                 runtime,
                 context,
-                operation="register-qualification-dependency",
+                operation="register-qualification-binding",
                 resource=command.subject_ref,
             )
             item = runtime.qualification.register_binding(
@@ -585,7 +585,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
                 rationale=command.rationale,
             )
         except KeyError as exc:
-            raise HTTPException(status_code=404, detail="review obligation not found") from exc
+            raise HTTPException(status_code=404, detail="review case not found") from exc
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
@@ -614,7 +614,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
                 basis_refs=tuple(command.basis_refs),
             )
         except KeyError as exc:
-            raise HTTPException(status_code=404, detail="review obligation not found") from exc
+            raise HTTPException(status_code=404, detail="review case not found") from exc
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
@@ -634,7 +634,7 @@ def register_agency_protocol_routes(app: FastAPI, runtime: WorldRuntime) -> None
             _assert_transition_authority(
                 runtime,
                 context,
-                operation="advance-qualification-dependency",
+                operation="advance-qualification-binding",
                 resource=binding_id,
             )
             item = runtime.qualification.advance_binding_after_review(
