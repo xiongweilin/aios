@@ -356,7 +356,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
             headers=OWNER,
         )
         assert assessed.status_code == 200, assessed.text
-        assert assessed.json()["review"]["status"] == "assessed"
+        assert assessed.json()["status"] == "assessed"
 
         pending = client.get("/v1/qualification/reviews", headers=OWNER).json()["reviews"]
         assert pending[0]["status"] == "assessed"
