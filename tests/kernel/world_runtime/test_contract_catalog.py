@@ -20,7 +20,7 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert "organization_durability" in catalog["contracts"]
     assert "postgres_backup_restore" in catalog["contracts"]
     assert "institutional_lineage" in catalog["contracts"]
-        assert "authorization_revocation" in catalog["contracts"]
+    assert "authorization_revocation" in catalog["contracts"]
     assert "ontology_version_history" in catalog["contracts"]
     assert "domain_assignment" in catalog["contracts"]
     assert "domain_report" in catalog["contracts"]
