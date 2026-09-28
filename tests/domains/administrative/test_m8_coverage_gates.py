@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
 from administrative_orchestrator.domain import (
     AuthorityClass,
@@ -44,7 +43,6 @@ from administrative_orchestrator.intake.documents import (
 from administrative_orchestrator.intake.models import DocumentRepresentation, SourceArtifact
 from administrative_orchestrator.intake.repository import IntakeRepository
 from administrative_orchestrator.persistence import SqlStore
-from administrative_orchestrator.production_readiness import ProductionReadinessError
 from administrative_orchestrator.verification import (
     VerificationDisposition,
     verify_financial_observation,
