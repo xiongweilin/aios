@@ -364,7 +364,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         premature_advance = client.post(
             "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
-                "obligation_id": review_id,
+                "review_id": review_id,
                 "assessment_id": "qualification-assessment:1",
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
@@ -388,7 +388,7 @@ def test_protocol_3_continuous_qualification_requires_explicit_resolution() -> N
         advanced = client.post(
             "/v1/qualification/bindings/qualification-dependency:1/advance",
             json={
-                "obligation_id": review_id,
+                "review_id": review_id,
                 "assessment_id": "qualification-assessment:1",
                 "new_version": "v2",
                 "basis_refs": ["evidence:new-basis"],
