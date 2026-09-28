@@ -1,7 +1,7 @@
 # World Runtime contracts
 
 This document defines Runtime-owned lifecycle, authority, persistence, and execution invariants.
-Cross-domain meaning remains owned by `semantic-language`. Domain completion and real-world
+Cross-domain role meaning remains owned by `semantic-language`; concrete payload schemas remain owner-local. Domain completion and real-world
 outcome qualification remain owned by Domain Controllers.
 
 The canonical version manifest is `src/kernel/world_runtime/contracts/catalog.toml`.
@@ -21,8 +21,7 @@ postcondition has been satisfied.
 
 ## Responsibility lifecycle
 
-A standing responsibility has stable identity, principal, subject, domain, scope, semantic
-references, and lifecycle state.
+A `Responsibility` has stable identity, principal, subject, domain, scope, owner-local references, and lifecycle state.
 
 `satisfied` and `failed` assessments require explicit basis references.
 Discharge requires both a prior `satisfied` assessment and a durable Decision explicitly applicable to that Responsibility transition. Discharge is
@@ -30,7 +29,7 @@ therefore a semantic lifecycle transition, not a synonym for "workflow returned 
 
 ## Domain Controller protocol
 
-A `DomainAssignment` is a bounded delegation from one standing responsibility to one named
+A `DomainAssignment` is a bounded delegation from one `Responsibility` to one named
 Domain Controller. It carries cross-domain references, resource budget, evidence requirements,
 and review conditions. It is not Work and it is not an Authorization.
 
@@ -39,12 +38,12 @@ outcome candidates, escalation, and completion proposals. The Runtime records th
 does not reinterpret domain-owned Outcome or Acceptance semantics.
 
 An `outcome-candidate` report requires both evidence references and domain-owned outcome
-references. A completion proposal does not discharge the standing responsibility; discharge still
+references. A completion proposal does not discharge the `Responsibility`; discharge still
 requires an explicit Runtime responsibility assessment and Decision.
 
 ## Work and Run
 
-Work may only be admitted under a current `active` standing responsibility. Work and Run are runtime
+Work may only be admitted under a current `active` `Responsibility`. Work and Run are runtime
 execution records, not business obligations or domain outcomes.
 
 A Domain Controller may map one domain obligation to one or more Runtime work units, but the
@@ -81,8 +80,7 @@ outside the Runtime.
 ## Epistemics and cognition
 
 Epistemic state, cognitive search/closure/revision, experience memory, and strategy are Runtime
-primitives. Their public semantic inputs should use `semantic-language` identities and
-distinctions rather than introducing a second universal ontology.
+primitives. Cross-owner references use the closed universal roles where applicable and explicit owner-local namespaces otherwise; Runtime subsystems do not introduce a second universal ontology.
 
 ## Strategy reassessment
 
@@ -177,7 +175,7 @@ of Runtime state under a shared durable store.
 ## Institutional continuity
 
 `institutional-lineage-v1` persists the operational consequence of
-`semantic-language.Revision` without redefining Revision itself. Runtime keeps
+the universal `Revision` role without making `semantic-language` own the concrete lineage payload. Runtime keeps
 immutable historical objects and separately computes which object is currently
 qualified.
 
@@ -194,7 +192,7 @@ Current qualification is owner-specific:
 
 - a historical Decision remains readable but cannot qualify a new current
   transition after it has been superseded or explicitly revoked; Decision
-  content remains immutable while current qualification is recorded separately;
+  content remains immutable while currentness is owned by the Decision lifecycle rather than a parallel qualification object;
 - Mandate revocation is durable history; Mandate supersession preserves
   historical Authorization and use records, but current authority cannot continue
   through the superseded Mandate;
@@ -254,19 +252,12 @@ Resource budget lines bind amount and unit. Allocation is Decision-qualified,
 principal-consistent, goal-scoped where applicable, and durably CAS-fenced so
 multiple Runtime processes cannot collectively exceed one portfolio ceiling.
 
-### Continuous qualification
+### Qualification review
 
-`continuous-qualification-v1` records the dependencies that make a historical
-subject currently usable.
+`qualification-review-v2` records current-use dependencies as `QualificationBinding` objects.
+A dependency version change opens one durable `ReviewCase`; it does not silently invalidate or rewrite the historical subject.
 
-A dependency version change creates a targeted `ReviewObligation`. It does
-not silently invalidate the subject. A `RevalidationAssessment` records the
-judgment reached by review.
-
-`continue` resolves the review directly. Non-continue dispositions remain
-`assessed` until the subsystem that owns the required action records an
-explicit resolution reference. Dependency lineage may advance only after that
-resolution.
+Assessment and resolution are distinct transitions on that same ReviewCase. `continue` resolves the case directly. Non-continue dispositions remain `assessed` until the subsystem that owns the required action records an explicit resolution reference. Binding lineage may advance only after the review is resolved.
 
 This contract deliberately distinguishes:
 
@@ -288,9 +279,8 @@ the 1.0 projections in addition to the earlier Runtime graph:
 - option/proposal/portfolio linkage;
 - portfolio -> Decision;
 - resource allocation -> portfolio/Responsibility/Decision;
-- qualification review -> dependency;
-- revalidation assessment -> review;
-- superseded qualification dependency lineage.
+- qualification review -> binding;
+- superseded qualification binding lineage.
 
 A cryptographically self-consistent bundle with a dangling semantic reference
 is still invalid.

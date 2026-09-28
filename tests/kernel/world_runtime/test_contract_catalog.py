@@ -13,14 +13,13 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert catalog["owner"] == CATALOG_OWNER == "world-runtime/contracts"
     assert catalog["catalog_version"] == CATALOG_VERSION
     assert catalog["runtime_protocol"] == "4.0"
-    assert catalog["semantic_language"] == "0.2.0"
+    assert catalog["semantic_language"] == "0.3.0"
     assert "persistent_responsibility" in catalog["contracts"]
     assert "reconciliation" in catalog["contracts"]
     assert "domain_effect_execution" in catalog["contracts"]
     assert "organization_durability" in catalog["contracts"]
     assert "postgres_backup_restore" in catalog["contracts"]
     assert "institutional_lineage" in catalog["contracts"]
-    assert "decision_qualification" in catalog["contracts"]
     assert "authorization_revocation" in catalog["contracts"]
     assert "ontology_version_history" in catalog["contracts"]
     assert "domain_assignment" in catalog["contracts"]
@@ -29,7 +28,7 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert "goal_lifecycle_transition" in catalog["contracts"]
     assert "responsibility_graph" in catalog["contracts"]
     assert "strategic_agency" in catalog["contracts"]
-    assert "continuous_qualification" in catalog["contracts"]
+    assert "qualification_review" in catalog["contracts"]
     assert "state_access" in catalog["contracts"]
     assert "transition_authority" in catalog["contracts"]
     assert "fresh_execution_lifecycle" in catalog["contracts"]
@@ -71,7 +70,7 @@ def test_contract_catalog_is_runtime_owned_and_versioned() -> None:
     assert catalog["contracts"]["ontology_version_history"]["current"] == "ontology-version-history-v1"
     assert catalog["contracts"]["experience_memory"]["current"] == "experience-memory-v2"
     assert catalog["contracts"]["strategy"]["current"] == "strategy-v2"
-    assert catalog["contracts"]["decision_qualification"]["current"] == "decision-qualification-v1"
+    assert catalog["contracts"]["qualification_review"]["current"] == "qualification-review-v2"
     assert catalog["contracts"]["authorization_revocation"]["current"] == "authorization-revocation-v1"
     assert catalog["contracts"]["strategy_assessment"]["current"] == "strategy-assessment-v2"
 

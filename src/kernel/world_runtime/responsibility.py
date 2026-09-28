@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from semantic_language import Responsibility
-
-from .common import new_id
 from .decisions import assert_decision_applies
 from .ledger import SemanticLedger
 
@@ -14,16 +11,18 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
-class StandingResponsibility:
+class Responsibility:
+    """Single durable owner model for responsibility state."""
+
     id: str
     principal: str
     subject: str
     domain: str
-    scope: dict[str, Any]
-    goal_refs: tuple[str, ...]
-    constraint_refs: tuple[str, ...]
-    acceptance_refs: tuple[str, ...]
-    authority_refs: tuple[str, ...]
+    scope: dict[str, Any] = field(default_factory=dict)
+    goal_refs: tuple[str, ...] = ()
+    constraint_refs: tuple[str, ...] = ()
+    acceptance_refs: tuple[str, ...] = ()
+    authority_refs: tuple[str, ...] = ()
     status: str = "active"
 
 
@@ -43,45 +42,35 @@ class ResponsibilityService:
     def bind_graph(self, graph: ResponsibilityGraphService) -> None:
         self._graph = graph
 
-    def create(self, responsibility: Responsibility, *, domain: str) -> StandingResponsibility:
-        item = StandingResponsibility(
-            responsibility.id,
-            responsibility.principal,
-            responsibility.subject,
-            domain,
-            dict(responsibility.scope),
-            tuple(r.id for r in responsibility.goal_refs),
-            tuple(r.id for r in responsibility.constraint_refs),
-            tuple(r.id for r in responsibility.acceptance_refs),
-            tuple(r.id for r in responsibility.authority_refs),
-        )
-        incoming = self._value(item)
-        existing = self.ledger.project_get("responsibility.current", item.id)
+    def create(self, responsibility: Responsibility) -> Responsibility:
+        if responsibility.status != "active":
+            raise ValueError("new responsibility must start active")
+        incoming = self._value(responsibility)
+        existing = self.ledger.project_get("responsibility.current", responsibility.id)
         if existing is not None:
-            existing_identity = self._identity_value(existing[0])
-            incoming_identity = self._identity_value(incoming)
-            if existing_identity != incoming_identity:
+            if self._identity_value(existing[0]) != self._identity_value(incoming):
                 raise ValueError("responsibility identity rebound")
-            return self.get(item.id)
+            return self.get(responsibility.id)
 
         with self.ledger.transaction():
             self.ledger.project_put(
                 "responsibility.current",
-                item.id,
+                responsibility.id,
                 incoming,
+                expected_version=0,
             )
             self.ledger.append(
-                stream=f"responsibility:{item.id}",
+                stream=f"responsibility:{responsibility.id}",
                 kind="responsibility.created",
                 payload=incoming,
             )
-        return item
+        return responsibility
 
     def assign(self, responsibility_id: str, *, controller: str) -> str:
         current = self.get(responsibility_id)
         if current.status != "active":
             raise ValueError("domain assignment requires active responsibility")
-        assignment_id = new_id("domain-assignment")
+        assignment_id = f"domain-assignment:{responsibility_id}:{controller}"
         value = {
             "id": assignment_id,
             "responsibility_id": responsibility_id,
@@ -89,15 +78,32 @@ class ResponsibilityService:
             "controller": controller,
             "status": "offered",
         }
-        self.ledger.project_put("responsibility.assignment", assignment_id, value)
-        self.ledger.append(
-            stream=f"responsibility:{responsibility_id}",
-            kind="responsibility.assignment.offered",
-            payload=value,
-        )
+        existing = self.ledger.project_get("responsibility.assignment", assignment_id)
+        if existing is not None:
+            if existing[0] != value:
+                raise ValueError("responsibility assignment identity rebound")
+            return assignment_id
+        with self.ledger.transaction():
+            self.ledger.project_put(
+                "responsibility.assignment",
+                assignment_id,
+                value,
+                expected_version=0,
+            )
+            self.ledger.append(
+                stream=f"responsibility:{responsibility_id}",
+                kind="responsibility.assignment.offered",
+                payload=value,
+            )
         return assignment_id
 
-    def assess(self, responsibility_id: str, *, status: str, basis_refs: tuple[str, ...]) -> str:
+    def assess(
+        self,
+        responsibility_id: str,
+        *,
+        status: str,
+        basis_refs: tuple[str, ...],
+    ) -> str:
         if status not in {"active", "blocked", "satisfied", "failed"}:
             raise ValueError(status)
         if status in {"satisfied", "failed"} and not basis_refs:
@@ -171,22 +177,22 @@ class ResponsibilityService:
             )
         return event.id
 
-    def get(self, responsibility_id: str) -> StandingResponsibility:
+    def get(self, responsibility_id: str) -> Responsibility:
         row = self.ledger.project_get("responsibility.current", responsibility_id)
         if row is None:
             raise KeyError(responsibility_id)
         v = row[0]
-        return StandingResponsibility(
-            v["id"],
-            v["principal"],
-            v["subject"],
-            v["domain"],
-            dict(v.get("scope", {})),
-            tuple(v["goal_refs"]),
-            tuple(v["constraint_refs"]),
-            tuple(v["acceptance_refs"]),
-            tuple(v["authority_refs"]),
-            v["status"],
+        return Responsibility(
+            id=str(v["id"]),
+            principal=str(v["principal"]),
+            subject=str(v["subject"]),
+            domain=str(v["domain"]),
+            scope=dict(v.get("scope", {})),
+            goal_refs=tuple(str(item) for item in v.get("goal_refs", [])),
+            constraint_refs=tuple(str(item) for item in v.get("constraint_refs", [])),
+            acceptance_refs=tuple(str(item) for item in v.get("acceptance_refs", [])),
+            authority_refs=tuple(str(item) for item in v.get("authority_refs", [])),
+            status=str(v.get("status", "active")),
         )
 
     @staticmethod
@@ -207,7 +213,7 @@ class ResponsibilityService:
         }
 
     @staticmethod
-    def _value(item: StandingResponsibility) -> dict[str, Any]:
+    def _value(item: Responsibility) -> dict[str, Any]:
         return {
             "id": item.id,
             "principal": item.principal,
@@ -220,3 +226,6 @@ class ResponsibilityService:
             "authority_refs": list(item.authority_refs),
             "status": item.status,
         }
+
+
+__all__ = ["Responsibility", "ResponsibilityService"]

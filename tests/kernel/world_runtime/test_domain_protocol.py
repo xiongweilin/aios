@@ -1,5 +1,6 @@
+from world_runtime.responsibility import Responsibility
 import pytest
-from semantic_language import Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import DomainAssignment, WorldRuntime
 
@@ -10,8 +11,9 @@ def test_domain_assignment_is_idempotent_across_acceptance() -> None:
         id="responsibility:domain-test",
         principal="controller:test",
         subject="bounded domain work",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = DomainAssignment(
         id="assignment:test",
         responsibility_ref=responsibility.id,
@@ -38,8 +40,9 @@ def test_domain_outcome_candidate_requires_domain_evidence_and_identity() -> Non
         id="responsibility:domain-outcome",
         principal="controller:test",
         subject="bounded domain outcome",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:outcome",
@@ -78,8 +81,9 @@ def test_completion_requires_prior_acceptance_and_old_accept_replay_is_idempoten
         id="responsibility:domain-transition",
         principal="controller:test",
         subject="bounded transition",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:transition",
@@ -128,8 +132,9 @@ def test_rejected_is_only_valid_from_offered_and_assignment_status_is_runtime_ow
         id="responsibility:reject-state",
         principal="controller:test",
         subject="bounded transition",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
 
     with pytest.raises(TypeError):
         DomainAssignment(
@@ -167,8 +172,9 @@ def test_domain_report_requires_typed_evidence_and_namespaced_outcome_refs() -> 
         id="responsibility:typed-refs",
         principal="controller:test",
         subject="typed refs",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:typed-refs",
@@ -188,7 +194,7 @@ def test_domain_report_requires_typed_evidence_and_namespaced_outcome_refs() -> 
             assignment.id,
             kind="outcome-candidate",
             report_id="report:typed-refs:bad-evidence",
-            evidence_refs=(SemanticRef(SemanticKind.GOAL, "goal:not-evidence"),),
+            evidence_refs=(SemanticRef(SemanticKind.DECISION, "decision:not-evidence"),),
             outcome_refs=(
                 SemanticRef(
                     SemanticKind.OUTCOME,

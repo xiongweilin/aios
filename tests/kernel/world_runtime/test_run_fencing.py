@@ -1,6 +1,6 @@
+from world_runtime.responsibility import Responsibility
 import pytest
 
-from semantic_language import Responsibility
 
 from world_runtime import WorldRuntime
 from world_runtime.execution import (
@@ -55,8 +55,8 @@ def _run(runtime: WorldRuntime):
             id="responsibility:lease-test",
             principal="service:test",
             subject="lease test",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:lease-test",

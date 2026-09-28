@@ -1,4 +1,4 @@
-from semantic_language import Claim, Evidence, Unknown
+from world_runtime.epistemics import Claim, Evidence, Unknown
 
 from world_runtime import (
     BeliefVerdict,

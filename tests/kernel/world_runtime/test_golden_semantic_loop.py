@@ -1,16 +1,12 @@
+from world_runtime.epistemics import Claim, Evidence
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
 import pytest
-from semantic_language import (
-    Claim,
-    Decision,
-    Evidence,
-    Goal,
-    Mandate,
-    Responsibility,
-    SemanticKind,
-    SemanticRef,
-)
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import (
     BeliefVerdict,
@@ -129,9 +125,10 @@ async def test_mandate_to_reality_to_belief_and_strategy_survives_restart(
         id="responsibility:checkout",
         principal="controller:development",
         subject="reduce checkout latency",
-        goal_refs=(goal.ref,),
+        goal_refs=(goal.id,),
+        domain="development",
     )
-    runtime.responsibility.create(responsibility, domain="development")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:checkout",

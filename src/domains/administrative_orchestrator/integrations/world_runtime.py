@@ -5,6 +5,8 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 
+from aios.runtime_compat import SEMANTIC_KERNEL_VERSION, WORLD_RUNTIME_PROTOCOL
+
 from ..config import Settings
 from ..domain import AdministrativeCase, CaseStatus, EffectRecord
 from ..effect_provider import (
@@ -58,8 +60,8 @@ def _effect_matches_current_execution(
 class WorldRuntimeBridge:
     """Compile governed Administrative effects into the generic World Runtime surface."""
 
-    REQUIRED_RUNTIME_PROTOCOL = "4.0"
-    REQUIRED_SEMANTIC_LANGUAGE = "0.2.0"
+    REQUIRED_RUNTIME_PROTOCOL = WORLD_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = SEMANTIC_KERNEL_VERSION
     REQUIRED_CONTRACTS = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",

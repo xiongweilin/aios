@@ -1,15 +1,55 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Mapping
 
-from semantic_language import Authorization, Mandate, Revision, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from .common import new_id, utcnow
 from .decisions import assert_decision_applies
 from .identity import AuthenticatedRequestContext
 from .ledger import SemanticLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
+
+
+GOVERNANCE_NAMESPACE = "world-runtime.governance"
+MANDATE_KIND = "mandate"
+
+
+def mandate_ref(mandate_id: str) -> SemanticRef:
+    return SemanticRef(
+        kind=MANDATE_KIND,
+        id=mandate_id,
+        namespace=GOVERNANCE_NAMESPACE,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Mandate:
+    id: str
+    principal: str
+    scope: Mapping[str, Any] = field(default_factory=dict)
+    authority_ceiling: Mapping[str, Any] = field(default_factory=dict)
+    expires_at: datetime | None = None
+
+    @property
+    def ref(self) -> SemanticRef:
+        return mandate_ref(self.id)
+
+
+@dataclass(frozen=True, slots=True)
+class Authorization:
+    id: str
+    principal: str
+    action: str
+    resource: str
+    conditions: Mapping[str, Any] = field(default_factory=dict)
+    expires_at: datetime | None = None
+
+    @property
+    def ref(self) -> SemanticRef:
+        return SemanticRef(SemanticKind.AUTHORIZATION, self.id)
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -43,9 +83,7 @@ def assert_mandate_current(
     mandate_id: str,
 ) -> Mapping[str, Any]:
     try:
-        RevisionLineageService(ledger).assert_current(
-            SemanticRef(SemanticKind.MANDATE, mandate_id)
-        )
+        RevisionLineageService(ledger).assert_current(mandate_ref(mandate_id))
     except ValueError as exc:
         raise PermissionError("mandate has been superseded") from exc
     row = ledger.project_get("governance.mandate", mandate_id)
@@ -58,11 +96,7 @@ def assert_mandate_current(
 
 def _assert_scope_allows(mandate: Mapping[str, Any], resource: str) -> None:
     scope = dict(mandate.get("scope", {}))
-    explicit = None
-    if "resource" in scope:
-        explicit = scope["resource"]
-    elif "resources" in scope:
-        explicit = scope["resources"]
+    explicit = scope.get("resource", scope.get("resources"))
     if explicit is not None and not _matches_constraint(explicit, resource):
         raise PermissionError("resource is outside mandate scope")
 
@@ -78,27 +112,20 @@ def _assert_authority_ceiling(
         raise PermissionError("mandate delegates no executable effect authority")
 
     recognized = False
-    if "action" in ceiling:
-        recognized = True
-        if not _matches_constraint(ceiling["action"], action):
-            raise PermissionError("action exceeds mandate authority ceiling")
-    if "actions" in ceiling:
-        recognized = True
-        if not _matches_constraint(ceiling["actions"], action):
-            raise PermissionError("action exceeds mandate authority ceiling")
-    if "resource" in ceiling:
-        recognized = True
-        if not _matches_constraint(ceiling["resource"], resource):
-            raise PermissionError("resource exceeds mandate authority ceiling")
-    if "resources" in ceiling:
-        recognized = True
-        if not _matches_constraint(ceiling["resources"], resource):
-            raise PermissionError("resource exceeds mandate authority ceiling")
+    for key in ("action", "actions"):
+        if key in ceiling:
+            recognized = True
+            if not _matches_constraint(ceiling[key], action):
+                raise PermissionError("action exceeds mandate authority ceiling")
+    for key in ("resource", "resources"):
+        if key in ceiling:
+            recognized = True
+            if not _matches_constraint(ceiling[key], resource):
+                raise PermissionError("resource exceeds mandate authority ceiling")
     if action in ceiling:
         recognized = True
         if not _matches_constraint(ceiling[action], resource):
             raise PermissionError("resource exceeds action-specific authority ceiling")
-
     if not recognized:
         raise PermissionError("mandate authority ceiling has no executable rule for requested action")
 
@@ -184,27 +211,10 @@ class GovernanceService:
         existing = self.ledger.project_get("governance.mandate", mandate.id)
         if existing is not None:
             existing_attestation = existing[0].get("issuer_attestation")
-            existing_identity = {
-                key: existing[0].get(key)
-                for key in (
-                    "id",
-                    "principal",
-                    "scope",
-                    "authority_ceiling",
-                    "expires_at",
-                )
-            }
-            incoming_identity = {
-                key: value.get(key)
-                for key in (
-                    "id",
-                    "principal",
-                    "scope",
-                    "authority_ceiling",
-                    "expires_at",
-                )
-            }
-            if existing_identity != incoming_identity:
+            identity_keys = ("id", "principal", "scope", "authority_ceiling", "expires_at")
+            if {k: existing[0].get(k) for k in identity_keys} != {
+                k: value.get(k) for k in identity_keys
+            }:
                 raise ValueError("mandate identity rebound")
             if attestation is not None:
                 if not isinstance(existing_attestation, Mapping):
@@ -221,7 +231,12 @@ class GovernanceService:
         if attestation is not None:
             value["issuer_attestation"] = dict(attestation)
         with self.ledger.transaction():
-            self.ledger.project_put("governance.mandate", mandate.id, value)
+            self.ledger.project_put(
+                "governance.mandate",
+                mandate.id,
+                value,
+                expected_version=0,
+            )
             self.ledger.append(
                 stream=f"mandate:{mandate.id}",
                 kind="governance.mandate.registered",
@@ -252,10 +267,7 @@ class GovernanceService:
             self.ledger.append(
                 stream=f"mandate:{mandate_id}",
                 kind="governance.mandate.revoked",
-                payload={
-                    "mandate_id": mandate_id,
-                    "reason": reason,
-                },
+                payload={"mandate_id": mandate_id, "reason": reason},
             )
 
     def supersede_mandate(
@@ -266,7 +278,7 @@ class GovernanceService:
         *,
         context: AuthenticatedRequestContext | None = None,
     ) -> None:
-        previous_ref = SemanticRef(SemanticKind.MANDATE, previous_id)
+        previous_ref = mandate_ref(previous_id)
         if revision.supersedes_ref != previous_ref:
             raise ValueError("Mandate Revision must supersede the selected Mandate")
         if revision.target_ref != successor.ref:
@@ -286,8 +298,7 @@ class GovernanceService:
             )
 
         updated_previous = dict(previous)
-        updated_previous["status"] = "revoked"
-        updated_previous["revocation_reason"] = f"superseded:{successor.id}"
+        updated_previous["status"] = "superseded"
         updated_previous["superseded_by"] = successor.id
         updated_previous["revision_id"] = revision.id
 
@@ -314,9 +325,7 @@ class GovernanceService:
             )
 
     def get_current_mandate(self, mandate_id: str) -> Mapping[str, Any]:
-        current = self.lineage.resolve_current(
-            SemanticRef(SemanticKind.MANDATE, mandate_id)
-        )
+        current = self.lineage.resolve_current(mandate_ref(mandate_id))
         return assert_mandate_current(self.ledger, current.id)
 
     def issue_authorization_attested(
@@ -398,10 +407,10 @@ class GovernanceService:
         resource: str,
         mandate_id: str,
         decision_id: str,
-        conditions: Mapping[str, Any] | None = None,
-        annotations: Mapping[str, Any] | None = None,
-        expires_at: datetime | None = None,
-        authorization_id: str | None = None,
+        conditions: Mapping[str, Any] | None,
+        annotations: Mapping[str, Any] | None,
+        expires_at: datetime | None,
+        authorization_id: str | None,
         issuer_attestation: Mapping[str, Any] | None,
     ) -> Authorization:
         mandate = assert_mandate_current(self.ledger, mandate_id)
@@ -417,11 +426,7 @@ class GovernanceService:
         if expires_at is not None and expires_at <= utcnow():
             raise PermissionError("cannot issue an already expired authorization")
         mandate_expiry = _parse_datetime(mandate.get("expires_at"))
-        if (
-            expires_at is not None
-            and mandate_expiry is not None
-            and expires_at > mandate_expiry
-        ):
+        if expires_at is not None and mandate_expiry is not None and expires_at > mandate_expiry:
             raise PermissionError("authorization cannot outlive its mandate")
         _validate_conditions(dict(conditions or {}))
 
@@ -447,11 +452,7 @@ class GovernanceService:
             comparable = dict(existing[0])
             comparable.pop("uses", None)
             comparable.pop("issuer_attestation", None)
-            incoming = {
-                key: value[key]
-                for key in value
-                if key not in {"uses", "issuer_attestation"}
-            }
+            incoming = {key: value[key] for key in value if key not in {"uses", "issuer_attestation"}}
             if comparable != incoming:
                 raise PermissionError("authorization identity rebound")
             if issuer_attestation is not None:
@@ -483,7 +484,12 @@ class GovernanceService:
             expires_at=expires_at,
         )
         with self.ledger.transaction():
-            self.ledger.project_put("governance.authorization", auth.id, value)
+            self.ledger.project_put(
+                "governance.authorization",
+                auth.id,
+                value,
+                expected_version=0,
+            )
             self.ledger.append(
                 stream=f"authorization:{auth.id}",
                 kind="governance.authorization.issued",
@@ -502,10 +508,7 @@ class GovernanceService:
             raise ValueError("authorization revocation requires reason")
         if not basis_refs:
             raise ValueError("authorization revocation requires basis refs")
-        current = self.ledger.project_get(
-            "governance.authorization",
-            authorization_id,
-        )
+        current = self.ledger.project_get("governance.authorization", authorization_id)
         if current is None:
             raise KeyError(authorization_id)
         value, version = current
@@ -597,4 +600,10 @@ class GovernanceService:
             )
 
 
-__all__ = ["GovernanceService", "assert_mandate_current"]
+__all__ = [
+    "Authorization",
+    "GovernanceService",
+    "Mandate",
+    "assert_mandate_current",
+    "mandate_ref",
+]

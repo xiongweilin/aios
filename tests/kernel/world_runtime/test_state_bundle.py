@@ -1,7 +1,10 @@
+from world_runtime.decisions import Decision
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 import copy
 
 import pytest
-from semantic_language import Decision, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 
@@ -13,8 +16,8 @@ def _populated_runtime() -> WorldRuntime:
             id="responsibility:bundle",
             principal="service:test",
             subject="bundle",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:bundle",

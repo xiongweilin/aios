@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: aios-ci-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,5 +41,15 @@ jobs:
         run: python -m compileall -q src
       - name: Ruff
         run: ruff check src tests
+      - name: Import boundaries
+        run: lint-imports
+      - name: Semantic acceptance
+        run: >-
+          pytest -q
+          tests/kernel/world_runtime/test_refactor_architecture.py
+          tests/kernel/world_runtime/test_semantic_ownership.py
+          tests/kernel/world_runtime/test_continuous_qualification.py
+          tests/kernel/world_runtime/test_contract_catalog.py
+          tests/kernel/world_runtime/test_conformance.py
       - name: Tests
         run: pytest -m "not postgres and not integration" --ignore=tests/acceptance

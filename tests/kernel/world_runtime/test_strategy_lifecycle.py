@@ -1,4 +1,7 @@
-from semantic_language import Decision, Goal, Mandate, SemanticKind, SemanticRef
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 

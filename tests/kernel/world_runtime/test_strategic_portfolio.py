@@ -1,5 +1,9 @@
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 import pytest
-from semantic_language import Decision, Goal, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import WorldRuntime
 
@@ -52,9 +56,10 @@ def _setup(runtime: WorldRuntime) -> tuple[Mandate, Goal, Responsibility]:
         principal="owner",
         subject="acquire customers",
         scope={"quarter": "Q4"},
-        goal_refs=(goal.ref,),
+        goal_refs=(goal.id,),
+        domain="sales",
     )
-    runtime.responsibility.create(responsibility, domain="sales")
+    runtime.responsibility.create(responsibility)
     return mandate, goal, responsibility
 
 

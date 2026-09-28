@@ -9,19 +9,23 @@ from .cognition import (
     InvestigationClosureReadiness,
     SearchBudget,
 )
-from .decisions import DecisionLedger
+from .decisions import Decision, DecisionLedger
 from .domains import DomainAssignment, DomainProtocolService, DomainReport
 from .epistemics import (
     BeliefState,
     BeliefVerdict,
+    Claim,
     ClaimRevision,
+    Conflict,
     EpistemicLedger,
+    Evidence,
     EvidenceAssessment,
     EvidencePredicate,
     EvidenceRelation,
     EvidenceRequirement,
     EvaluatorKind,
     FalsificationCondition,
+    Unknown,
     evaluate_predicate,
 )
 from .execution import (
@@ -35,18 +39,13 @@ from .execution import (
     Run,
     Work,
 )
-from .governance import GovernanceService
+from .governance import Authorization, GovernanceService, Mandate
 from .identity import IdentityService
 from .ledger import LedgerEvent, SemanticLedger, SQLiteLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
 from .memory import Experience, MemoryService
 from .ontology import OntologyRegistry, SemanticTypeDefinition
-from .qualification import (
-    QualificationDependency,
-    QualificationService,
-    ReviewObligation,
-    RevalidationAssessment,
-)
+from .qualification import QualificationBinding, QualificationService, ReviewCase
 from .recovery import (
     RecoveryDisposition,
     RecoveryDispositionKind,
@@ -54,11 +53,11 @@ from .recovery import (
     RecoveryResolutionStatus,
     RecoveryService,
 )
-from .responsibility import ResponsibilityService, StandingResponsibility
+from .responsibility import Responsibility, ResponsibilityService
 from .responsibility_graph import ResponsibilityGraphService, ResponsibilityRelation
 from .runtime import WorldRuntime
 from .state_bundle import BUNDLE_VERSION, BundleValidation, StateBundleService
-from .strategy import GoalLifecycleTransition, StrategyAssessment, StrategyService
+from .strategy import Goal, GoalLifecycleTransition, StrategyAssessment, StrategyService
 from .strategic_portfolio import (
     PortfolioProposal,
     ResourceAllocation,
@@ -69,18 +68,18 @@ from .strategic_portfolio import (
 )
 
 __all__ = [
-    "BeliefState", "BeliefVerdict", "ClaimRevision", "Candidate", "CapabilityRequest", "CapabilityResult",
-    "ClosureReadiness", "CognitionEngine", "DecisionLedger", "DomainAssignment",
-    "DomainProtocolService", "DomainReport", "EffectClass", "EpistemicLedger", "EvidenceAssessment",
+    "Authorization", "BeliefState", "BeliefVerdict", "Claim", "ClaimRevision", "Conflict", "Candidate", "CapabilityRequest", "CapabilityResult",
+    "ClosureReadiness", "CognitionEngine", "Decision", "DecisionLedger", "DomainAssignment",
+    "DomainProtocolService", "DomainReport", "EffectClass", "EpistemicLedger", "Evidence", "EvidenceAssessment",
     "EvidencePredicate", "EvidenceRelation", "EvidenceRequirement", "EvaluatorKind",
     "FalsificationCondition",
-    "Experience", "GovernanceService", "GoalLifecycleTransition", "IdentityService",
+    "Experience", "GovernanceService", "Goal", "GoalLifecycleTransition", "IdentityService",
     "InvestigationBudget", "InvestigationCandidate", "InvestigationClosureReadiness",
     "InvocationContext", "LedgerEvent", "MemoryService", "OntologyRegistry",
-    "RevisionLineageService", "SemanticTypeDefinition",
-    "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "QualificationDependency", "QualificationService", "ReviewObligation", "RevalidationAssessment", "RecoveryDisposition",
+    "Mandate", "Revision", "RevisionLineageService", "SemanticTypeDefinition",
+    "ProviderDescriptor", "ProviderHealth", "ProviderRegistry", "QualificationBinding", "QualificationService", "ReviewCase", "RecoveryDisposition",
     "RecoveryDispositionKind", "RecoveryResolution", "RecoveryResolutionStatus",
-    "RecoveryService", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger", "SearchBudget",
-    "StandingResponsibility", "StrategicIssue", "StrategicPortfolio", "StrategicPortfolioService", "PortfolioProposal", "ResourceAllocation", "ResourceBudgetLine", "StrategyAssessment", "StrategyService", "BUNDLE_VERSION", "BundleValidation",
-    "StateBundleService", "Work", "WorldRuntime", "evaluate_predicate",
+    "RecoveryService", "Responsibility", "ResponsibilityGraphService", "ResponsibilityRelation", "ResponsibilityService", "Run", "SemanticLedger", "SQLiteLedger", "SearchBudget",
+    "StrategicIssue", "StrategicPortfolio", "StrategicPortfolioService", "PortfolioProposal", "ResourceAllocation", "ResourceBudgetLine", "StrategyAssessment", "StrategyService", "BUNDLE_VERSION", "BundleValidation",
+    "StateBundleService", "Unknown", "Work", "WorldRuntime", "evaluate_predicate",
 ]

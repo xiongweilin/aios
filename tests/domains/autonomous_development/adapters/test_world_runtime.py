@@ -396,7 +396,7 @@ def test_world_runtime_contract_handshake_fails_closed_on_version_drift() -> Non
                 200,
                 json={
                     "runtime_protocol": "1.1",
-                    "semantic_language": "0.2.0",
+                    "semantic_language": "0.3.0",
                     "contracts": {},
                 },
             )
@@ -427,7 +427,7 @@ def test_world_runtime_contract_handshake_requires_exact_contract_ids() -> None:
                 200,
                 json={
                     "runtime_protocol": WorldRuntimeDevelopmentBridge.REQUIRED_RUNTIME_PROTOCOL,
-                    "semantic_language": "0.2.0",
+                    "semantic_language": "0.3.0",
                     "contracts": contracts,
                 },
             )

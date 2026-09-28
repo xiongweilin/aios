@@ -7,7 +7,11 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
-from semantic_language import Decision, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
+
+from .decisions import Decision
+from .governance import Mandate
+from .responsibility import Responsibility
 
 from .agency_protocol import register_agency_protocol_routes
 from .conformance import conformance_vectors
@@ -304,9 +308,9 @@ def create_app(runtime: WorldRuntime) -> FastAPI:
                     id=command.id,
                     principal=command.principal,
                     subject=command.subject,
+                    domain=command.domain,
                     scope=command.scope,
                 ),
-                domain=command.domain,
             )
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc

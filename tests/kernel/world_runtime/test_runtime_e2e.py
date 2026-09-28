@@ -1,9 +1,13 @@
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
 import world_runtime
 import world_runtime.execution as execution_module
 import pytest
-from semantic_language import Decision, Goal, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import CapabilityRequest, CapabilityResult, WorldRuntime
 from world_runtime.execution import InvocationContext, ProviderDescriptor, ProviderHealth
@@ -74,9 +78,10 @@ async def test_authorized_provider_success_is_not_outcome_or_discharge(tmp_path:
         id="responsibility:1",
         principal="development-controller",
         subject="checkout",
-        goal_refs=(goal.ref,),
+        goal_refs=(goal.id,),
+        domain="development",
     )
-    rt.responsibility.create(responsibility, domain="development")
+    rt.responsibility.create(responsibility)
     work = rt.execution.admit_work(
         responsibility_id=responsibility.id,
         kind="domain-assignment",

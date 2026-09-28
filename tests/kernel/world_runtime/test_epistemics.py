@@ -1,7 +1,8 @@
+from world_runtime.epistemics import Claim, Conflict, Evidence, Unknown
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from semantic_language import Claim, Conflict, Evidence, SemanticKind, SemanticRef, Unknown
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import (
     BeliefVerdict,

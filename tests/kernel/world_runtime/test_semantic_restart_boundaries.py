@@ -1,15 +1,11 @@
+from world_runtime.epistemics import Claim, Evidence
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from pathlib import Path
 
-from semantic_language import (
-    Claim,
-    Decision,
-    Evidence,
-    Goal,
-    Mandate,
-    Responsibility,
-    SemanticKind,
-    SemanticRef,
-)
+from semantic_language import SemanticKind, SemanticRef
 
 from world_runtime import (
     BeliefVerdict,
@@ -96,8 +92,9 @@ def test_restart_after_domain_assignment_acceptance(tmp_path: Path) -> None:
         id="responsibility:restart-assignment",
         principal="controller:test",
         subject="bounded work",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:restart",
@@ -150,9 +147,10 @@ def test_restart_after_outcome_report_before_strategy_assessment(tmp_path: Path)
         id="responsibility:outcome-restart",
         principal="controller:test",
         subject="produce outcome",
-        goal_refs=(goal.ref,),
+        goal_refs=(goal.id,),
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = runtime.domains.offer(
         DomainAssignment(
             id="assignment:outcome-restart",
@@ -202,8 +200,9 @@ def test_restart_before_dispatch_has_no_provider_attempt(tmp_path: Path) -> None
         id="responsibility:before-dispatch",
         principal="controller:test",
         subject="bounded work",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     work = runtime.execution.admit_work(
         responsibility_id=responsibility.id,
         kind="restart-boundary",

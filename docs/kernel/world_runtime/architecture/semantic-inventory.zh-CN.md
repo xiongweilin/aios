@@ -1,32 +1,42 @@
 # 语义清单与所有权
 
-World Runtime 对每个 semantic concept 使用一个 canonical owner。Universal meaning 由 `semantic-language` 拥有；Runtime 拥有 durable lifecycle specialization；Domain Controller 拥有 domain-specific lifecycle、Outcome qualification、Acceptance 和 completion。
+World Runtime 将 universal role vocabulary 与具体 payload ownership 分开。
 
-| Concept | Canonical owner | Durable |
-| --- | --- | --- |
-| Claim / Evidence / Unknown / Conflict | semantic-language | yes |
-| Goal / Constraint / Mandate | semantic-language | yes |
-| Decision / Authorization / Responsibility | semantic-language | yes |
-| Effect / Outcome / Acceptance | semantic-language | yes |
-| ClaimRevision / EvidenceAssessment / BeliefState | world-runtime/epistemics | yes |
-| CognitiveControllerState | world-runtime/cognition | yes |
-| Experience | world-runtime/memory | yes |
-| StandingResponsibility | world-runtime/responsibility | yes |
-| DomainAssignment / DomainReport | world-runtime/domains | yes |
-| StrategyAssessment | world-runtime/strategy | yes |
-| ResponsibilityRelation | world-runtime/responsibility | yes |
-| StrategicIssue / StrategicOption / PortfolioProposal / StrategicPortfolio | world-runtime/strategy | yes |
-| ResourceBudgetLine / ResourceAllocation | world-runtime/strategy | yes |
-| QualificationDependency / ReviewObligation / RevalidationAssessment | world-runtime/qualification | yes |
-| Work / Run / ProviderAttempt / ProviderResult | world-runtime/execution | yes |
-| Domain Outcome qualification / Domain Acceptance | Domain Controller | yes |
+`semantic-language` 只拥有封闭的跨领域 role set 与 non-substitution rule。
+Runtime subsystem 与 Domain Controller 拥有具体 schema、lifecycle、persistence 和 policy。
+
+| Concept / role | Role vocabulary owner | Concrete payload owner | Durable |
+| --- | --- | --- | --- |
+| Claim / Evidence / Unknown | semantic-language | world-runtime/epistemics | yes |
+| Decision | semantic-language | world-runtime/decisions | yes |
+| Authorization | semantic-language | world-runtime/governance | yes |
+| Responsibility | semantic-language | world-runtime/responsibility | yes |
+| Revision | semantic-language | world-runtime/lineage | yes |
+| Effect | semantic-language | world-runtime/execution / effect boundary | yes |
+| Outcome | semantic-language | Domain Controller | yes |
+| Goal | owner-local namespace | world-runtime/strategy | yes |
+| Mandate | owner-local namespace | world-runtime/governance | yes |
+| Conflict | owner-local namespace | world-runtime/epistemics | yes |
+| ClaimRevision / EvidenceAssessment / BeliefState | owner-local namespace | world-runtime/epistemics | yes |
+| CognitiveControllerState | owner-local namespace | world-runtime/cognition | yes |
+| Experience | owner-local namespace | world-runtime/memory | yes |
+| DomainAssignment / DomainReport | owner-local namespace | world-runtime/domains | yes |
+| StrategyAssessment | owner-local namespace | world-runtime/strategy | yes |
+| ResponsibilityRelation | owner-local namespace | world-runtime/responsibility | yes |
+| StrategicIssue / StrategicOption / PortfolioProposal / StrategicPortfolio | owner-local namespace | world-runtime/strategy | yes |
+| ResourceBudgetLine / ResourceAllocation | owner-local namespace | world-runtime/strategy | yes |
+| QualificationBinding / ReviewCase | owner-local namespace | world-runtime/qualification | yes |
+| Work / Run / ProviderAttempt / ProviderResult | owner-local namespace | world-runtime/execution | yes |
+| Domain Acceptance / completion | owner-local namespace | Domain Controller | yes |
 
 规则：
 
-1. 一个 semantic identity 可以被多个 subsystem 引用，但不能被复制成 subsystem-local substitute。
-2. Projection state 是 derived state，不会变成第二个 semantic authority。
-3. Runtime 可以保存 Domain Outcome reference 的 lineage，但不会制造或重新解释 domain Outcome。
-4. Runtime 拥有 generic Responsibility topology，而不是 domain process graph。
-5. StrategicOption evaluation 是 data/evidence，不是 Decision authority；Runtime 不拥有 universal utility function。
-6. Qualification dependency 描述当前使用的 basis。Dependency change 创建 review work，而不是改写 historical subject。
-8. Personal fact、UI projection、model-routing policy 和可复用 cognitive procedure 继续位于 Runtime 之外。
+1. Universal role meaning 不等于 payload ownership。
+2. 一个 concrete semantic identity 只有一个 payload owner；其他 subsystem 通过引用使用它，不复制出竞争 owner model。
+3. Projection state 是 derived state，不会变成第二个 semantic authority。
+4. Runtime 可以保存 Domain Outcome reference 的 lineage，但不会制造或重新解释 domain Outcome。
+5. Runtime 拥有 generic Responsibility topology，而不是 domain process graph。
+6. StrategicOption evaluation 是 evidence/context，不是 Decision authority；Runtime 不拥有 universal utility function。
+7. QualificationBinding 记录当前使用依赖；dependency change 打开一个 ReviewCase，而不是改写 historical subject。
+8. Review assessment 与 review resolution 是同一个 durable ReviewCase 上的两个不同 transition。
+9. Personal fact、UI projection、model-routing policy 和可复用 cognitive procedure 不进入 Runtime semantic inventory。

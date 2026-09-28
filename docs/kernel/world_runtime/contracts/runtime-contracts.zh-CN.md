@@ -6,13 +6,13 @@
 
 ## 所有权
 
-World Runtime 持有通用 durable agency/execution 语义：Responsibility、Work、Run、Decision、Mandate、Authorization、capability invocation、durable provider attempt、reconciliation 和 recovery。
+World Runtime 持有这些对象的具体 durable payload/lifecycle：Responsibility、Work、Run、Decision、Mandate、Authorization、capability invocation、durable provider attempt、reconciliation 和 recovery。`semantic-language` 只持有跨领域 role vocabulary 与 non-substitution boundary，不持有这些 payload schema。
 
 它不拥有 employee onboarding、invoice matching、canary/release 等 domain lifecycle，也不把 provider success 当作 domain Outcome。Domain Controller 必须独立读取现实并判断自己的 postcondition。
 
 ## Responsibility 与 Domain Controller
 
-Standing Responsibility 有稳定 identity、principal、subject、domain、scope 和 lifecycle。Discharge 需要先有带 basis 的 satisfied assessment，再有明确适用于该 transition 的 durable Decision。
+`Responsibility` 是唯一 durable owner model，具有稳定 identity、principal、subject、domain、scope 和 lifecycle，不再存在独立 StandingResponsibility payload。Discharge 需要先有带 basis 的 satisfied assessment，再有明确适用于该 transition 的 durable Decision。
 
 `DomainAssignment` 是 bounded delegation，不是 Work 或 Authorization。`DomainReport` 保存 Controller 到 Runtime 的 progress/evidence/outcome-candidate/completion lineage；completion proposal 不会自动 discharge Responsibility。
 
@@ -57,6 +57,15 @@ SQLite 是 local reference backend；PostgreSQL 是 shared backend，并通过 p
 
 ## 演进规则
 
-Epistemic/cognition/memory/strategy 可以是 Runtime primitive，但不能形成第二个 universal semantic ontology。
+Epistemic/cognition/memory/strategy 可以是 Runtime primitive。跨 owner 引用优先使用闭合 universal role；owner-specific concept 使用 non-universal namespace，不能形成第二个 universal semantic ontology。
 
 Externally observable contract semantics 变化才创建新 contract version；内部 refactor 不创建新版本。
+
+
+## Qualification review v2
+
+Qualification 只保留两个 durable entity：`QualificationBinding` 与 `ReviewCase`。
+Dependency version change 打开一个 ReviewCase，不自动使 historical subject 失效。
+Assessment 与 resolution 是同一个 ReviewCase 上的不同 transition；`continue` 可直接
+resolve，其他 disposition 必须等待 owner subsystem 写入明确 resolution 后，binding
+lineage 才能前进。

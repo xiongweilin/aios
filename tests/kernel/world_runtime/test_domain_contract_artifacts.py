@@ -1,7 +1,7 @@
+from world_runtime.responsibility import Responsibility
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
-from semantic_language import Responsibility
 
 from world_runtime import WorldRuntime
 from world_runtime.contracts import contract_schema, domain_conformance_vectors
@@ -34,8 +34,9 @@ def _client_for_state(state: str) -> tuple[TestClient, str]:
         id=f"responsibility:vector:{state}",
         principal="controller:test",
         subject="protocol vector",
+        domain="test-domain",
     )
-    runtime.responsibility.create(responsibility, domain="test-domain")
+    runtime.responsibility.create(responsibility)
     assignment = DomainAssignment(
         id=f"assignment:vector:{state}",
         responsibility_ref=responsibility.id,

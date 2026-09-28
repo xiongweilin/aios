@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from semantic_language import Revision, SemanticRef, semantic_digest
+from semantic_language import SemanticRef, semantic_digest
 
 from .ledger import SemanticLedger
-from .lineage import RevisionLineageService
+from .lineage import Revision, RevisionLineageService
 
 
 @dataclass(frozen=True, slots=True)

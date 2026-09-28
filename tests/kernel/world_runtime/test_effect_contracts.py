@@ -1,6 +1,7 @@
 import pytest
 
 from world_runtime import WorldRuntime
+from world_runtime.responsibility import Responsibility
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -59,12 +60,12 @@ async def test_contract_prevents_caller_from_downclassifying_effect() -> None:
     )
 
     runtime.responsibility.create(
-        __import__("semantic_language", fromlist=["Responsibility"]).Responsibility(
+        Responsibility(
             id="responsibility:write-safe",
             principal="principal:test",
             subject="safe write",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:write-safe",
@@ -101,12 +102,12 @@ async def test_contract_requires_authorization_before_provider_invocation() -> N
     )
 
     runtime.responsibility.create(
-        __import__("semantic_language", fromlist=["Responsibility"]).Responsibility(
+        Responsibility(
             id="responsibility:write-protected",
             principal="principal:test",
             subject="protected write",
-        ),
-        domain="test",
+            domain="test",
+        )
     )
     work = runtime.execution.admit_work(
         responsibility_id="responsibility:write-protected",

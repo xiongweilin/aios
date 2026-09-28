@@ -1,7 +1,11 @@
+from world_runtime.decisions import Decision
+from world_runtime.strategy import Goal
+from world_runtime.governance import Mandate
+from world_runtime.responsibility import Responsibility
 from datetime import timedelta
 
 import pytest
-from semantic_language import Decision, Goal, Mandate, Responsibility, SemanticKind, SemanticRef
+from semantic_language import SemanticKind, SemanticRef
 
 import world_runtime.governance as governance_module
 from world_runtime import DomainAssignment, WorldRuntime
@@ -66,19 +70,23 @@ def test_canonical_identity_rejects_rebinding_and_does_not_reactivate() -> None:
             Mandate(id=mandate.id, principal="owner", scope={"resource": "r:2"})
         )
 
-    responsibility = Responsibility(id="responsibility:identity", principal="p", subject="s")
-    runtime.responsibility.create(responsibility, domain="test")
+    responsibility = Responsibility(id="responsibility:identity", principal="p", subject="s", domain="test")
+    runtime.responsibility.create(responsibility)
     with pytest.raises(ValueError, match="responsibility identity rebound"):
         runtime.responsibility.create(
-            Responsibility(id=responsibility.id, principal="p", subject="other"),
-            domain="test",
+            Responsibility(
+                id=responsibility.id,
+                principal="p",
+                subject="other",
+                domain="test",
+            )
         )
 
 
 def test_discharged_responsibility_cannot_reopen_admit_work_or_receive_assignment() -> None:
     runtime = WorldRuntime.sqlite()
-    responsibility = Responsibility(id="responsibility:terminal", principal="p", subject="s")
-    runtime.responsibility.create(responsibility, domain="test")
+    responsibility = Responsibility(id="responsibility:terminal", principal="p", subject="s", domain="test")
+    runtime.responsibility.create(responsibility)
     runtime.responsibility.assess(
         responsibility.id,
         status="satisfied",
