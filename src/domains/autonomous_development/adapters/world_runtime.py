@@ -23,6 +23,8 @@ T = TypeVar("T")
 
 
 class WorldRuntimeDevelopmentBridge:
+    REQUIRED_RUNTIME_PROTOCOL = WorldRuntimeHttpClient.REQUIRED_RUNTIME_PROTOCOL
+    REQUIRED_SEMANTIC_LANGUAGE = WorldRuntimeHttpClient.REQUIRED_SEMANTIC_LANGUAGE
     """HTTP-only adapter from Development semantics to generic World Runtime contracts."""
 
     REQUIRED_CONTRACTS: ClassVar[dict[str, str]] = {
