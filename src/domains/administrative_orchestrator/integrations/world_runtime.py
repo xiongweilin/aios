@@ -59,7 +59,7 @@ class WorldRuntimeBridge:
     """Compile governed Administrative effects into the generic World Runtime surface."""
 
     REQUIRED_RUNTIME_PROTOCOL = "4.0"
-    REQUIRED_SEMANTIC_LANGUAGE = "0.2.0"
+    REQUIRED_SEMANTIC_LANGUAGE = "0.3.0"
     REQUIRED_CONTRACTS = {
         "request_authentication": "request-authentication-v2",
         "transition_authority": "transition-authority-v1",
