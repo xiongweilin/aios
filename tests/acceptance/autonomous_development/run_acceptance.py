@@ -503,7 +503,7 @@ def _clear_readonly_and_retry(function: Any, path: str, error: OSError) -> None:
 def _remove_temp_tree_if_present(path: Path) -> None:
     try:
         shutil.rmtree(path, onexc=_clear_readonly_and_retry)
-    except FileNotFoundError:
+    except OSError:
         try:
             path.stat()
         except FileNotFoundError:
