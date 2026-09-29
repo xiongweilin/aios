@@ -501,7 +501,8 @@ def _clear_readonly_and_retry(function: Any, path: str, error: OSError) -> None:
 
 
 def _remove_temp_tree_if_present(path: Path) -> None:
-    for attempt in range(2):
+    retry_delays = (1, 2, 4)
+    for attempt in range(len(retry_delays) + 1):
         try:
             shutil.rmtree(path, onexc=_clear_readonly_and_retry)
             return
@@ -510,8 +511,12 @@ def _remove_temp_tree_if_present(path: Path) -> None:
                 path.stat()
             except FileNotFoundError:
                 return
-            if os.name == "nt" and getattr(error, "winerror", None) == 145 and attempt == 0:
-                time.sleep(1)
+            if (
+                os.name == "nt"
+                and getattr(error, "winerror", None) == 145
+                and attempt < len(retry_delays)
+            ):
+                time.sleep(retry_delays[attempt])
                 continue
             raise
 
