@@ -1090,7 +1090,21 @@ def run_acceptance(evidence_path: Path | None) -> int:
                     raise RuntimeError("Temporary acceptance directory remained after cleanup.")
             except Exception as error:
                 teardown_ok = False
-                cleanup_errors.append(f"temporary directory cleanup: {type(error).__name__}")
+                if isinstance(error, OSError):
+                    filename = (
+                        Path(os.fsdecode(error.filename)).name
+                        if error.filename is not None
+                        else None
+                    )
+                    cleanup_errors.append(
+                        "temporary directory cleanup: "
+                        f"{type(error).__name__} (errno={error.errno}, "
+                        f"winerror={getattr(error, 'winerror', None)}, filename={filename})"
+                    )
+                else:
+                    cleanup_errors.append(
+                        f"temporary directory cleanup: {type(error).__name__}"
+                    )
 
         for image_tag in (target_image, root_image):
             try:
