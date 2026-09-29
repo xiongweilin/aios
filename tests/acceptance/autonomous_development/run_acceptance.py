@@ -1072,8 +1072,15 @@ def run_acceptance(evidence_path: Path | None) -> int:
                     raise RuntimeError("Refusing to remove a path outside the isolated acceptance temp root.")
                 try:
                     _remove_temp_tree_if_present(temp_root)
-                except PermissionError:
-                    if os.name == "nt" or not _resource_exists("image", root_image):
+                except OSError as error:
+                    root_cleanup_needed = (
+                        (isinstance(error, PermissionError) and os.name != "nt")
+                        or (
+                            os.name == "nt"
+                            and getattr(error, "winerror", None) == 145
+                        )
+                    )
+                    if not root_cleanup_needed or not _resource_exists("image", root_image):
                         raise
                     _run(
                         [
