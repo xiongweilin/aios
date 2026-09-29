@@ -494,9 +494,21 @@ def _capture_target_diagnostics(
 
 
 def _clear_readonly_and_retry(function: Any, path: str, error: OSError) -> None:
-    del error
+    if isinstance(error, FileNotFoundError):
+        return
     os.chmod(path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
     function(path)
+
+
+def _remove_temp_tree_if_present(path: Path) -> None:
+    try:
+        shutil.rmtree(path, onexc=_clear_readonly_and_retry)
+    except FileNotFoundError:
+        try:
+            path.stat()
+        except FileNotFoundError:
+            return
+        raise
 
 
 def run_acceptance(evidence_path: Path | None) -> int:
@@ -1049,7 +1061,7 @@ def run_acceptance(evidence_path: Path | None) -> int:
                 ):
                     raise RuntimeError("Refusing to remove a path outside the isolated acceptance temp root.")
                 try:
-                    shutil.rmtree(temp_root, onexc=_clear_readonly_and_retry)
+                    _remove_temp_tree_if_present(temp_root)
                 except PermissionError:
                     if os.name == "nt" or not _resource_exists("image", root_image):
                         raise
@@ -1073,7 +1085,9 @@ def run_acceptance(evidence_path: Path | None) -> int:
                         env=compose_env,
                         secrets_to_redact=secrets_to_redact,
                     )
-                    shutil.rmtree(temp_root, onexc=_clear_readonly_and_retry)
+                    _remove_temp_tree_if_present(temp_root)
+                if temp_root.exists():
+                    raise RuntimeError("Temporary acceptance directory remained after cleanup.")
             except Exception as error:
                 teardown_ok = False
                 cleanup_errors.append(f"temporary directory cleanup: {type(error).__name__}")
