@@ -22,6 +22,8 @@ domains
 
 The names above are internal semantic owners, not separate products or repositories.
 
+Engineering design background migrated from guide: [reference index](docs/reference/guide/README.md). These notes do not supersede current contracts.
+
 ## Repository layout
 
 ```text
