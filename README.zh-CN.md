@@ -22,6 +22,8 @@ domains
 
 上面的名称都是内部语义所有者，不是彼此独立的产品或仓库。
 
+从 guide 迁入的工程设计背景见[参考索引](docs/reference/guide/README.zh-CN.md)；现行契约及实现仍以 AIOS 本仓库为准。
+
 ## 仓库结构
 
 ```text
