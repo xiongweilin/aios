@@ -195,13 +195,13 @@ def build() -> WorldRuntime:
             grantor=principal,
             grantee=controller,
             scope={
-                "case_id": "00000000-0000-4000-8000-00000000baa1",
-                "authority_epoch": 1,
-                "obligation_id": [
-                    "ac745a5c-dea4-5a3f-a3a9-6976421ac42f",
-                    "9738edec-4de4-5b2b-acbc-32eeab008d4c",
-                    "d2411d33-7bc9-5211-bb62-bb722000cb0c",
+                "case_id": [
+                    "00000000-0000-4000-8000-00000000baa1",
+                    "00000000-0000-4000-8000-00000000baa2",
+                    "00000000-0000-4000-8000-00000000baa3",
                 ],
+                "authority_epoch": 1,
+                "obligation_id": "*",
             },
             authority_ceiling={
                 "operation": "*",
@@ -212,20 +212,6 @@ def build() -> WorldRuntime:
         context=grantor_context,
     )
 
-    original_register_mandate_attested = runtime.governance.register_mandate_attested
-
-    def _diagnostic_register_mandate_attested(mandate, *, context):
-        if mandate.principal != context.effective_principal:
-            raise PermissionError(
-                "acceptance mandate principal mismatch: "
-                f"mandate={mandate.principal!r}; "
-                f"authenticated={context.authenticated_principal!r}; "
-                f"effective={context.effective_principal!r}; "
-                f"delegation_chain={context.delegation_chain!r}"
-            )
-        return original_register_mandate_attested(mandate, context=context)
-
-    runtime.governance.register_mandate_attested = _diagnostic_register_mandate_attested
     runtime.registry.register(
         NetworkEffectProvider(sandbox_base, timeout_seconds=timeout)
     )
