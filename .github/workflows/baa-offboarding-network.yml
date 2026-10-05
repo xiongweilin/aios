@@ -1,0 +1,115 @@
+name: BAA Offboarding Network Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/baa-offboarding-network.yml"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "src/kernel/world_runtime/**"
+      - "src/domains/administrative_orchestrator/**"
+      - "tests/acceptance/baa_offboarding/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-offboarding-network-selfhosted
+  cancel-in-progress: false
+
+jobs:
+  network-acceptance:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout BAA-Protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: xiongweilin/BAA-Protocol
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare isolated experiment identity
+        shell: pwsh
+        run: |
+          $runtimePort = Get-Random -Minimum 22000 -Maximum 32000
+          $sandboxPort = Get-Random -Minimum 32001 -Maximum 42000
+          $token = [guid]::NewGuid().ToString("N")
+          Write-Output "::add-mask::$token"
+          "AIOS_IMAGE=aios:baa-network-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_RUNTIME_HOST_PORT=$runtimePort" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_SANDBOX_HOST_PORT=$sandboxPort" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_NETWORK_RUNTIME_TOKEN=$token" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_EVIDENCE_DIR=$env:RUNNER_TEMP\baa-offboarding-network" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install host AIOS package
+        run: python -m pip install --disable-pip-version-check -e .
+
+      - name: Build isolated AIOS image
+        shell: pwsh
+        run: docker build --build-arg AIOS_APP_ROOT=/app -t $env:AIOS_IMAGE .
+
+      - name: Start network experiment stack
+        shell: pwsh
+        run: |
+          $compose = Get-Command docker-compose.exe -ErrorAction SilentlyContinue
+          if (-not $compose) { $compose = Get-Command docker-compose -ErrorAction Stop }
+          & $compose.Source -f tests/acceptance/baa_offboarding/compose.network.yaml up -d
+
+      - name: Run networked BAA offboarding experiment
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:BAA_EVIDENCE_DIR | Out-Null
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol;$env:GITHUB_WORKSPACE\baa-protocol\integration"
+          $args = @(
+            "tests/acceptance/baa_offboarding/run_network_experiment.py",
+            "--runtime-base", "http://127.0.0.1:$env:BAA_RUNTIME_HOST_PORT",
+            "--sandbox-base", "http://127.0.0.1:$env:BAA_SANDBOX_HOST_PORT",
+            "--runtime-token", "$env:BAA_NETWORK_RUNTIME_TOKEN",
+            "--evidence-path", "$env:BAA_EVIDENCE_DIR\evidence.json"
+          )
+          python @args
+
+      - name: Capture container diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:BAA_EVIDENCE_DIR | Out-Null
+          $compose = Get-Command docker-compose.exe -ErrorAction SilentlyContinue
+          if (-not $compose) { $compose = Get-Command docker-compose -ErrorAction Stop }
+          & $compose.Source -f tests/acceptance/baa_offboarding/compose.network.yaml ps | Out-File "$env:BAA_EVIDENCE_DIR\compose-ps.txt"
+          & $compose.Source -f tests/acceptance/baa_offboarding/compose.network.yaml logs --no-color | Out-File "$env:BAA_EVIDENCE_DIR\compose.log"
+
+      - name: Upload network evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-offboarding-network/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Tear down isolated stack
+        if: always()
+        shell: pwsh
+        run: |
+          $compose = Get-Command docker-compose.exe -ErrorAction SilentlyContinue
+          if (-not $compose) { $compose = Get-Command docker-compose -ErrorAction SilentlyContinue }
+          if ($compose) {
+            & $compose.Source -f tests/acceptance/baa_offboarding/compose.network.yaml down -v --remove-orphans
+          }
+          if ($env:AIOS_IMAGE) {
+            docker image rm -f $env:AIOS_IMAGE 2>$null
+          }
