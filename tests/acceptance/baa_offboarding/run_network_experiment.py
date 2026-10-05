@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from pydantic import SecretStr
-
 from administrative_orchestrator.authority import (
     ApprovalSatisfaction,
     AuthorityRepository,
@@ -50,9 +48,8 @@ from administrative_orchestrator.policy_plane import (
     compile_offboarding_policy,
     default_offboarding_policy_version,
 )
-
 from aios_gate import BAAGatedAIOSProvider
-
+from pydantic import SecretStr
 
 PRINCIPAL = "service:administrative-orchestrator"
 
