@@ -849,12 +849,64 @@ def _runtime_bypass(
     if before["keycloak"]["active_sessions"] < 1:
         raise AssertionError(f"bypass fixture has no active Keycloak session: {before}")
 
+    def post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        status, body = _json_request(
+            "POST",
+            f"{runtime_base}{path}",
+            payload,
+            token=runtime_token,
+            delegation_id=DELEGATION_ID,
+        )
+        if status < 200 or status >= 300:
+            raise AssertionError(
+                f"Runtime bypass setup failed at {path}: HTTP {status}: {body}"
+            )
+        return body
+
+    responsibility_id = f"responsibility:bypass:{uuid4()}"
+    post(
+        "/v1/responsibilities",
+        {
+            "id": responsibility_id,
+            "principal": PRINCIPAL,
+            "subject": subject_ref,
+            "domain": "administrative",
+            "scope": {
+                "case_id": str(CASE_ID),
+                "authority_epoch": 1,
+                "obligation_id": "bypass-authorization-test",
+            },
+        },
+    )
+    work = post(
+        "/v1/work",
+        {
+            "responsibility_id": responsibility_id,
+            "kind": "administrative-effect",
+            "payload": {
+                "requested_capabilities": [
+                    "administrative.iam.identity.disable.v1"
+                ],
+                "scenario": "runtime-bypass-without-authorization",
+            },
+        },
+    )
+    run = post(
+        "/v1/runs",
+        {
+            "work_id": str(work["id"]),
+            "workflow_id": "administrative-effect",
+        },
+    )
+
     payload = {
         "id": f"request:bypass:{uuid4()}",
         "capability": "administrative.iam.identity.disable.v1",
         "effect_class": "external-effect",
         "principal": PRINCIPAL,
         "actor_ref": PRINCIPAL,
+        "work_id": str(work["id"]),
+        "run_id": str(run["id"]),
         "resource": f"administrative:iam:{subject_ref}",
         "resource_ref": f"administrative:iam:{subject_ref}",
         "subject_version_refs": [f"administrative-case:{CASE_ID}:v4"],
@@ -874,9 +926,11 @@ def _runtime_bypass(
         employee_id=employee_id,
         keycloak_user_id=keycloak_user_id,
     )
-    if status < 400:
+    detail = str(body.get("detail") or "")
+    if status != 403 or "authorization" not in detail.lower():
         raise AssertionError(
-            f"World Runtime admitted an invocation without authorization: HTTP {status}: {body}"
+            "World Runtime did not reject specifically at the authorization boundary: "
+            f"HTTP {status}: {body}"
         )
     if after != before:
         raise AssertionError(
@@ -886,6 +940,11 @@ def _runtime_bypass(
     return {
         "http_status": status,
         "response": body,
+        "responsibility_id": responsibility_id,
+        "work_id": str(work["id"]),
+        "run_id": str(run["id"]),
+        "authorization_id": None,
+        "authorization_boundary_reached": True,
         "product_state_before": before,
         "product_state_after": after,
         "provider_effect_observed": False,
