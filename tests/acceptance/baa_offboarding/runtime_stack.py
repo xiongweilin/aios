@@ -4,6 +4,7 @@ import os
 
 import httpx
 from world_runtime import WorldRuntime
+from world_runtime.identity import DelegationGrant
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -161,6 +162,14 @@ def build() -> WorldRuntime:
         "BAA_NETWORK_RUNTIME_PRINCIPAL",
         "service:administrative-orchestrator",
     )
+    controller = os.environ.get(
+        "BAA_NETWORK_RUNTIME_CONTROLLER",
+        "controller:administrative-orchestrator",
+    )
+    delegation_id = os.environ.get(
+        "BAA_NETWORK_RUNTIME_DELEGATION_ID",
+        "delegation:baa-network-administrative",
+    )
     timeout = float(os.environ.get("BAA_NETWORK_PROVIDER_TIMEOUT_SECONDS", "0.35"))
 
     runtime = WorldRuntime.sqlite(
@@ -168,10 +177,33 @@ def build() -> WorldRuntime:
         runtime_id="runtime:baa-network-acceptance",
         root_principal=principal,
     )
+    bootstrap_token = f"bootstrap-{token}"
     runtime.identity.bind_bearer_token(
         principal=principal,
+        token=bootstrap_token,
+        credential_id="credential:baa-network-bootstrap",
+    )
+    runtime.identity.bind_bearer_token(
+        principal=controller,
         token=token,
-        credential_id="credential:baa-network-administrative",
+        credential_id="credential:baa-network-controller",
+    )
+    grantor_context = runtime.identity.authenticate_bearer(
+        f"Bearer {bootstrap_token}"
+    )
+    runtime.identity.grant_delegation(
+        DelegationGrant(
+            id=delegation_id,
+            grantor=principal,
+            grantee=controller,
+            scope={},
+            authority_ceiling={
+                "operation": "*",
+                "action": "*",
+                "resource": "*",
+            },
+        ),
+        context=grantor_context,
     )
     runtime.registry.register(
         NetworkEffectProvider(sandbox_base, timeout_seconds=timeout)
