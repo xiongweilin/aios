@@ -309,6 +309,7 @@ def _engine(
         world_runtime_timeout_seconds=2.0,
         world_runtime_principal=PRINCIPAL,
         world_runtime_bearer_token=SecretStr(token),
+        world_runtime_delegation_id="delegation:baa-network-administrative",
     )
     bridge = WorldRuntimeBridge(store, settings)
     fallback = HttpEffectProvider(sandbox_base, timeout_seconds=1.0)
