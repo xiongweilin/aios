@@ -1,9 +1,24 @@
 name: Real Odoo Offboarding Connector Acceptance
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - experiment/real-odoo-offboarding
+    branches: [main]
+    paths:
+      - ".github/workflows/administrative-real-odoo.yml"
+      - "src/domains/administrative_orchestrator/integrations/odoo_effects.py"
+      - "src/domains/administrative_orchestrator/integrations/credentials.py"
+      - "src/domains/administrative_orchestrator/integrations/effect_common.py"
+      - "tests/acceptance/baa_offboarding/real_odoo/**"
+      - "tests/domains/administrative/test_m7_offboarding_connectors.py"
+  pull_request:
+    paths:
+      - ".github/workflows/administrative-real-odoo.yml"
+      - "src/domains/administrative_orchestrator/integrations/odoo_effects.py"
+      - "src/domains/administrative_orchestrator/integrations/credentials.py"
+      - "src/domains/administrative_orchestrator/integrations/effect_common.py"
+      - "tests/acceptance/baa_offboarding/real_odoo/**"
+      - "tests/domains/administrative/test_m7_offboarding_connectors.py"
 
 permissions:
   contents: read
