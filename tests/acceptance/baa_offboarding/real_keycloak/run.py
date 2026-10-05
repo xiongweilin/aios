@@ -105,6 +105,24 @@ class KeycloakAdmin:
             expected={201, 409},
         )
 
+    def configure_user_profile(self) -> None:
+        current = self.request(
+            "GET",
+            f"/admin/realms/{REALM}/users/profile",
+            expected={200},
+        ).json()
+        if not isinstance(current, dict):
+            raise RuntimeError("Keycloak user-profile configuration is malformed")
+        current["unmanagedAttributePolicy"] = "ADMIN_EDIT"
+        updated = self.request(
+            "PUT",
+            f"/admin/realms/{REALM}/users/profile",
+            json_body=current,
+            expected={200},
+        ).json()
+        if not isinstance(updated, dict) or updated.get("unmanagedAttributePolicy") != "ADMIN_EDIT":
+            raise RuntimeError("Keycloak user-profile policy update was not retained")
+
     def _client_rep(self, client_id: str) -> dict[str, Any]:
         response = self.request(
             "GET",
@@ -380,6 +398,7 @@ def main() -> None:
     try:
         admin.wait_ready()
         admin.create_realm()
+        admin.configure_user_profile()
         writer_client = admin.create_service_client(WRITER_CLIENT, writer_secret)
         verifier_client = admin.create_service_client(VERIFIER_CLIENT, verifier_secret)
         admin.create_session_client()
