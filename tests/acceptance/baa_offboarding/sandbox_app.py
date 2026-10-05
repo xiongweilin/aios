@@ -61,6 +61,16 @@ async def execute(effect_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         "target_system": target_system,
         "operation": operation,
         "subject_ref": subject_ref,
+        "payload": {
+            key: parameters[key]
+            for key in (
+                "employee_ref",
+                "employment_episode_ref",
+                "termination_status",
+                "termination_effective_at",
+            )
+            if parameters.get(key) is not None
+        },
     }
     if operation == "employee.deactivate":
         observed["active"] = False
