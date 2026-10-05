@@ -43,6 +43,8 @@ services:
       BAA_NETWORK_SANDBOX_BASE: http://sandbox:8090
       BAA_NETWORK_RUNTIME_TOKEN: ${BAA_NETWORK_RUNTIME_TOKEN:?set BAA_NETWORK_RUNTIME_TOKEN}
       BAA_NETWORK_RUNTIME_PRINCIPAL: service:administrative-orchestrator
+      BAA_NETWORK_RUNTIME_CONTROLLER: controller:administrative-orchestrator
+      BAA_NETWORK_RUNTIME_DELEGATION_ID: delegation:baa-network-administrative
       BAA_NETWORK_PROVIDER_TIMEOUT_SECONDS: "0.35"
     volumes:
       - ./runtime_stack.py:/acceptance/runtime_stack.py:ro
