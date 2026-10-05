@@ -320,6 +320,37 @@ def _engine(
     return OffboardingExecutionEngine(store, gated, clock=lambda: now), bridge
 
 
+def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
+    payload = {
+        "id": f"mandate:baa-network-probe:{uuid4()}",
+        "principal": PRINCIPAL,
+        "scope": {
+            "case_id": "case:baa-network-probe",
+            "authority_epoch": 1,
+            "obligation_id": "obligation:baa-network-probe",
+        },
+        "authority_ceiling": {
+            "action": "administrative.iam.identity.disable.v1",
+            "resource": "administrative:iam:employee:baa-network-probe",
+        },
+    }
+    status, body = _json_request(
+        "POST",
+        f"{runtime_base}/v1/mandates",
+        payload,
+        token=token,
+    )
+    if status != 200:
+        raise AssertionError(
+            "direct Runtime mandate probe failed: "
+            f"HTTP {status}: {json.dumps(body, sort_keys=True)}"
+        )
+    return {
+        "http_status": status,
+        "status": body.get("status"),
+    }
+
+
 def _run_normal(runtime_base: str, sandbox_base: str, token: str) -> dict[str, Any]:
     _sandbox_control(sandbox_base)
     now = datetime.now(UTC)
@@ -482,6 +513,11 @@ def main() -> None:
     if status != 200:
         raise RuntimeError(f"Runtime capability catalog unavailable: HTTP {status}: {catalog}")
 
+    mandate_probe = _probe_runtime_mandate(
+        args.runtime_base,
+        args.runtime_token,
+    )
+
     scenarios = [
         _run_normal(args.runtime_base, args.sandbox_base, args.runtime_token),
         _run_lost_ack(args.runtime_base, args.sandbox_base, args.runtime_token),
@@ -500,6 +536,7 @@ def main() -> None:
             "base_url": args.runtime_base,
             "runtime_id": catalog.get("runtime_id"),
             "effect_rule_count": len(catalog.get("effect_rules", [])),
+            "mandate_probe": mandate_probe,
         },
         "scenarios": scenarios,
     }
