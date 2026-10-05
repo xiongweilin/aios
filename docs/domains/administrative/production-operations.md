@@ -104,6 +104,28 @@ Typical roles:
 
 Raw credentials are never business evidence.
 
+### Keycloak durable identity attributes
+
+The IAM connector depends on four durable Keycloak user attributes:
+
+```text
+administrative_subject_ref
+administrative_request_ref
+administrative_disable_request_ref
+administrative_session_revoke_request_ref
+```
+
+Deployments must register the configured equivalents as managed User Profile attributes that are
+visible and editable from the administrative context. Do not satisfy this requirement by broadly
+enabling arbitrary end-user unmanaged attributes. Writer and verifier clients remain distinct
+runtime identities; realm/profile administration belongs to deployment provisioning, not to either
+runtime credential.
+
+Production preflight validates that the configured attribute names are non-empty and mutually
+distinct. A high-fidelity acceptance workflow also exercises the connectors against an ephemeral
+real Keycloak server with admin-only managed attributes, a real user session, separated writer and
+verifier service accounts, independent read-back, reconciliation, and a verifier write-denial check.
+
 ## Ambiguous execution
 
 `OUTCOME_UNKNOWN` is not resend permission.
