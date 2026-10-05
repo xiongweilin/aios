@@ -11,7 +11,6 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
-
 from administrative_orchestrator.integrations.credentials import CredentialRef
 from administrative_orchestrator.integrations.effect_common import ConnectorStatus
 from administrative_orchestrator.integrations.odoo_effects import (
@@ -20,7 +19,6 @@ from administrative_orchestrator.integrations.odoo_effects import (
     OdooEmployeeDeactivateVerifier,
     OdooEmployeeEffectConnector,
 )
-
 
 DATABASE = "baa_odoo"
 ADMIN_LOGIN = "admin"
