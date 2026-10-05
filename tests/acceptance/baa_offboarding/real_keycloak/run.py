@@ -104,6 +104,20 @@ class KeycloakAdmin:
             json_body={"realm": REALM, "enabled": True},
             expected={201, 409},
         )
+        profile = self.request(
+            "GET",
+            f"/admin/realms/{REALM}/users/profile",
+            expected={200},
+        ).json()
+        if not isinstance(profile, dict):
+            raise RuntimeError("Keycloak user profile configuration is not an object")
+        profile["unmanagedAttributePolicy"] = "ADMIN_EDIT"
+        self.request(
+            "PUT",
+            f"/admin/realms/{REALM}/users/profile",
+            json_body=profile,
+            expected={200, 204},
+        )
 
     def configure_user_profile(self) -> None:
         current = self.request(
