@@ -1,0 +1,21 @@
+name: Windows Runner Dispatch Probe
+
+on:
+  push:
+    branches:
+      - probe/windows-runner-dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 5
+    steps:
+      - name: Confirm dispatch
+        shell: pwsh
+        run: |
+          Write-Host "runner=$env:RUNNER_NAME"
+          Write-Host "arch=$env:RUNNER_ARCH"
+          Write-Host "os=$env:RUNNER_OS"
