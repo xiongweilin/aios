@@ -22,7 +22,6 @@ from administrative_orchestrator.integrations.keycloak_effects import (
     KeycloakSessionVerifier,
 )
 
-
 REALM = "baa-real-keycloak"
 WRITER_CLIENT = "baa-writer"
 VERIFIER_CLIENT = "baa-verifier"
