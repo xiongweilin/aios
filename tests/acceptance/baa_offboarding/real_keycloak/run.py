@@ -215,7 +215,11 @@ class KeycloakAdmin:
                 "scope": "openid",
             },
         )
-        response.raise_for_status()
+        if response.status_code != 200:
+            detail = response.text[:500]
+            raise RuntimeError(
+                f"direct grant failed with HTTP {response.status_code}: {detail}"
+            )
         if not response.json().get("access_token"):
             raise RuntimeError("direct grant did not create a user session")
 
