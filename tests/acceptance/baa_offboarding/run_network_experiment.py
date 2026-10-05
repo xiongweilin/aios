@@ -8,7 +8,7 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from administrative_orchestrator.authority import (
     ApprovalSatisfaction,
@@ -53,6 +53,12 @@ from pydantic import SecretStr
 
 PRINCIPAL = "service:administrative-orchestrator"
 DELEGATION_ID = "delegation:baa-network-administrative"
+NETWORK_CASE_ID = UUID("00000000-0000-4000-8000-00000000baa1")
+NETWORK_OBLIGATION_IDS = (
+    "ac745a5c-dea4-5a3f-a3a9-6976421ac42f",
+    "9738edec-4de4-5b2b-acbc-32eeab008d4c",
+    "d2411d33-7bc9-5211-bb62-bb722000cb0c",
+)
 
 
 def _json_request(
@@ -210,6 +216,7 @@ def _authorized_case(now: datetime) -> tuple[SqlStore, AdministrativeCase]:
         intent="offboard isolated network fixture",
     )
     case = AdministrativeCase(
+        case_id=NETWORK_CASE_ID,
         case_kind="employee-offboarding",
         requester_principal_id=request.requester_principal_id,
         subject_ref="odoo:hr.employee:baa-network-42",
@@ -329,9 +336,9 @@ def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
         "id": f"mandate:baa-network-probe:{uuid4()}",
         "principal": PRINCIPAL,
         "scope": {
-            "case_id": "case:baa-network-probe",
+            "case_id": str(NETWORK_CASE_ID),
             "authority_epoch": 1,
-            "obligation_id": "obligation:baa-network-probe",
+            "obligation_id": NETWORK_OBLIGATION_IDS[0],
         },
         "authority_ceiling": {
             "action": "administrative.iam.identity.disable.v1",
