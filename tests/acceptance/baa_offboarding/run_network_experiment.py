@@ -413,16 +413,16 @@ def drive_episode(*, fault: bool) -> dict[str, object]:
     ]
     metrics = _get("/control/metrics")
 
-    runtime_state = bridge.client.get("/v1/state/export")
+    runtime_state_response = _runtime_get("/acceptance/provider-state")
+    runtime_state_response.raise_for_status()
+    runtime_state = runtime_state_response.json()
     runtime_attempts = {
-        str(row.get("key")): dict(row.get("value") or {})
-        for row in runtime_state.get("projections", [])
-        if row.get("namespace") == "execution.provider-attempt"
+        str(key): dict(value or {})
+        for key, value in dict(runtime_state.get("provider_attempts") or {}).items()
     }
     runtime_idempotency = {
-        str(row.get("key")): dict(row.get("value") or {})
-        for row in runtime_state.get("projections", [])
-        if row.get("namespace") == "execution.provider-idempotency"
+        str(key): dict(value or {})
+        for key, value in dict(runtime_state.get("provider_idempotency") or {}).items()
     }
 
     identity_effect = next(
