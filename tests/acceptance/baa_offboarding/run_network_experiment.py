@@ -9,7 +9,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
-
 from administrative_orchestrator.authority import (
     ApprovalSatisfaction,
     AuthorityRepository,
@@ -69,7 +68,6 @@ from administrative_orchestrator.policy_plane import (
     compile_offboarding_policy,
     default_offboarding_policy_version,
 )
-
 from aios_gate import BAAGatedAIOSProvider
 
 ENTERPRISE = os.environ.get("BAA_ENTERPRISE_BASE_URL", "http://enterprise:19000")
