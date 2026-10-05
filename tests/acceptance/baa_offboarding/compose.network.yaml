@@ -1,0 +1,113 @@
+name: aios-baa-offboarding-network
+
+services:
+  enterprise:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "/acceptance/enterprise_fixture.py"]
+    volumes:
+      - type: bind
+        source: ${BAA_ACCEPTANCE_HOST_ROOT:?set BAA_ACCEPTANCE_HOST_ROOT}
+        target: /acceptance
+        read_only: true
+    expose:
+      - "19000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:19000/healthz', timeout=2).read()"
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  world-runtime:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "/acceptance/runtime_service.py"]
+    environment:
+      ADMIN_RUNTIME_PROFILE: staging
+      ADMIN_AUTH_MODE: oidc
+      ADMIN_OIDC_ISSUER: https://issuer.example.test
+      ADMIN_OIDC_AUDIENCE: administrative-orchestrator
+      ADMIN_OIDC_ALLOW_INSECURE_HTTP: "true"
+      ADMIN_CONNECTOR_TIMEOUT_SECONDS: "0.5"
+      ADMIN_ODOO_BASE_URL: http://enterprise:19000/odoo
+      ADMIN_ODOO_DATABASE: fixture
+      ADMIN_ODOO_READER_USERNAME: reader
+      ADMIN_ODOO_WRITER_USERNAME: writer
+      ADMIN_ODOO_VERIFIER_USERNAME: verifier
+      ADMIN_ODOO_FINANCIAL_WRITER_USERNAME: financial-writer
+      ADMIN_ODOO_FINANCIAL_VERIFIER_USERNAME: financial-verifier
+      ADMIN_KEYCLOAK_BASE_URL: http://enterprise:19000/keycloak
+      ADMIN_KEYCLOAK_REALM: company
+      ADMIN_KEYCLOAK_WRITER_CLIENT_ID: writer
+      ADMIN_KEYCLOAK_VERIFIER_CLIENT_ID: verifier
+      ADMIN_WORLD_RUNTIME_PRINCIPAL: service:administrative-orchestrator
+      ADMIN_ODOO_READER_SECRET: fixture-reader-secret
+      ADMIN_ODOO_WRITER_SECRET: fixture-writer-secret
+      ADMIN_ODOO_VERIFIER_SECRET: fixture-verifier-secret
+      ADMIN_ODOO_FINANCIAL_WRITER_SECRET: fixture-financial-writer-secret
+      ADMIN_ODOO_FINANCIAL_VERIFIER_SECRET: fixture-financial-verifier-secret
+      ADMIN_KEYCLOAK_WRITER_SECRET: fixture-keycloak-writer-secret
+      ADMIN_KEYCLOAK_VERIFIER_SECRET: fixture-keycloak-verifier-secret
+      WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH: /state/runtime.db
+      BAA_RUNTIME_BEARER_TOKEN: ${BAA_RUNTIME_BEARER_TOKEN:?set BAA_RUNTIME_BEARER_TOKEN}
+    volumes:
+      - type: bind
+        source: ${BAA_ACCEPTANCE_HOST_ROOT}
+        target: /acceptance
+        read_only: true
+      - world_runtime_state:/state
+    expose:
+      - "18086"
+    depends_on:
+      enterprise:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18086/healthz', timeout=2).read()"
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  experiment:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command:
+      [
+        "python",
+        "/acceptance/run_network_experiment.py",
+        "--evidence-path",
+        "/evidence/evidence.json"
+      ]
+    environment:
+      PYTHONPATH: /baa:/baa/integration
+      BAA_ENTERPRISE_BASE_URL: http://enterprise:19000
+      BAA_WORLD_RUNTIME_BASE_URL: http://world-runtime:18086
+      BAA_RUNTIME_BEARER_TOKEN: ${BAA_RUNTIME_BEARER_TOKEN}
+      BAA_EXPERIMENT_COMMIT: ${BAA_EXPERIMENT_COMMIT:?set BAA_EXPERIMENT_COMMIT}
+      AIOS_EXPERIMENT_COMMIT: ${AIOS_EXPERIMENT_COMMIT:?set AIOS_EXPERIMENT_COMMIT}
+      ADMIN_ODOO_VERIFIER_SECRET: fixture-verifier-secret
+      ADMIN_KEYCLOAK_VERIFIER_SECRET: fixture-keycloak-verifier-secret
+    volumes:
+      - type: bind
+        source: ${BAA_ACCEPTANCE_HOST_ROOT}
+        target: /acceptance
+        read_only: true
+      - type: bind
+        source: ${BAA_REPO_HOST_ROOT:?set BAA_REPO_HOST_ROOT}
+        target: /baa
+        read_only: true
+      - type: bind
+        source: ${BAA_EVIDENCE_HOST_ROOT:?set BAA_EVIDENCE_HOST_ROOT}
+        target: /evidence
+    depends_on:
+      world-runtime:
+        condition: service_healthy
+      enterprise:
+        condition: service_healthy
+
+volumes:
+  world_runtime_state:
