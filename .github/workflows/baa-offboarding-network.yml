@@ -42,7 +42,7 @@ jobs:
 
       - name: Build portable acceptance image
         run: |
-          image="aios:baa-network-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          image="aios:baa-network-${GITHUB_RUN_ID}"
           docker build             --tag "$image"             --build-arg AIOS_APP_ROOT=/app             --file tests/acceptance/baa_offboarding/Dockerfile.network             .
           docker save --output tests/acceptance/baa_offboarding/baa-network-image.tar "$image"
 
@@ -90,7 +90,7 @@ jobs:
           $sandboxPort = Get-Random -Minimum 32001 -Maximum 42000
           $token = [guid]::NewGuid().ToString("N")
           Write-Output "::add-mask::$token"
-          "AIOS_IMAGE=aios:baa-network-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AIOS_IMAGE=aios:baa-network-$env:GITHUB_RUN_ID" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_RUNTIME_HOST_PORT=$runtimePort" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_SANDBOX_HOST_PORT=$sandboxPort" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_NETWORK_RUNTIME_TOKEN=$token" | Out-File -FilePath $env:GITHUB_ENV -Append
