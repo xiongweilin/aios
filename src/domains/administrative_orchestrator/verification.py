@@ -78,8 +78,12 @@ def verify_onboarding_observation(
             differences[field] = {"expected": expected_value, "actual": actual}
 
     state = observation.state
-    if "active" in expected and state.get("active") != expected["active"]:
-        differences["active"] = {"expected": expected["active"], "actual": state.get("active")}
+    for field in ("active", "enabled", "active_sessions"):
+        if field in expected and state.get(field) != expected[field]:
+            differences[field] = {
+                "expected": expected[field],
+                "actual": state.get(field),
+            }
 
     expected_payload = expected.get("payload", {})
     payload = state.get("payload")
