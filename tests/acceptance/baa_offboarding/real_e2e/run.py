@@ -126,7 +126,11 @@ def _json_request(
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
-            return response.status, json.loads(raw) if raw else {}
+            try:
+                parsed = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                parsed = {"raw": raw.decode("utf-8", errors="replace")}
+            return response.status, parsed
     except urllib.error.HTTPError as exc:
         raw = exc.read()
         try:
