@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 6c72855973d288a49ad88d49bf5e3b3c5a35ac73
+          ref: fix/deferred-hold-recovery
           path: baa-protocol
           persist-credentials: false
 
