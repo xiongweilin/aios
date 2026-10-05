@@ -155,6 +155,7 @@ class Settings(BaseSettings):
     keycloak_writer_secret_env: str = "ADMIN_KEYCLOAK_WRITER_SECRET"
     keycloak_verifier_client_id: str = ""
     keycloak_verifier_secret_env: str = "ADMIN_KEYCLOAK_VERIFIER_SECRET"
+    keycloak_subject_ref_attribute: str = "administrative_subject_ref"
     keycloak_request_ref_attribute: str = "administrative_request_ref"
     keycloak_disable_request_ref_attribute: str = (
         "administrative_disable_request_ref"
