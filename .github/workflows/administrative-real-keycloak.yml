@@ -1,9 +1,22 @@
 name: Real Keycloak Offboarding Connector Acceptance
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - experiment/real-keycloak-offboarding
+    branches: [main]
+    paths:
+      - ".github/workflows/administrative-real-keycloak.yml"
+      - "src/domains/administrative_orchestrator/integrations/keycloak_effects.py"
+      - "src/domains/administrative_orchestrator/integrations/credentials.py"
+      - "src/domains/administrative_orchestrator/integrations/effect_common.py"
+      - "tests/acceptance/baa_offboarding/real_keycloak/**"
+  pull_request:
+    paths:
+      - ".github/workflows/administrative-real-keycloak.yml"
+      - "src/domains/administrative_orchestrator/integrations/keycloak_effects.py"
+      - "src/domains/administrative_orchestrator/integrations/credentials.py"
+      - "src/domains/administrative_orchestrator/integrations/effect_common.py"
+      - "tests/acceptance/baa_offboarding/real_keycloak/**"
 
 permissions:
   contents: read
