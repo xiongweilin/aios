@@ -16,6 +16,18 @@ def begin_reconciliation(case: AdministrativeCase) -> AdministrativeCase:
     )
 
 
+def resume_execution(case: AdministrativeCase) -> AdministrativeCase:
+    if case.status != CaseStatus.RECONCILING:
+        raise TransitionError("execution resume requires reconciling state")
+    return case.model_copy(
+        update={
+            "status": CaseStatus.EXECUTING,
+            "version": case.version + 1,
+            "updated_at": utcnow(),
+        }
+    )
+
+
 def resume_verification(case: AdministrativeCase) -> AdministrativeCase:
     if case.status != CaseStatus.RECONCILING:
         raise TransitionError("verification resume requires reconciling state")
