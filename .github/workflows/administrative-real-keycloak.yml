@@ -7,6 +7,12 @@ on:
     paths:
       - ".github/workflows/administrative-real-keycloak.yml"
       - "src/domains/administrative_orchestrator/integrations/keycloak_effects.py"
+      - "docs/domains/administrative/production-operations.md"
+      - ".env.example"
+      - "tests/domains/administrative/test_m5_production_readiness.py"
+      - "scripts/domains/administrative/production_world_runtime_stack.py"
+      - "src/domains/administrative_orchestrator/production_readiness.py"
+      - "src/domains/administrative_orchestrator/config.py"
       - "src/domains/administrative_orchestrator/integrations/credentials.py"
       - "src/domains/administrative_orchestrator/integrations/effect_common.py"
       - "tests/acceptance/baa_offboarding/real_keycloak/**"
