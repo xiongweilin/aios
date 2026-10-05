@@ -17,9 +17,79 @@ permissions:
 
 concurrency:
   group: baa-offboarding-network-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
+  hosted-network-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 6c72855973d288a49ad88d49bf5e3b3c5a35ac73
+          path: baa-protocol
+          persist-credentials: false
+
+      - name: Prepare isolated experiment environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}"
+          mkdir -p "$evidence"
+          token="$(python - <<'PY'
+          import secrets
+          print(secrets.token_hex(32))
+          PY
+          )"
+          {
+            echo "AIOS_IMAGE=aios:baa-network-${{ github.run_id }}-${{ github.run_attempt }}"
+            echo "BAA_ACCEPTANCE_HOST_ROOT=$PWD/tests/acceptance/baa_offboarding"
+            echo "BAA_REPO_HOST_ROOT=$PWD/baa-protocol"
+            echo "BAA_EVIDENCE_HOST_ROOT=$evidence"
+            echo "BAA_RUNTIME_BEARER_TOKEN=$token"
+            echo "BAA_EXPERIMENT_COMMIT=6c72855973d288a49ad88d49bf5e3b3c5a35ac73"
+            echo "AIOS_EXPERIMENT_COMMIT=${{ github.sha }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build isolated AIOS image
+        run: docker build --build-arg AIOS_APP_ROOT=/app -t "$AIOS_IMAGE" .
+
+      - name: Validate network experiment compose
+        run: docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml config --quiet
+
+      - name: Run BAA offboarding network experiment
+        run: docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml up --abort-on-container-exit --exit-code-from experiment
+
+      - name: Capture compose diagnostics
+        if: always()
+        shell: bash
+        run: |
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml ps -a > "$BAA_EVIDENCE_HOST_ROOT/compose-ps.txt" || true
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml logs --no-color > "$BAA_EVIDENCE_HOST_ROOT/compose-logs.txt" || true
+
+      - name: Tear down isolated experiment
+        if: always()
+        shell: bash
+        run: |
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml down -v --remove-orphans || true
+          docker image rm "$AIOS_IMAGE" >/dev/null 2>&1 || true
+
+      - name: Upload experiment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: baa-offboarding-network-hosted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
+
   network-experiment:
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 45
