@@ -14,6 +14,9 @@ class ProviderExecutionStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     OUTCOME_UNKNOWN = "outcome_unknown"
+    # The provider boundary explicitly attests that no external execution
+    # attempt was made (for example, an admission gate returned HOLD).
+    DEFERRED = "deferred"
 
 
 class ProviderExecutionResult(UtcModel):
