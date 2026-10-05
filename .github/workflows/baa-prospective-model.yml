@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: experiment/prospective-model-study
+          ref: 63972cc367a453a64d7d435e9270d1b8619b3155
           path: baa-protocol
           persist-credentials: false
 
@@ -45,6 +45,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=63972cc367a453a64d7d435e9270d1b8619b3155" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Verify local model gateway
@@ -78,6 +79,8 @@ jobs:
             $summary = [ordered]@{
               workload_version = $result.workload_version
               model_id = $result.model_id
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
               budget = $result.budget
               levels = @(
                 $result.levels | ForEach-Object {
