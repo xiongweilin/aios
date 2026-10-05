@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
 
+# Portable image is built on hosted Linux; Windows only loads and executes it.
 concurrency:
   group: baa-offboarding-network-selfhosted
   cancel-in-progress: true
