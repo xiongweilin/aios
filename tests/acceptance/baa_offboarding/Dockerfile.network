@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ARG AIOS_APP_ROOT=/app
+RUN test -n "$AIOS_APP_ROOT"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    AIOS_APP_ROOT=$AIOS_APP_ROOT
+
+WORKDIR $AIOS_APP_ROOT
+
+# Built on a GitHub-hosted Linux runner. The Windows self-hosted runner only
+# assembles this acceptance image; it does not need container-side PyPI access.
+COPY tests/acceptance/baa_offboarding/wheelhouse /wheelhouse
+RUN python -m pip install --no-cache-dir --no-index --find-links=/wheelhouse "aios==0.1.0" \
+    && rm -rf /wheelhouse
+
+COPY contracts ./contracts
+COPY migrations ./migrations
+COPY scripts ./scripts
+
+CMD ["world-runtime"]
