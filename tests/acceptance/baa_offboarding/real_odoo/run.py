@@ -179,18 +179,15 @@ class OdooRpc:
         if not isinstance(field_id, int) or field_id <= 0:
             raise RuntimeError("failed to create Odoo custom request field")
 
-    def create_access_group(
+    def grant_model_access(
         self,
         *,
-        name: str,
+        group_id: int,
+        group_name: str,
         model: str,
         read: bool,
         write: bool,
-    ) -> int:
-        group_id = self.admin("res.groups", "create", [{"name": name}])
-        if not isinstance(group_id, int) or group_id <= 0:
-            raise RuntimeError(f"failed to create group {name!r}")
-
+    ) -> None:
         model_rows = self.admin(
             "ir.model",
             "search_read",
@@ -205,7 +202,7 @@ class OdooRpc:
             "create",
             [
                 {
-                    "name": f"{name} hr.employee ACL",
+                    "name": f"{group_name} {model} ACL",
                     "model_id": model_id,
                     "group_id": group_id,
                     "perm_read": read,
@@ -216,7 +213,26 @@ class OdooRpc:
             ],
         )
         if not isinstance(acl_id, int) or acl_id <= 0:
-            raise RuntimeError(f"failed to create ACL for {name!r}")
+            raise RuntimeError(f"failed to create ACL for {group_name!r} on {model}")
+
+    def create_access_group(
+        self,
+        *,
+        name: str,
+        model: str,
+        read: bool,
+        write: bool,
+    ) -> int:
+        group_id = self.admin("res.groups", "create", [{"name": name}])
+        if not isinstance(group_id, int) or group_id <= 0:
+            raise RuntimeError(f"failed to create group {name!r}")
+        self.grant_model_access(
+            group_id=group_id,
+            group_name=name,
+            model=model,
+            read=read,
+            write=write,
+        )
         return group_id
 
     def create_user(
@@ -355,6 +371,16 @@ def main() -> None:
         writer_group = rpc.create_access_group(
             name="BAA Odoo Writer",
             model="hr.employee",
+            read=True,
+            write=True,
+        )
+        # hr.employee.active is synchronized to the underlying resource record
+        # by Odoo itself. Grant only the model access needed for that exact
+        # cascade rather than assigning a broad HR administrator role.
+        rpc.grant_model_access(
+            group_id=writer_group,
+            group_name="BAA Odoo Writer",
+            model="resource.resource",
             read=True,
             write=True,
         )
