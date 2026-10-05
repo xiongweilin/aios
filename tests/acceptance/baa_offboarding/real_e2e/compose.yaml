@@ -85,6 +85,7 @@ services:
       WORLD_RUNTIME_FACTORY: runtime_stack:build
       BAA_REAL_RUNTIME_STATE_PATH: /state/runtime.db
       BAA_REAL_RUNTIME_TOKEN: ${BAA_REAL_RUNTIME_TOKEN:?set BAA_REAL_RUNTIME_TOKEN}
+      BAA_REAL_FAULT_MODE: ${BAA_REAL_FAULT_MODE:-none}
       BAA_REAL_ODOO_BASE_URL: http://odoo:8069
       BAA_REAL_ODOO_DATABASE: baa_real_e2e
       BAA_REAL_ODOO_WRITER_USERNAME: baa-writer
