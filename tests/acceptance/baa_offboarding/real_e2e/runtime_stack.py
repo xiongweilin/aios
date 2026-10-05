@@ -19,12 +19,13 @@ from administrative_orchestrator.integrations.runtime_capabilities import (
     ADMINISTRATIVE_IAM_IDENTITY_DISABLE,
     ADMINISTRATIVE_IAM_SESSIONS_REVOKE,
 )
-from scripts.domains.administrative.production_world_runtime_stack import (
-    ProductionEffectProvider,
-)
 from world_runtime import WorldRuntime
 from world_runtime.execution import CapabilityEffectRule
 from world_runtime.identity import DelegationGrant
+
+from scripts.domains.administrative.production_world_runtime_stack import (
+    ProductionEffectProvider,
+)
 
 CASE_ID = "00000000-0000-4000-8000-00000000baa4"
 PRINCIPAL = "service:administrative-orchestrator"
