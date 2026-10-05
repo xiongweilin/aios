@@ -3,6 +3,10 @@ from __future__ import annotations
 import os
 
 from administrative_orchestrator.integrations.credentials import CredentialRef
+from administrative_orchestrator.integrations.effect_common import (
+    ConnectorResult,
+    ConnectorStatus,
+)
 from administrative_orchestrator.integrations.keycloak_effects import (
     KeycloakEffectConnection,
     KeycloakIdentityDisableConnector,
@@ -31,6 +35,31 @@ CASE_ID = "00000000-0000-4000-8000-00000000baa4"
 PRINCIPAL = "service:administrative-orchestrator"
 CONTROLLER = "controller:administrative-orchestrator"
 DELEGATION_ID = "delegation:baa-real-products-administrative"
+
+
+class PostCommitUnknownConnector:
+    """Acceptance shim that loses one successful provider acknowledgement."""
+
+    def __init__(self, connector) -> None:
+        self.connector = connector
+        self.injected = False
+
+    async def invoke(self, **kwargs) -> ConnectorResult:
+        result: ConnectorResult = await self.connector.invoke(**kwargs)
+        if not self.injected and result.status is ConnectorStatus.SUCCEEDED:
+            self.injected = True
+            return ConnectorResult(
+                ConnectorStatus.UNKNOWN,
+                external_operation_ref=result.external_operation_ref,
+                error_code="InjectedLostAcknowledgement",
+                error_message=(
+                    "acceptance shim discarded the successful post-commit acknowledgement"
+                ),
+            )
+        return result
+
+    async def reconcile(self, request_ref: str) -> ConnectorResult | None:
+        return await self.connector.reconcile(request_ref)
 
 
 def build() -> WorldRuntime:
@@ -110,6 +139,12 @@ def build() -> WorldRuntime:
         )
     )
 
+    identity_disable_connector = KeycloakIdentityDisableConnector(keycloak_writer)
+    if os.environ.get("BAA_REAL_FAULT_MODE", "").strip() == "lost_ack":
+        identity_disable_connector = PostCommitUnknownConnector(
+            identity_disable_connector
+        )
+
     providers = [
         ProductionEffectProvider(
             provider_id="provider:baa-real-products:odoo-deactivate-writer",
@@ -130,7 +165,7 @@ def build() -> WorldRuntime:
             execution_domain="keycloak:iam",
             credential_configuration_ref="keycloak:baa-real-products-writer",
             network_domain="keycloak",
-            connector=KeycloakIdentityDisableConnector(keycloak_writer),
+            connector=identity_disable_connector,
             reversibility="irreversible",
         ),
         ProductionEffectProvider(
