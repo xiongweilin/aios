@@ -213,6 +213,36 @@ def test_missing_dispatch_dependency_does_not_call_provider() -> None:
     assert repository.status_updates == [(EffectStatus.DISPATCHED, None)]
 
 
+def test_deferred_provider_result_restores_planned_without_reality_retry() -> None:
+    effect = _effect(EffectStatus.PLANNED)
+    provider = _Provider(
+        result=ProviderExecutionResult(
+            status=ProviderExecutionStatus.DEFERRED,
+            error="admission held before provider attempt",
+        )
+    )
+    owner, repository = _owner(
+        effect,
+        disposition=VerificationDisposition.UNKNOWN,
+        provider=provider,
+    )
+
+    result = VerifiedObligationExecutor(owner).drive_dispatch(
+        SimpleNamespace(fact_snapshot=None),
+        [effect],
+        None,
+        (),
+    )
+
+    assert result == "deferred"
+    assert provider.execute_calls == 1
+    assert effect.status is EffectStatus.PLANNED
+    assert repository.status_updates == [
+        (EffectStatus.DISPATCHED, None),
+        (EffectStatus.PLANNED, None),
+    ]
+
+
 def test_definitive_provider_failure_marks_effect_failed() -> None:
     effect = _effect(EffectStatus.PLANNED)
     provider = _Provider(
