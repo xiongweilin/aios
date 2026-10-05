@@ -53,12 +53,12 @@ from pydantic import SecretStr
 
 PRINCIPAL = "service:administrative-orchestrator"
 DELEGATION_ID = "delegation:baa-network-administrative"
-NETWORK_CASE_ID = UUID("00000000-0000-4000-8000-00000000baa1")
-NETWORK_OBLIGATION_IDS = (
-    "ac745a5c-dea4-5a3f-a3a9-6976421ac42f",
-    "9738edec-4de4-5b2b-acbc-32eeab008d4c",
-    "d2411d33-7bc9-5211-bb62-bb722000cb0c",
-)
+NETWORK_CASE_IDS = {
+    "normal": UUID("00000000-0000-4000-8000-00000000baa1"),
+    "lost_ack": UUID("00000000-0000-4000-8000-00000000baa2"),
+    "readback_outage": UUID("00000000-0000-4000-8000-00000000baa3"),
+}
+NETWORK_PROBE_OBLIGATION_ID = "obligation:baa-network-probe"
 
 
 def _json_request(
@@ -132,7 +132,7 @@ def _sandbox_state(sandbox_base: str) -> dict[str, Any]:
     return body
 
 
-def _authorized_case(now: datetime) -> tuple[SqlStore, AdministrativeCase]:
+def _authorized_case(now: datetime, *, case_id: UUID) -> tuple[SqlStore, AdministrativeCase]:
     effective = now - timedelta(minutes=1)
     store = SqlStore("sqlite+pysqlite:///:memory:")
     store.init_schema()
@@ -216,7 +216,7 @@ def _authorized_case(now: datetime) -> tuple[SqlStore, AdministrativeCase]:
         intent="offboard isolated network fixture",
     )
     case = AdministrativeCase(
-        case_id=NETWORK_CASE_ID,
+        case_id=case_id,
         case_kind="employee-offboarding",
         requester_principal_id=request.requester_principal_id,
         subject_ref="odoo:hr.employee:baa-network-42",
@@ -336,9 +336,9 @@ def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
         "id": f"mandate:baa-network-probe:{uuid4()}",
         "principal": PRINCIPAL,
         "scope": {
-            "case_id": str(NETWORK_CASE_ID),
+            "case_id": str(NETWORK_CASE_IDS["normal"]),
             "authority_epoch": 1,
-            "obligation_id": NETWORK_OBLIGATION_IDS[0],
+            "obligation_id": NETWORK_PROBE_OBLIGATION_ID,
         },
         "authority_ceiling": {
             "action": "administrative.iam.identity.disable.v1",
@@ -366,7 +366,7 @@ def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
 def _run_normal(runtime_base: str, sandbox_base: str, token: str) -> dict[str, Any]:
     _sandbox_control(sandbox_base)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["normal"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
@@ -395,7 +395,7 @@ def _run_normal(runtime_base: str, sandbox_base: str, token: str) -> dict[str, A
 def _run_lost_ack(runtime_base: str, sandbox_base: str, token: str) -> dict[str, Any]:
     _sandbox_control(sandbox_base, lost_ack_once=True)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["lost_ack"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
@@ -438,7 +438,7 @@ def _run_readback_outage(
 ) -> dict[str, Any]:
     _sandbox_control(sandbox_base, read_outage_once=True)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["readback_outage"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
