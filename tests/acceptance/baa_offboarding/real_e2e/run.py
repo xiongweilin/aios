@@ -731,8 +731,184 @@ def _product_state(
     }
 
 
+def _require_final_product_state(product: dict[str, Any]) -> None:
+    if product["odoo"]["active"] is not False:
+        raise AssertionError(f"Odoo employee still active: {product}")
+    if product["keycloak"]["enabled"] is not False:
+        raise AssertionError(f"Keycloak identity still enabled: {product}")
+    if product["keycloak"]["active_sessions"] != 0:
+        raise AssertionError(f"Keycloak sessions remain active: {product}")
+    for marker in (
+        product["odoo"]["deactivate_request_ref"],
+        product["keycloak"]["disable_request_ref"],
+        product["keycloak"]["session_revoke_request_ref"],
+    ):
+        if not isinstance(marker, str) or not marker:
+            raise AssertionError(f"durable product request marker missing: {product}")
+
+
+def _drive_episode(
+    engine: OffboardingExecutionEngine,
+    case: AdministrativeCase,
+    *,
+    scenario: str,
+    odoo: Any,
+    keycloak: Any,
+    employee_id: int,
+    keycloak_user_id: str,
+) -> tuple[AdministrativeCase, list[str], dict[str, Any] | None, bool, float]:
+    started = time.perf_counter()
+    current = engine.run(case.case_id)
+    status_trace = [current.status.value]
+    product_after_first: dict[str, Any] | None = None
+    marker_stable = True
+
+    if scenario == "normal":
+        if current.status is not CaseStatus.COMPLETED:
+            raise AssertionError(
+                f"normal real-product E2E did not complete in one drive: {current.status}"
+            )
+    else:
+        if current.status is CaseStatus.COMPLETED:
+            raise AssertionError(
+                f"{scenario} did not preserve the injected uncertainty before recovery"
+            )
+        product_after_first = _product_state(
+            odoo=odoo,
+            keycloak=keycloak,
+            employee_id=employee_id,
+            keycloak_user_id=keycloak_user_id,
+        )
+        if product_after_first["keycloak"]["enabled"] is not False:
+            raise AssertionError(
+                f"{scenario} did not commit the real Keycloak disable before uncertainty: "
+                f"{product_after_first}"
+            )
+        first_disable_marker = product_after_first["keycloak"]["disable_request_ref"]
+        if not isinstance(first_disable_marker, str) or not first_disable_marker:
+            raise AssertionError(
+                f"{scenario} lost the durable Keycloak disable request identity"
+            )
+
+        for _ in range(8):
+            if current.status is CaseStatus.COMPLETED:
+                break
+            current = engine.run(case.case_id)
+            status_trace.append(current.status.value)
+        if current.status is not CaseStatus.COMPLETED:
+            raise AssertionError(
+                f"{scenario} recovery did not converge to completion: {status_trace}"
+            )
+
+        recovered_product = _product_state(
+            odoo=odoo,
+            keycloak=keycloak,
+            employee_id=employee_id,
+            keycloak_user_id=keycloak_user_id,
+        )
+        marker_stable = (
+            recovered_product["keycloak"]["disable_request_ref"]
+            == first_disable_marker
+        )
+        if not marker_stable:
+            raise AssertionError(
+                f"{scenario} recovery created a new logical disable request identity: "
+                f"before={first_disable_marker!r}, "
+                f"after={recovered_product['keycloak']['disable_request_ref']!r}"
+            )
+
+    return (
+        current,
+        status_trace,
+        product_after_first,
+        marker_stable,
+        time.perf_counter() - started,
+    )
+
+
+def _runtime_bypass(
+    *,
+    runtime_base: str,
+    runtime_token: str,
+    subject_ref: str,
+    odoo: Any,
+    keycloak: Any,
+    employee_id: int,
+    keycloak_user_id: str,
+) -> dict[str, Any]:
+    before = _product_state(
+        odoo=odoo,
+        keycloak=keycloak,
+        employee_id=employee_id,
+        keycloak_user_id=keycloak_user_id,
+    )
+    if before["odoo"]["active"] is not True:
+        raise AssertionError(f"bypass fixture Odoo employee is not initially active: {before}")
+    if before["keycloak"]["enabled"] is not True:
+        raise AssertionError(f"bypass fixture Keycloak user is not initially enabled: {before}")
+    if before["keycloak"]["active_sessions"] < 1:
+        raise AssertionError(f"bypass fixture has no active Keycloak session: {before}")
+
+    payload = {
+        "id": f"request:bypass:{uuid4()}",
+        "capability": "administrative.iam.identity.disable.v1",
+        "effect_class": "external-effect",
+        "principal": PRINCIPAL,
+        "actor_ref": PRINCIPAL,
+        "resource": f"administrative:iam:{subject_ref}",
+        "resource_ref": f"administrative:iam:{subject_ref}",
+        "subject_version_refs": [f"administrative-case:{CASE_ID}:v4"],
+        "idempotency_key": f"administrative-effect:{uuid4()}",
+        "parameters": {"subject_ref": subject_ref},
+    }
+    status, body = _json_request(
+        "POST",
+        f"{runtime_base}/v1/invoke",
+        payload,
+        token=runtime_token,
+        delegation_id=DELEGATION_ID,
+    )
+    after = _product_state(
+        odoo=odoo,
+        keycloak=keycloak,
+        employee_id=employee_id,
+        keycloak_user_id=keycloak_user_id,
+    )
+    if status < 400:
+        raise AssertionError(
+            f"World Runtime admitted an invocation without authorization: HTTP {status}: {body}"
+        )
+    if after != before:
+        raise AssertionError(
+            "unauthorized Runtime invocation changed real product state: "
+            f"before={before}, after={after}"
+        )
+    return {
+        "http_status": status,
+        "response": body,
+        "product_state_before": before,
+        "product_state_after": after,
+        "provider_effect_observed": False,
+    }
+
+
+def _write_evidence(path_value: str, evidence: dict[str, Any]) -> None:
+    path = Path(path_value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(evidence, indent=2, sort_keys=True))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--scenario",
+        choices=("normal", "lost_ack", "readback_outage", "runtime_bypass"),
+        default="normal",
+    )
     parser.add_argument("--runtime-base", required=True)
     parser.add_argument("--odoo-base", required=True)
     parser.add_argument("--keycloak-base", required=True)
@@ -772,6 +948,55 @@ def main() -> None:
             keycloak_user_password=keycloak_user_password,
         )
 
+        status, catalog = _json_request(
+            "GET",
+            f"{args.runtime_base}/v1/capabilities",
+            token=args.runtime_token,
+            delegation_id=DELEGATION_ID,
+        )
+        if status != 200:
+            raise AssertionError(
+                f"World Runtime capability catalog unavailable: HTTP {status}: {catalog}"
+            )
+
+        if args.scenario == "runtime_bypass":
+            bypass = _runtime_bypass(
+                runtime_base=args.runtime_base,
+                runtime_token=args.runtime_token,
+                subject_ref=subject_ref,
+                odoo=odoo,
+                keycloak=keycloak,
+                employee_id=employee_id,
+                keycloak_user_id=keycloak_user_id,
+            )
+            _write_evidence(
+                args.evidence_path,
+                {
+                    "status": "passed",
+                    "scenario": args.scenario,
+                    "generated_at": datetime.now(UTC).isoformat(),
+                    "qualification": (
+                        "Unauthorized World Runtime invocation was rejected before "
+                        "changing real ephemeral Keycloak/Odoo state; not production "
+                        "tenant evidence."
+                    ),
+                    "world_runtime": {
+                        "runtime_id": catalog.get("runtime_id"),
+                        "effect_rule_count": len(catalog.get("effect_rules", [])),
+                    },
+                    "runtime_bypass": bypass,
+                    "credential_separation": {
+                        "odoo_writer": ODOO_WRITER,
+                        "odoo_verifier": ODOO_VERIFIER,
+                        "odoo_verifier_write_denied": True,
+                        "keycloak_writer": KEYCLOAK_WRITER,
+                        "keycloak_verifier": KEYCLOAK_VERIFIER,
+                        "keycloak_verifier_write_denied": True,
+                    },
+                },
+            )
+            return
+
         now = datetime.now(UTC)
         store, case = _authorized_case(
             now,
@@ -785,13 +1010,24 @@ def main() -> None:
             keycloak_base=args.keycloak_base,
             runtime_token=args.runtime_token,
             now=now,
+            fault_mode=args.scenario,
         )
 
-        started = time.perf_counter()
-        result = engine.run(case.case_id)
-        duration = time.perf_counter() - started
-        if result.status is not CaseStatus.COMPLETED:
-            raise AssertionError(f"real-product E2E did not complete: {result.status}")
+        (
+            result,
+            status_trace,
+            product_after_first,
+            marker_stable,
+            duration,
+        ) = _drive_episode(
+            engine,
+            case,
+            scenario=args.scenario,
+            odoo=odoo,
+            keycloak=keycloak,
+            employee_id=employee_id,
+            keycloak_user_id=keycloak_user_id,
+        )
 
         product = _product_state(
             odoo=odoo,
@@ -799,19 +1035,7 @@ def main() -> None:
             employee_id=employee_id,
             keycloak_user_id=keycloak_user_id,
         )
-        if product["odoo"]["active"] is not False:
-            raise AssertionError(f"Odoo employee still active: {product}")
-        if product["keycloak"]["enabled"] is not False:
-            raise AssertionError(f"Keycloak identity still enabled: {product}")
-        if product["keycloak"]["active_sessions"] != 0:
-            raise AssertionError(f"Keycloak sessions remain active: {product}")
-        for marker in (
-            product["odoo"]["deactivate_request_ref"],
-            product["keycloak"]["disable_request_ref"],
-            product["keycloak"]["session_revoke_request_ref"],
-        ):
-            if not isinstance(marker, str) or not marker:
-                raise AssertionError(f"durable product request marker missing: {product}")
+        _require_final_product_state(product)
 
         execution = ExecutionRepository(store)
         effects = execution.list_effects(case.case_id, case.authority_epoch)
@@ -827,74 +1051,69 @@ def main() -> None:
         if len(kernels) != 1 or not kernels[0].externally_complete():
             raise AssertionError("BAA kernel did not verify all external obligations")
 
-        status, catalog = _json_request(
-            "GET",
-            f"{args.runtime_base}/v1/capabilities",
-            token=args.runtime_token,
-            delegation_id=DELEGATION_ID,
-        )
-        if status != 200:
-            raise AssertionError(f"World Runtime capability catalog unavailable: {status}")
-
-        evidence = {
-            "status": "passed",
-            "generated_at": datetime.now(UTC).isoformat(),
-            "qualification": (
-                "Single-episode BAA -> AIOS -> World Runtime -> real ephemeral "
-                "Keycloak/Odoo acceptance with independent verifier credentials; "
-                "not production tenant evidence."
-            ),
-            "case": {
-                "case_id": str(case.case_id),
-                "subject_ref": subject_ref,
-                "final_status": result.status.value,
-                "duration_seconds": duration,
-            },
-            "world_runtime": {
-                "runtime_id": catalog.get("runtime_id"),
-                "effect_rule_count": len(catalog.get("effect_rules", [])),
-            },
-            "baa": {
-                "kernel_count": len(kernels),
-                "externally_complete": kernels[0].externally_complete(),
-                "effect_knowledge": {
-                    obligation_id: state.knowledge.value
-                    for obligation_id, state in kernels[0].effects.items()
+        _write_evidence(
+            args.evidence_path,
+            {
+                "status": "passed",
+                "scenario": args.scenario,
+                "generated_at": datetime.now(UTC).isoformat(),
+                "qualification": (
+                    "Single-episode BAA -> AIOS -> World Runtime -> real ephemeral "
+                    "Keycloak/Odoo acceptance with independent verifier credentials; "
+                    "fault recovery claims concern stable logical request identity, "
+                    "not a claim of physical exactly-once delivery; not production "
+                    "tenant evidence."
+                ),
+                "case": {
+                    "case_id": str(case.case_id),
+                    "subject_ref": subject_ref,
+                    "final_status": result.status.value,
+                    "status_trace": status_trace,
+                    "duration_seconds": duration,
+                },
+                "recovery": {
+                    "product_after_first_run": product_after_first,
+                    "disable_request_identity_stable": marker_stable,
+                },
+                "world_runtime": {
+                    "runtime_id": catalog.get("runtime_id"),
+                    "effect_rule_count": len(catalog.get("effect_rules", [])),
+                },
+                "baa": {
+                    "kernel_count": len(kernels),
+                    "externally_complete": kernels[0].externally_complete(),
+                    "effect_knowledge": {
+                        obligation_id: state.knowledge.value
+                        for obligation_id, state in kernels[0].effects.items()
+                    },
+                },
+                "aios": {
+                    "effect_count": len(effects),
+                    "realization_count": len(realizations),
+                    "confirmed_outcome_count": len(outcomes),
+                    "effects": [
+                        {
+                            "effect_id": str(effect.effect_id),
+                            "target_system": effect.target_system,
+                            "operation": effect.operation,
+                            "status": effect.status.value,
+                            "provider_ref": effect.provider_ref,
+                        }
+                        for effect in effects
+                    ],
+                },
+                "product_state": product,
+                "independent_readback": readback.readbacks,
+                "credential_separation": {
+                    "odoo_writer": ODOO_WRITER,
+                    "odoo_verifier": ODOO_VERIFIER,
+                    "odoo_verifier_write_denied": True,
+                    "keycloak_writer": KEYCLOAK_WRITER,
+                    "keycloak_verifier": KEYCLOAK_VERIFIER,
+                    "keycloak_verifier_write_denied": True,
                 },
             },
-            "aios": {
-                "effect_count": len(effects),
-                "realization_count": len(realizations),
-                "confirmed_outcome_count": len(outcomes),
-                "effects": [
-                    {
-                        "effect_id": str(effect.effect_id),
-                        "target_system": effect.target_system,
-                        "operation": effect.operation,
-                        "status": effect.status.value,
-                        "provider_ref": effect.provider_ref,
-                    }
-                    for effect in effects
-                ],
-            },
-            "product_state": product,
-            "independent_readback": readback.readbacks,
-            "credential_separation": {
-                "odoo_writer": ODOO_WRITER,
-                "odoo_verifier": ODOO_VERIFIER,
-                "odoo_verifier_write_denied": True,
-                "keycloak_writer": KEYCLOAK_WRITER,
-                "keycloak_verifier": KEYCLOAK_VERIFIER,
-                "keycloak_verifier_write_denied": True,
-            },
-        }
-        path = Path(args.evidence_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
         )
-        print(json.dumps(evidence, indent=2, sort_keys=True))
     finally:
         if bridge is not None:
             bridge.close()
