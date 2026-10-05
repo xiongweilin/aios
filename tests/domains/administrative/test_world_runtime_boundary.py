@@ -90,7 +90,7 @@ def test_planned_effect_remains_current_across_execution_lifecycle_transition() 
     assert _effect_matches_current_execution(
         executing.model_copy(update={"version": effect.case_version + 2}),
         effect,
-    ) is False
+    ) is True
     assert _effect_matches_current_execution(
         executing.model_copy(
             update={"authority_epoch": effect.authority_epoch + 1}
@@ -206,12 +206,25 @@ def test_runtime_context_accepts_planned_effect_in_current_execution_state() -> 
             update={"version": effect.case_version + 2}
         )
     )
+    assert bridge._context(effect) == {
+        "issuer_principal_id": "service:administrative-orchestrator",
+        "expected_postcondition": {"active": True},
+    }
+
+    bridge.store = SimpleNamespace(
+        get_case=lambda case_id: executing.model_copy(
+            update={
+                "status": CaseStatus.AUTHORIZED,
+                "version": effect.case_version,
+            }
+        )
+    )
     try:
         bridge._context(effect)
     except WorldRuntimeBoundaryError as exc:
         assert "effect is stale" in str(exc)
     else:
-        raise AssertionError("stale effect must fail closed")
+        raise AssertionError("effect outside current execution must fail closed")
     finally:
         bridge.close()
 

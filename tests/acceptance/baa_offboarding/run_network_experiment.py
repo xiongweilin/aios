@@ -8,7 +8,7 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from administrative_orchestrator.authority import (
     ApprovalSatisfaction,
@@ -52,6 +52,13 @@ from aios_gate import BAAGatedAIOSProvider
 from pydantic import SecretStr
 
 PRINCIPAL = "service:administrative-orchestrator"
+DELEGATION_ID = "delegation:baa-network-administrative"
+NETWORK_CASE_IDS = {
+    "normal": UUID("00000000-0000-4000-8000-00000000baa1"),
+    "lost_ack": UUID("00000000-0000-4000-8000-00000000baa2"),
+    "readback_outage": UUID("00000000-0000-4000-8000-00000000baa3"),
+}
+NETWORK_PROBE_OBLIGATION_ID = "obligation:baa-network-probe"
 
 
 def _json_request(
@@ -60,12 +67,15 @@ def _json_request(
     payload: dict[str, Any] | None = None,
     *,
     token: str | None = None,
+    delegation_id: str | None = None,
     timeout: float = 5.0,
 ) -> tuple[int, dict[str, Any]]:
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if delegation_id:
+        headers["X-World-Runtime-Delegation"] = delegation_id
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -122,7 +132,7 @@ def _sandbox_state(sandbox_base: str) -> dict[str, Any]:
     return body
 
 
-def _authorized_case(now: datetime) -> tuple[SqlStore, AdministrativeCase]:
+def _authorized_case(now: datetime, *, case_id: UUID) -> tuple[SqlStore, AdministrativeCase]:
     effective = now - timedelta(minutes=1)
     store = SqlStore("sqlite+pysqlite:///:memory:")
     store.init_schema()
@@ -206,6 +216,7 @@ def _authorized_case(now: datetime) -> tuple[SqlStore, AdministrativeCase]:
         intent="offboard isolated network fixture",
     )
     case = AdministrativeCase(
+        case_id=case_id,
         case_kind="employee-offboarding",
         requester_principal_id=request.requester_principal_id,
         subject_ref="odoo:hr.employee:baa-network-42",
@@ -306,7 +317,7 @@ def _engine(
         world_runtime_timeout_seconds=2.0,
         world_runtime_principal=PRINCIPAL,
         world_runtime_bearer_token=SecretStr(token),
-        world_runtime_delegation_id="delegation:baa-network-administrative",
+        world_runtime_delegation_id=DELEGATION_ID,
     )
     bridge = WorldRuntimeBridge(store, settings)
     fallback = HttpEffectProvider(sandbox_base, timeout_seconds=1.0)
@@ -320,10 +331,42 @@ def _engine(
     return OffboardingExecutionEngine(store, gated, clock=lambda: now), bridge
 
 
+def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
+    payload = {
+        "id": f"mandate:baa-network-probe:{uuid4()}",
+        "principal": PRINCIPAL,
+        "scope": {
+            "case_id": str(NETWORK_CASE_IDS["normal"]),
+            "authority_epoch": 1,
+            "obligation_id": NETWORK_PROBE_OBLIGATION_ID,
+        },
+        "authority_ceiling": {
+            "action": "administrative.iam.identity.disable.v1",
+            "resource": "administrative:iam:employee:baa-network-probe",
+        },
+    }
+    status, body = _json_request(
+        "POST",
+        f"{runtime_base}/v1/mandates",
+        payload,
+        token=token,
+        delegation_id=DELEGATION_ID,
+    )
+    if status != 200:
+        raise AssertionError(
+            "direct Runtime mandate probe failed: "
+            f"HTTP {status}: {json.dumps(body, sort_keys=True)}"
+        )
+    return {
+        "http_status": status,
+        "status": body.get("status"),
+    }
+
+
 def _run_normal(runtime_base: str, sandbox_base: str, token: str) -> dict[str, Any]:
     _sandbox_control(sandbox_base)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["normal"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
@@ -352,7 +395,7 @@ def _run_normal(runtime_base: str, sandbox_base: str, token: str) -> dict[str, A
 def _run_lost_ack(runtime_base: str, sandbox_base: str, token: str) -> dict[str, Any]:
     _sandbox_control(sandbox_base, lost_ack_once=True)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["lost_ack"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
@@ -363,28 +406,48 @@ def _run_lost_ack(runtime_base: str, sandbox_base: str, token: str) -> dict[str,
     try:
         first = engine.run(case.case_id)
         first_state = _sandbox_state(sandbox_base)
-        if first.status is not CaseStatus.RECONCILING:
-            raise AssertionError(f"lost-ACK episode must enter reconciling: {first.status}")
+        if first.status not in {CaseStatus.RECONCILING, CaseStatus.EXECUTING}:
+            raise AssertionError(
+                f"lost-ACK episode did not preserve recoverable execution: {first.status}"
+            )
         if first_state["write_count"] != 1:
             raise AssertionError(f"lost-ACK first dispatch must write exactly once: {first_state}")
+        if first_state["write_count"] != len(first_state["effect_ids"]):
+            raise AssertionError(f"lost-ACK first dispatch duplicated reality: {first_state}")
 
-        time.sleep(2.2)
-        second = engine.run(case.case_id)
-        second_state = _sandbox_state(sandbox_base)
-        if second_state["write_count"] != len(second_state["effect_ids"]):
+        statuses = [first.status.value]
+        current = first
+        final_state = first_state
+        for _ in range(5):
+            if current.status is CaseStatus.COMPLETED:
+                break
+            time.sleep(0.5)
+            current = engine.run(case.case_id)
+            statuses.append(current.status.value)
+            final_state = _sandbox_state(sandbox_base)
+            if final_state["write_count"] != len(final_state["effect_ids"]):
+                raise AssertionError(
+                    "lost-ACK recovery duplicated at least one reality effect: "
+                    f"{final_state}"
+                )
+        if current.status is not CaseStatus.COMPLETED:
             raise AssertionError(
-                "lost-ACK recovery duplicated at least one reality effect: "
-                f"{second_state}"
+                f"lost-ACK recovery did not converge to completion: {statuses}"
+            )
+        if final_state["write_count"] != 3:
+            raise AssertionError(
+                f"lost-ACK recovery must realize all three effects exactly once: {final_state}"
             )
     finally:
         bridge.close()
     return {
         "name": "lost_ack",
         "first_status": first.status.value,
-        "second_status": second.status.value,
+        "status_trace": statuses,
+        "final_status": current.status.value,
         "first_sandbox": first_state,
-        "second_sandbox": second_state,
-        "duplicate_writes": second_state["write_count"] - len(second_state["effect_ids"]),
+        "final_sandbox": final_state,
+        "duplicate_writes": final_state["write_count"] - len(final_state["effect_ids"]),
     }
 
 
@@ -395,7 +458,7 @@ def _run_readback_outage(
 ) -> dict[str, Any]:
     _sandbox_control(sandbox_base, read_outage_once=True)
     now = datetime.now(UTC)
-    store, case = _authorized_case(now)
+    store, case = _authorized_case(now, case_id=NETWORK_CASE_IDS["readback_outage"])
     engine, bridge = _engine(
         store=store,
         runtime_base=runtime_base,
@@ -406,26 +469,49 @@ def _run_readback_outage(
     try:
         first = engine.run(case.case_id)
         first_state = _sandbox_state(sandbox_base)
-        if first.status is not CaseStatus.RECONCILING:
+        if first.status not in {CaseStatus.RECONCILING, CaseStatus.EXECUTING}:
             raise AssertionError(
-                f"read-back outage must preserve uncertainty: {first.status}"
+                f"read-back outage did not preserve recoverable execution: {first.status}"
             )
-        second = engine.run(case.case_id)
-        second_state = _sandbox_state(sandbox_base)
-        if second_state["write_count"] != len(second_state["effect_ids"]):
+        if first_state["write_count"] != 1:
             raise AssertionError(
-                "read-back recovery duplicated at least one reality effect: "
-                f"{second_state}"
+                f"read-back outage must stop after one external write: {first_state}"
+            )
+        if first_state["write_count"] != len(first_state["effect_ids"]):
+            raise AssertionError(f"read-back outage duplicated reality: {first_state}")
+
+        statuses = [first.status.value]
+        current = first
+        final_state = first_state
+        for _ in range(5):
+            if current.status is CaseStatus.COMPLETED:
+                break
+            current = engine.run(case.case_id)
+            statuses.append(current.status.value)
+            final_state = _sandbox_state(sandbox_base)
+            if final_state["write_count"] != len(final_state["effect_ids"]):
+                raise AssertionError(
+                    "read-back recovery duplicated at least one reality effect: "
+                    f"{final_state}"
+                )
+        if current.status is not CaseStatus.COMPLETED:
+            raise AssertionError(
+                f"read-back recovery did not converge to completion: {statuses}"
+            )
+        if final_state["write_count"] != 3:
+            raise AssertionError(
+                f"read-back recovery must realize all three effects exactly once: {final_state}"
             )
     finally:
         bridge.close()
     return {
         "name": "readback_outage",
         "first_status": first.status.value,
-        "second_status": second.status.value,
+        "status_trace": statuses,
+        "final_status": current.status.value,
         "first_sandbox": first_state,
-        "second_sandbox": second_state,
-        "duplicate_writes": second_state["write_count"] - len(second_state["effect_ids"]),
+        "final_sandbox": final_state,
+        "duplicate_writes": final_state["write_count"] - len(final_state["effect_ids"]),
     }
 
 
@@ -450,6 +536,7 @@ def _run_runtime_bypass(runtime_base: str, sandbox_base: str, token: str) -> dic
         f"{runtime_base}/v1/invoke",
         payload,
         token=token,
+        delegation_id=DELEGATION_ID,
     )
     after = _sandbox_state(sandbox_base)
     if status < 400:
@@ -478,9 +565,15 @@ def main() -> None:
         "GET",
         f"{args.runtime_base}/v1/capabilities",
         token=args.runtime_token,
+        delegation_id=DELEGATION_ID,
     )
     if status != 200:
         raise RuntimeError(f"Runtime capability catalog unavailable: HTTP {status}: {catalog}")
+
+    mandate_probe = _probe_runtime_mandate(
+        args.runtime_base,
+        args.runtime_token,
+    )
 
     scenarios = [
         _run_normal(args.runtime_base, args.sandbox_base, args.runtime_token),
@@ -500,6 +593,7 @@ def main() -> None:
             "base_url": args.runtime_base,
             "runtime_id": catalog.get("runtime_id"),
             "effect_rule_count": len(catalog.get("effect_rules", [])),
+            "mandate_probe": mandate_probe,
         },
         "scenarios": scenarios,
     }

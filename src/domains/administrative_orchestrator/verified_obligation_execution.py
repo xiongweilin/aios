@@ -18,6 +18,7 @@ from .execution_transitions import (
     begin_reconciliation,
     complete_verified_case,
     fail_execution,
+    resume_execution,
     resume_verification,
 )
 from .service import TransitionError, begin_execution, begin_verification
@@ -94,6 +95,10 @@ class VerifiedObligationExecutor:
                     {"reason": "one or more effect outcomes are unknown or not observable"},
                 )
                 case = reconciling
+            elif dispatch_state == "deferred":
+                # Admission was explicitly held before any external attempt.
+                # Keep the case executable and preserve the effect as PLANNED.
+                return owner._require_case(case_id)
             else:
                 verifying = begin_verification(case)
                 owner._persist_case_transition(case, verifying, "case.verification_started")
@@ -104,11 +109,39 @@ class VerifiedObligationExecutor:
             return owner._reopen_for_governance(case, governance)
 
         if case.status == CaseStatus.RECONCILING:
-            result = owner._verify_all(case, effects, obligation_set, links)
+            attempted_effects = []
+            for planned in effects:
+                current = owner.repository.get_effect(planned.effect_id) or planned
+                if current.status is not EffectStatus.PLANNED:
+                    attempted_effects.append(current)
+            if not attempted_effects:
+                resumed = resume_execution(case)
+                owner._persist_case_transition(
+                    case,
+                    resumed,
+                    "case.reconciliation_resolved_for_execution",
+                )
+                return resumed
+
+            result = owner._verify_all(case, attempted_effects, obligation_set, links)
             if result == "mismatch":
                 return owner._reopen_for_mismatch(case)
             if result == "incomplete":
                 return owner._require_case(case_id)
+
+            current_effects = [
+                owner.repository.get_effect(planned.effect_id) or planned
+                for planned in effects
+            ]
+            if any(item.status is EffectStatus.PLANNED for item in current_effects):
+                resumed = resume_execution(case)
+                owner._persist_case_transition(
+                    case,
+                    resumed,
+                    "case.reconciliation_resolved_for_execution",
+                )
+                return resumed
+
             resumed = resume_verification(case)
             owner._persist_case_transition(case, resumed, "case.reconciliation_resolved")
             case = resumed
@@ -176,6 +209,7 @@ class VerifiedObligationExecutor:
         owner = self.owner
         payload = case.fact_snapshot.facts if case.fact_snapshot else {}
         saw_unknown = False
+        saw_deferred = False
         for planned in sorted(effects, key=owner._effect_dispatch_order):
             effect = owner.repository.get_effect(planned.effect_id) or planned
             obligation = owner._obligation_for_effect(effect.effect_id, obligation_set, links)
@@ -241,6 +275,16 @@ class VerifiedObligationExecutor:
                     provider_ref=result.provider_ref,
                 )
                 saw_unknown = True
+            elif result.status == ProviderExecutionStatus.DEFERRED:
+                # The provider boundary guarantees no external attempt occurred.
+                # Undo the crash-safety pre-dispatch marker so this effect may be
+                # admitted later after the blocking uncertainty is resolved.
+                owner.repository.set_effect_status(
+                    effect.effect_id,
+                    status=EffectStatus.PLANNED,
+                    provider_ref=result.provider_ref,
+                )
+                saw_deferred = True
             else:
                 owner.repository.set_effect_status(
                     effect.effect_id,
@@ -248,7 +292,11 @@ class VerifiedObligationExecutor:
                     provider_ref=result.provider_ref,
                 )
                 return "failed"
-        return "outcome_unknown" if saw_unknown else "succeeded"
+        if saw_unknown:
+            return "outcome_unknown"
+        if saw_deferred:
+            return "deferred"
+        return "succeeded"
 
     def verify_all(self, case, effects, obligation_set, links) -> str:
         owner = self.owner
@@ -330,6 +378,11 @@ class VerifiedObligationExecutor:
                         str(obligation.governance_basis_id) if obligation is not None else None
                     ),
                 },
+            )
+            owner.repository.set_effect_status(
+                effect.effect_id,
+                status=EffectStatus.SUCCEEDED,
+                provider_ref=observation.provider_ref,
             )
             assessment = EffectRealizationAssessment(
                 assessment_id=realization_id,

@@ -1,0 +1,102 @@
+name: BAA Offboarding Network Hosted Preflight
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/baa-offboarding-network-preflight.yml"
+      - ".github/workflows/baa-offboarding-network.yml"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "src/kernel/world_runtime/**"
+      - "src/domains/administrative_orchestrator/**"
+      - "tests/acceptance/baa_offboarding/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout BAA-Protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 2a504ec120034288323adc5774372e4d0e8c4f48
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare isolated experiment identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(python -c 'import secrets; print(secrets.token_hex(24))')"
+          echo "::add-mask::$token"
+          {
+            echo "AIOS_IMAGE=aios:baa-network-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            echo "BAA_RUNTIME_HOST_PORT=28086"
+            echo "BAA_SANDBOX_HOST_PORT=28090"
+            echo "BAA_NETWORK_RUNTIME_TOKEN=$token"
+            echo "BAA_EVIDENCE_DIR=$RUNNER_TEMP/baa-offboarding-network"
+          } >> "$GITHUB_ENV"
+
+      - name: Install host AIOS package
+        run: python -m pip install --disable-pip-version-check -e .
+
+      - name: Build Linux wheelhouse
+        run: |
+          mkdir -p tests/acceptance/baa_offboarding/wheelhouse
+          python -m pip wheel --disable-pip-version-check \
+            --wheel-dir tests/acceptance/baa_offboarding/wheelhouse \
+            .
+
+      - name: Build isolated AIOS image
+        run: |
+          docker build \
+            --build-arg AIOS_APP_ROOT=/app \
+            --file tests/acceptance/baa_offboarding/Dockerfile.network \
+            -t "$AIOS_IMAGE" \
+            .
+
+      - name: Start network experiment stack
+        run: docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml up -d
+
+      - name: Run networked BAA offboarding experiment
+        env:
+          PYTHONPATH: ${{ github.workspace }}/baa-protocol:${{ github.workspace }}/baa-protocol/integration
+        run: |
+          mkdir -p "$BAA_EVIDENCE_DIR"
+          python tests/acceptance/baa_offboarding/run_network_experiment.py             --runtime-base "http://127.0.0.1:$BAA_RUNTIME_HOST_PORT"             --sandbox-base "http://127.0.0.1:$BAA_SANDBOX_HOST_PORT"             --runtime-token "$BAA_NETWORK_RUNTIME_TOKEN"             --evidence-path "$BAA_EVIDENCE_DIR/evidence.json"
+
+      - name: Capture container diagnostics
+        if: always()
+        run: |
+          mkdir -p "$BAA_EVIDENCE_DIR"
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml ps > "$BAA_EVIDENCE_DIR/compose-ps.txt" || true
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml logs --no-color > "$BAA_EVIDENCE_DIR/compose.log" 2>&1 || true
+
+      - name: Upload network evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: baa-offboarding-network-hosted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-offboarding-network/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Tear down isolated stack
+        if: always()
+        run: |
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml down -v --remove-orphans || true
+          docker image rm -f "$AIOS_IMAGE" 2>/dev/null || true

@@ -194,7 +194,15 @@ def build() -> WorldRuntime:
             id=delegation_id,
             grantor=principal,
             grantee=controller,
-            scope={},
+            scope={
+                "case_id": [
+                    "00000000-0000-4000-8000-00000000baa1",
+                    "00000000-0000-4000-8000-00000000baa2",
+                    "00000000-0000-4000-8000-00000000baa3",
+                ],
+                "authority_epoch": 1,
+                "obligation_id": "*",
+            },
             authority_ceiling={
                 "operation": "*",
                 "action": "*",
@@ -203,6 +211,7 @@ def build() -> WorldRuntime:
         ),
         context=grantor_context,
     )
+
     runtime.registry.register(
         NetworkEffectProvider(sandbox_base, timeout_seconds=timeout)
     )

@@ -4,11 +4,13 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from administrative_orchestrator.domain import EffectStatus
+from administrative_orchestrator.domain import AdministrativeCase, CaseStatus, EffectStatus
 from administrative_orchestrator.effect_provider import (
     ProviderExecutionResult,
     ProviderExecutionStatus,
 )
+from administrative_orchestrator.execution_transitions import resume_execution
+from administrative_orchestrator.service import TransitionError
 from administrative_orchestrator.verification import (
     SemanticVerificationResult,
     VerificationDisposition,
@@ -213,6 +215,36 @@ def test_missing_dispatch_dependency_does_not_call_provider() -> None:
     assert repository.status_updates == [(EffectStatus.DISPATCHED, None)]
 
 
+def test_deferred_provider_result_restores_planned_without_reality_retry() -> None:
+    effect = _effect(EffectStatus.PLANNED)
+    provider = _Provider(
+        result=ProviderExecutionResult(
+            status=ProviderExecutionStatus.DEFERRED,
+            error="admission held before provider attempt",
+        )
+    )
+    owner, repository = _owner(
+        effect,
+        disposition=VerificationDisposition.UNKNOWN,
+        provider=provider,
+    )
+
+    result = VerifiedObligationExecutor(owner).drive_dispatch(
+        SimpleNamespace(fact_snapshot=None),
+        [effect],
+        None,
+        (),
+    )
+
+    assert result == "deferred"
+    assert provider.execute_calls == 1
+    assert effect.status is EffectStatus.PLANNED
+    assert repository.status_updates == [
+        (EffectStatus.DISPATCHED, None),
+        (EffectStatus.PLANNED, None),
+    ]
+
+
 def test_definitive_provider_failure_marks_effect_failed() -> None:
     effect = _effect(EffectStatus.PLANNED)
     provider = _Provider(
@@ -271,3 +303,102 @@ def test_persisted_terminal_effect_status_short_circuits_provider(status, expect
     assert provider.observe_calls == 0
     assert provider.execute_calls == 0
     assert repository.status_updates == []
+
+
+class _RunRepository:
+    def __init__(self, effects) -> None:
+        self.effects = {item.effect_id: item for item in effects}
+
+    def list_effects(self, case_id, authority_epoch):
+        del case_id, authority_epoch
+        return list(self.effects.values())
+
+    def get_effect(self, effect_id):
+        return self.effects.get(effect_id)
+
+
+class _RunOwner:
+    def __init__(self, case, effects, *, verify_result="verified") -> None:
+        self.case = case
+        self.repository = _RunRepository(effects)
+        self.obligations = SimpleNamespace(
+            get_current=lambda case_id, authority_epoch: None,
+            list_links=lambda case_id, authority_epoch: (),
+        )
+        self.verify_result = verify_result
+        self.verify_calls = []
+        self.transitions = []
+
+    def _require_case(self, case_id):
+        assert case_id == self.case.case_id
+        return self.case
+
+    def _validate_current_governance(self, case):
+        del case
+        return None
+
+    def _verify_all(self, case, effects, obligation_set, links):
+        del case, obligation_set, links
+        self.verify_calls.append(tuple(item.effect_id for item in effects))
+        for item in effects:
+            if item.status is EffectStatus.OUTCOME_UNKNOWN:
+                item.status = EffectStatus.SUCCEEDED
+        return self.verify_result
+
+    def _persist_case_transition(self, before, after, event_type, payload=None):
+        assert before.case_id == after.case_id == self.case.case_id
+        self.case = after
+        self.transitions.append((event_type, payload))
+
+
+def _reconciling_case() -> AdministrativeCase:
+    return AdministrativeCase(
+        case_kind="employee-offboarding",
+        requester_principal_id="person:requester",
+        subject_ref="employee:test",
+        status=CaseStatus.RECONCILING,
+        version=7,
+        authority_epoch=3,
+    )
+
+
+def test_resume_execution_requires_reconciling_state() -> None:
+    case = _reconciling_case()
+    resumed = resume_execution(case)
+    assert resumed.status is CaseStatus.EXECUTING
+    assert resumed.version == case.version + 1
+
+    with pytest.raises(TransitionError, match="execution resume requires reconciling state"):
+        resume_execution(resumed)
+
+
+def test_reconciliation_with_only_planned_effects_resumes_execution() -> None:
+    case = _reconciling_case()
+    planned = _effect(EffectStatus.PLANNED)
+    owner = _RunOwner(case, [planned])
+
+    result = VerifiedObligationExecutor(owner).run(case.case_id)
+
+    assert result.status is CaseStatus.EXECUTING
+    assert result.version == case.version + 1
+    assert owner.verify_calls == []
+    assert owner.transitions == [
+        ("case.reconciliation_resolved_for_execution", None)
+    ]
+
+
+def test_reconciliation_verifies_attempted_effect_then_resumes_planned_work() -> None:
+    case = _reconciling_case()
+    ambiguous = _effect(EffectStatus.OUTCOME_UNKNOWN)
+    planned = _effect(EffectStatus.PLANNED)
+    owner = _RunOwner(case, [ambiguous, planned])
+
+    result = VerifiedObligationExecutor(owner).run(case.case_id)
+
+    assert result.status is CaseStatus.EXECUTING
+    assert ambiguous.status is EffectStatus.SUCCEEDED
+    assert planned.status is EffectStatus.PLANNED
+    assert owner.verify_calls == [(ambiguous.effect_id,)]
+    assert owner.transitions == [
+        ("case.reconciliation_resolved_for_execution", None)
+    ]

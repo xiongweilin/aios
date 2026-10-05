@@ -38,18 +38,19 @@ def _effect_matches_current_execution(
     case: AdministrativeCase,
     effect: EffectRecord,
 ) -> bool:
-    """A planned effect survives the lifecycle-only AUTHORIZED -> EXECUTING transition.
+    """Keep a governed planned effect valid across execution-lifecycle progress.
 
-    effect.case_version identifies the case version at planning/authorization time.
-    Dispatch occurs after begin_execution() advances the case by exactly one version
-    without changing the authority epoch or semantic governance basis.
+    effect.case_version records the planning/authorization version. Execution,
+    reconciliation, and a later resume can advance only the case lifecycle version
+    while preserving the same authority epoch, governance basis, authorization, and
+    obligation. Those semantic lineage checks are enforced separately in _context.
     """
 
     return (
         case.case_id == effect.case_id
         and case.authority_epoch == effect.authority_epoch
         and case.status is CaseStatus.EXECUTING
-        and case.version == effect.case_version + 1
+        and case.version > effect.case_version
     )
 
 
