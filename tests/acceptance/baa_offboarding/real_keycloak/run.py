@@ -182,7 +182,12 @@ class KeycloakAdmin:
             f"/admin/realms/{REALM}/users",
             json_body={
                 "username": USERNAME,
+                "firstName": "BAA",
+                "lastName": "Acceptance",
+                "email": "baa-real-keycloak@example.test",
+                "emailVerified": True,
                 "enabled": True,
+                "requiredActions": [],
                 "attributes": {
                     "administrative_subject_ref": [SUBJECT_REF],
                     "preserve_me": ["yes"],
