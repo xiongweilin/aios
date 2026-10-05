@@ -418,13 +418,12 @@ def drive_episode(*, fault: bool) -> dict[str, object]:
         None,
     )
     runtime_reconciliation = None
-    if identity_effect is not None:
+    if fault and identity_effect is not None:
         idempotency_key = bridge.idempotency_key_for_effect(identity_effect.effect_id)
-        response = bridge.client.post(
+        runtime_reconciliation = bridge.client.post(
             f"/v1/reconcile/{idempotency_key}",
             {},
         )
-        runtime_reconciliation = response
 
     bridge.close()
     return {
