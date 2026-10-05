@@ -1,0 +1,113 @@
+name: baa-real-admin-offboarding-e2e
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  odoo-init:
+    image: odoo:18.0
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - odoo-data:/var/lib/odoo
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - -i
+      - hr
+      - --without-demo=all
+      - --stop-after-init
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+
+  odoo:
+    image: odoo:18.0
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+    depends_on:
+      odoo-init:
+        condition: service_completed_successfully
+    volumes:
+      - odoo-data:/var/lib/odoo
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - --db-filter=^baa_real_e2e$
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+      - --http-port=8069
+    ports:
+      - "127.0.0.1:${BAA_REAL_ODOO_HOST_PORT:?set BAA_REAL_ODOO_HOST_PORT}:8069"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${BAA_REAL_KEYCLOAK_ADMIN_PASSWORD:?set BAA_REAL_KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:${BAA_REAL_KEYCLOAK_HOST_PORT:?set BAA_REAL_KEYCLOAK_HOST_PORT}:8080"
+
+  world-runtime:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command:
+      - python
+      - -m
+      - uvicorn
+      - world_runtime.service:create_configured_app
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8086"
+    environment:
+      PYTHONPATH: /acceptance:/app
+      WORLD_RUNTIME_FACTORY: runtime_stack:build
+      BAA_REAL_RUNTIME_STATE_PATH: /state/runtime.db
+      BAA_REAL_RUNTIME_TOKEN: ${BAA_REAL_RUNTIME_TOKEN:?set BAA_REAL_RUNTIME_TOKEN}
+      BAA_REAL_FAULT_MODE: ${BAA_REAL_FAULT_MODE:-none}
+      BAA_REAL_ODOO_BASE_URL: http://odoo:8069
+      BAA_REAL_ODOO_DATABASE: baa_real_e2e
+      BAA_REAL_ODOO_WRITER_USERNAME: baa-writer
+      BAA_REAL_ODOO_WRITER_SECRET: ${BAA_REAL_ODOO_WRITER_PASSWORD:?set BAA_REAL_ODOO_WRITER_PASSWORD}
+      BAA_REAL_KEYCLOAK_BASE_URL: http://keycloak:8080
+      BAA_REAL_KEYCLOAK_REALM: baa-real-e2e
+      BAA_REAL_KEYCLOAK_WRITER_CLIENT_ID: baa-writer
+      BAA_REAL_KEYCLOAK_WRITER_SECRET: ${BAA_REAL_KEYCLOAK_WRITER_SECRET:?set BAA_REAL_KEYCLOAK_WRITER_SECRET}
+    volumes:
+      - ./runtime_stack.py:/acceptance/runtime_stack.py:ro
+      - runtime-state:/state
+    ports:
+      - "127.0.0.1:${BAA_REAL_RUNTIME_HOST_PORT:?set BAA_REAL_RUNTIME_HOST_PORT}:8086"
+    depends_on:
+      - odoo
+      - keycloak
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8086/healthz', timeout=1).read()"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  odoo-data:
+  runtime-state:

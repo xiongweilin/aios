@@ -1,0 +1,136 @@
+name: Real Product Offboarding E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/administrative-real-e2e.yml"
+      - "src/domains/administrative_orchestrator/**"
+      - "src/kernel/world_runtime/**"
+      - "scripts/domains/administrative/production_world_runtime_stack.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/**"
+      - "tests/domains/administrative/test_offboarding_verification_semantics.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: administrative-real-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-product-e2e:
+    name: real-product-e2e (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - normal
+          - lost_ack
+          - readback_outage
+          - runtime_bypass
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: f6ceca7168fb7503e61a14a36b42d62b9cffa763
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare ephemeral credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          make_secret() { python -c 'import secrets; print(secrets.token_urlsafe(32))'; }
+
+          db_password="$(make_secret)"
+          odoo_writer="$(make_secret)"
+          odoo_verifier="$(make_secret)"
+          keycloak_admin="$(make_secret)"
+          keycloak_writer="$(make_secret)"
+          keycloak_verifier="$(make_secret)"
+          keycloak_user="$(make_secret)"
+          runtime_token="$(make_secret)"
+
+          for value in             "$db_password"             "$odoo_writer"             "$odoo_verifier"             "$keycloak_admin"             "$keycloak_writer"             "$keycloak_verifier"             "$keycloak_user"             "$runtime_token"; do
+            echo "::add-mask::$value"
+          done
+
+          fault_mode=none
+          if [[ "${{ matrix.scenario }}" == "lost_ack" ]]; then
+            fault_mode=lost_ack
+          fi
+
+          {
+            echo "AIOS_IMAGE=aios:real-e2e-${{ matrix.scenario }}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            echo "BAA_REAL_SCENARIO=${{ matrix.scenario }}"
+            echo "BAA_REAL_FAULT_MODE=$fault_mode"
+            echo "BAA_REAL_ODOO_DB_PASSWORD=$db_password"
+            echo "BAA_REAL_ODOO_WRITER_PASSWORD=$odoo_writer"
+            echo "BAA_REAL_ODOO_VERIFIER_PASSWORD=$odoo_verifier"
+            echo "BAA_REAL_KEYCLOAK_ADMIN_PASSWORD=$keycloak_admin"
+            echo "BAA_REAL_KEYCLOAK_WRITER_SECRET=$keycloak_writer"
+            echo "BAA_REAL_KEYCLOAK_VERIFIER_SECRET=$keycloak_verifier"
+            echo "BAA_REAL_KEYCLOAK_USER_PASSWORD=$keycloak_user"
+            echo "BAA_REAL_RUNTIME_TOKEN=$runtime_token"
+            echo "BAA_REAL_ODOO_HOST_PORT=28169"
+            echo "BAA_REAL_KEYCLOAK_HOST_PORT=28180"
+            echo "BAA_REAL_RUNTIME_HOST_PORT=28186"
+            echo "BAA_REAL_E2E_EVIDENCE_DIR=$RUNNER_TEMP/baa-real-product-e2e-${{ matrix.scenario }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Install host AIOS
+        run: python -m pip install --disable-pip-version-check -e .
+
+      - name: Build isolated AIOS image
+        run: docker build --build-arg AIOS_APP_ROOT=/app -t "$AIOS_IMAGE" .
+
+      - name: Start Odoo, Keycloak, and World Runtime
+        run: docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml up -d
+
+      - name: Run real-product E2E scenario
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$BAA_REAL_E2E_EVIDENCE_DIR"
+          export PYTHONPATH="$GITHUB_WORKSPACE/baa-protocol:$GITHUB_WORKSPACE/baa-protocol/integration"
+          python tests/acceptance/baa_offboarding/real_e2e/run.py             --scenario "$BAA_REAL_SCENARIO"             --runtime-base "http://127.0.0.1:$BAA_REAL_RUNTIME_HOST_PORT"             --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT"             --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT"             --runtime-token "$BAA_REAL_RUNTIME_TOKEN"             --evidence-path "$BAA_REAL_E2E_EVIDENCE_DIR/evidence.json"
+
+      - name: Capture diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$BAA_REAL_E2E_EVIDENCE_DIR"
+          docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml ps             > "$BAA_REAL_E2E_EVIDENCE_DIR/compose-ps.txt" || true
+          docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml logs --no-color             > "$BAA_REAL_E2E_EVIDENCE_DIR/compose.log" 2>&1 || true
+
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: real-product-offboarding-e2e-${{ matrix.scenario }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/baa-real-product-e2e-${{ matrix.scenario }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Tear down ephemeral products
+        if: always()
+        shell: bash
+        run: |
+          docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml down -v --remove-orphans || true
+          if [[ -n "${AIOS_IMAGE:-}" ]]; then
+            docker image rm -f "$AIOS_IMAGE" >/dev/null 2>&1 || true
+          fi
