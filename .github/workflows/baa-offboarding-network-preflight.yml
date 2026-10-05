@@ -41,26 +41,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          runtime_port="$(python - <<'PY'
-import socket
-s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1]); s.close()
-PY
-)"
-          sandbox_port="$(python - <<'PY'
-import socket
-s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1]); s.close()
-PY
-)"
-          token="$(python - <<'PY'
-import secrets
-print(secrets.token_hex(24))
-PY
-)"
+          token="$(python -c 'import secrets; print(secrets.token_hex(24))')"
           echo "::add-mask::$token"
           {
             echo "AIOS_IMAGE=aios:baa-network-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-            echo "BAA_RUNTIME_HOST_PORT=$runtime_port"
-            echo "BAA_SANDBOX_HOST_PORT=$sandbox_port"
+            echo "BAA_RUNTIME_HOST_PORT=28086"
+            echo "BAA_SANDBOX_HOST_PORT=28090"
             echo "BAA_NETWORK_RUNTIME_TOKEN=$token"
             echo "BAA_EVIDENCE_DIR=$RUNNER_TEMP/baa-offboarding-network"
           } >> "$GITHUB_ENV"
