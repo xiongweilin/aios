@@ -63,10 +63,31 @@ def validate_production_connector_isolation(settings: Settings) -> None:
         raise ProductionReadinessError("Keycloak writer and verifier identities must be distinct")
     if settings.keycloak_writer_secret_env == settings.keycloak_verifier_secret_env:
         raise ProductionReadinessError("Keycloak writer and verifier secret references must be distinct")
-    _require_nonempty(
-        settings.keycloak_request_ref_attribute,
-        "ADMIN_KEYCLOAK_REQUEST_REF_ATTRIBUTE",
+    keycloak_identity_attributes = (
+        (
+            settings.keycloak_subject_ref_attribute,
+            "ADMIN_KEYCLOAK_SUBJECT_REF_ATTRIBUTE",
+        ),
+        (
+            settings.keycloak_request_ref_attribute,
+            "ADMIN_KEYCLOAK_REQUEST_REF_ATTRIBUTE",
+        ),
+        (
+            settings.keycloak_disable_request_ref_attribute,
+            "ADMIN_KEYCLOAK_DISABLE_REQUEST_REF_ATTRIBUTE",
+        ),
+        (
+            settings.keycloak_session_revoke_request_ref_attribute,
+            "ADMIN_KEYCLOAK_SESSION_REVOKE_REQUEST_REF_ATTRIBUTE",
+        ),
     )
+    for value, setting_name in keycloak_identity_attributes:
+        _require_nonempty(value, setting_name)
+    normalized_keycloak_attributes = [value.strip() for value, _ in keycloak_identity_attributes]
+    if len(set(normalized_keycloak_attributes)) != len(normalized_keycloak_attributes):
+        raise ProductionReadinessError(
+            "Keycloak durable identity attributes must be distinct"
+        )
 
 
 def validate_production_control_plane(settings: Settings) -> None:

@@ -140,3 +140,23 @@ def test_production_connector_isolation_rejects_shared_secret_reference():
                 odoo_financial_verifier_secret_env="ADMIN_ODOO_FINANCIAL_WRITER_SECRET"
             )
         )
+
+
+def test_production_connector_isolation_rejects_invalid_keycloak_identity_attributes():
+    with pytest.raises(
+        ProductionReadinessError,
+        match="ADMIN_KEYCLOAK_SUBJECT_REF_ATTRIBUTE is required",
+    ):
+        validate_production_connector_isolation(
+            _production_settings(keycloak_subject_ref_attribute="")
+        )
+
+    with pytest.raises(
+        ProductionReadinessError,
+        match="Keycloak durable identity attributes must be distinct",
+    ):
+        validate_production_connector_isolation(
+            _production_settings(
+                keycloak_disable_request_ref_attribute="administrative_subject_ref"
+            )
+        )
