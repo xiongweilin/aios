@@ -1106,6 +1106,20 @@ def main() -> None:
                 f"{len(effects)=}, {len(realizations)=}, {len(outcomes)=}"
             )
 
+        audit_events = store.list_audit_events(case.case_id)
+        audit_event_types = [str(item["event_type"]) for item in audit_events]
+        if args.scenario in {"lost_ack", "readback_outage"}:
+            required_recovery_events = {
+                "case.reconciliation_started",
+                "case.reconciliation_resolved_for_execution",
+            }
+            missing = required_recovery_events - set(audit_event_types)
+            if missing:
+                raise AssertionError(
+                    f"{args.scenario} did not persist the recovery state transition: "
+                    f"missing={sorted(missing)}, events={audit_event_types}"
+                )
+
         kernels = list(gated._kernels.values())
         if len(kernels) != 1 or not kernels[0].externally_complete():
             raise AssertionError("BAA kernel did not verify all external obligations")
@@ -1150,6 +1164,7 @@ def main() -> None:
                     "effect_count": len(effects),
                     "realization_count": len(realizations),
                     "confirmed_outcome_count": len(outcomes),
+                    "audit_event_types": audit_event_types,
                     "effects": [
                         {
                             "effect_id": str(effect.effect_id),
