@@ -468,9 +468,11 @@ class RealProductReadbackProvider:
         *,
         odoo_base: str,
         keycloak_base: str,
+        fault_mode: str = "none",
     ) -> None:
         self.store = store
         self.readbacks: list[dict[str, Any]] = []
+        self.readback_fault_pending = fault_mode == "readback_outage"
         self.odoo = OdooEmployeeDeactivateVerifier(
             OdooEmployeeDeactivateConnector(
                 OdooEmployeeEffectConnector(
@@ -535,6 +537,24 @@ class RealProductReadbackProvider:
 
     def observe(self, effect) -> RealityObservation:
         expected = self._expected(effect)
+        if self.readback_fault_pending and effect.operation == "identity.disable":
+            self.readback_fault_pending = False
+            self.readbacks.append(
+                {
+                    "effect_id": str(effect.effect_id),
+                    "operation": effect.operation,
+                    "injected_fault": "readback_outage",
+                }
+            )
+            return RealityObservation(
+                availability=ObservationAvailability.UNAVAILABLE,
+                presence=ObservationPresence.UNKNOWN,
+                freshness=ObservationFreshness.UNKNOWN,
+                target_system=effect.target_system,
+                operation=effect.operation,
+                subject_ref=effect.subject_ref,
+                error_class="InjectedReadbackOutage",
+            )
         if effect.operation == "employee.deactivate":
             result = asyncio.run(
                 self.odoo.observe(
@@ -618,6 +638,7 @@ def _build_engine(
     keycloak_base: str,
     runtime_token: str,
     now: datetime,
+    fault_mode: str = "none",
 ) -> tuple[
     OffboardingExecutionEngine,
     WorldRuntimeBridge,
@@ -638,6 +659,7 @@ def _build_engine(
         store,
         odoo_base=odoo_base,
         keycloak_base=keycloak_base,
+        fault_mode=fault_mode,
     )
     runtime_provider = WorldRuntimeEffectProvider(readback, bridge)
     gated = BAAGatedAIOSProvider(
