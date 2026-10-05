@@ -311,6 +311,7 @@ def build() -> WorldRuntime:
             realm=settings.keycloak_realm,
             client_id=settings.keycloak_writer_client_id,
             credential=CredentialRef("keycloak:iam-writer", settings.keycloak_writer_secret_env),
+            subject_ref_attribute=settings.keycloak_subject_ref_attribute,
             request_ref_attribute=settings.keycloak_request_ref_attribute,
             disable_request_ref_attribute=settings.keycloak_disable_request_ref_attribute,
             session_revoke_request_ref_attribute=(
@@ -326,6 +327,7 @@ def build() -> WorldRuntime:
             realm=settings.keycloak_realm,
             client_id=settings.keycloak_verifier_client_id,
             credential=CredentialRef("keycloak:iam-verifier", settings.keycloak_verifier_secret_env),
+            subject_ref_attribute=settings.keycloak_subject_ref_attribute,
             request_ref_attribute=settings.keycloak_request_ref_attribute,
             disable_request_ref_attribute=settings.keycloak_disable_request_ref_attribute,
             session_revoke_request_ref_attribute=(
