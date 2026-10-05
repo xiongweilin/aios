@@ -1,0 +1,93 @@
+name: BAA Offboarding Network Experiment
+
+on:
+  push:
+    branches:
+      - baa-network-experiment
+    paths:
+      - ".github/workflows/baa-offboarding-network.yml"
+      - "tests/acceptance/baa_offboarding/**"
+      - "scripts/domains/administrative/production_world_runtime_stack.py"
+      - "src/domains/administrative_orchestrator/**"
+      - "src/kernel/world_runtime/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-offboarding-network-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  network-experiment:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 6c72855973d288a49ad88d49bf5e3b3c5a35ac73
+          path: baa-protocol
+          persist-credentials: false
+
+      - name: Prepare isolated experiment environment
+        shell: pwsh
+        run: |
+          docker info | Out-Null
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $token = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
+          @(
+            "AIOS_IMAGE=aios:baa-network-${{ github.run_id }}-${{ github.run_attempt }}"
+            "BAA_ACCEPTANCE_HOST_ROOT=$((Resolve-Path 'tests\acceptance\baa_offboarding').Path)"
+            "BAA_REPO_HOST_ROOT=$((Resolve-Path 'baa-protocol').Path)"
+            "BAA_EVIDENCE_HOST_ROOT=$evidence"
+            "BAA_RUNTIME_BEARER_TOKEN=$token"
+            "BAA_EXPERIMENT_COMMIT=6c72855973d288a49ad88d49bf5e3b3c5a35ac73"
+            "AIOS_EXPERIMENT_COMMIT=${{ github.sha }}"
+          ) | Add-Content -Path $env:GITHUB_ENV
+
+      - name: Build isolated AIOS image
+        shell: pwsh
+        run: docker build --build-arg AIOS_APP_ROOT=/app -t $env:AIOS_IMAGE .
+
+      - name: Validate network experiment compose
+        shell: pwsh
+        run: docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml config --quiet
+
+      - name: Run BAA offboarding network experiment
+        shell: pwsh
+        run: docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml up --abort-on-container-exit --exit-code-from experiment
+
+      - name: Capture compose diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:BAA_EVIDENCE_HOST_ROOT "compose-ps.txt"
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml ps -a | Out-File -Encoding utf8 $out
+          $logs = Join-Path $env:BAA_EVIDENCE_HOST_ROOT "compose-logs.txt"
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml logs --no-color | Out-File -Encoding utf8 $logs
+
+      - name: Tear down isolated experiment
+        if: always()
+        shell: pwsh
+        run: |
+          docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml down -v --remove-orphans
+          docker image rm $env:AIOS_IMAGE 2>$null
+          exit 0
+
+      - name: Upload experiment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-offboarding-network-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
