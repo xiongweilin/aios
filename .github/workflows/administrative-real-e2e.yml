@@ -20,8 +20,17 @@ concurrency:
 
 jobs:
   real-product-e2e:
+    name: real-product-e2e (${{ matrix.scenario }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - normal
+          - lost_ack
+          - readback_outage
+          - runtime_bypass
 
     steps:
       - name: Checkout AIOS
@@ -60,8 +69,15 @@ jobs:
             echo "::add-mask::$value"
           done
 
+          fault_mode=none
+          if [[ "${{ matrix.scenario }}" == "lost_ack" ]]; then
+            fault_mode=lost_ack
+          fi
+
           {
-            echo "AIOS_IMAGE=aios:real-e2e-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            echo "AIOS_IMAGE=aios:real-e2e-${{ matrix.scenario }}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            echo "BAA_REAL_SCENARIO=${{ matrix.scenario }}"
+            echo "BAA_REAL_FAULT_MODE=$fault_mode"
             echo "BAA_REAL_ODOO_DB_PASSWORD=$db_password"
             echo "BAA_REAL_ODOO_WRITER_PASSWORD=$odoo_writer"
             echo "BAA_REAL_ODOO_VERIFIER_PASSWORD=$odoo_verifier"
@@ -73,7 +89,7 @@ jobs:
             echo "BAA_REAL_ODOO_HOST_PORT=28169"
             echo "BAA_REAL_KEYCLOAK_HOST_PORT=28180"
             echo "BAA_REAL_RUNTIME_HOST_PORT=28186"
-            echo "BAA_REAL_E2E_EVIDENCE_DIR=$RUNNER_TEMP/baa-real-product-e2e"
+            echo "BAA_REAL_E2E_EVIDENCE_DIR=$RUNNER_TEMP/baa-real-product-e2e-${{ matrix.scenario }}"
           } >> "$GITHUB_ENV"
 
       - name: Install host AIOS
@@ -85,13 +101,13 @@ jobs:
       - name: Start Odoo, Keycloak, and World Runtime
         run: docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml up -d
 
-      - name: Run single-episode real-product E2E
+      - name: Run real-product E2E scenario
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$BAA_REAL_E2E_EVIDENCE_DIR"
           export PYTHONPATH="$GITHUB_WORKSPACE/baa-protocol:$GITHUB_WORKSPACE/baa-protocol/integration"
-          python tests/acceptance/baa_offboarding/real_e2e/run.py             --runtime-base "http://127.0.0.1:$BAA_REAL_RUNTIME_HOST_PORT"             --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT"             --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT"             --runtime-token "$BAA_REAL_RUNTIME_TOKEN"             --evidence-path "$BAA_REAL_E2E_EVIDENCE_DIR/evidence.json"
+          python tests/acceptance/baa_offboarding/real_e2e/run.py             --scenario "$BAA_REAL_SCENARIO"             --runtime-base "http://127.0.0.1:$BAA_REAL_RUNTIME_HOST_PORT"             --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT"             --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT"             --runtime-token "$BAA_REAL_RUNTIME_TOKEN"             --evidence-path "$BAA_REAL_E2E_EVIDENCE_DIR/evidence.json"
 
       - name: Capture diagnostics
         if: always()
@@ -105,8 +121,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: real-product-offboarding-e2e-${{ github.run_id }}
-          path: ${{ runner.temp }}/baa-real-product-e2e/
+          name: real-product-offboarding-e2e-${{ matrix.scenario }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/baa-real-product-e2e-${{ matrix.scenario }}/
           if-no-files-found: warn
           retention-days: 14
 
