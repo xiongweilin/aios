@@ -5,7 +5,6 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
 app = FastAPI(title="BAA Offboarding Network Sandbox")
 
 _effects: dict[str, dict[str, Any]] = {}
