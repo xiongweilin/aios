@@ -1,0 +1,218 @@
+name: Administrative Real-Integration Readiness Probe
+
+on:
+  push:
+    branches:
+      - probe/administrative-real-readiness
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Probe local administrative deployment metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outDir = Join-Path $env:RUNNER_TEMP 'administrative-real-readiness'
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $localRoot = 'D:\infrastructure\compose\aios'
+          $envFile = Join-Path $localRoot '.env'
+
+          function Read-DotEnv([string]$Path) {
+            $map = @{}
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+              return $map
+            }
+            foreach ($line in Get-Content -LiteralPath $Path) {
+              if ($line -match '^\s*#' -or [string]::IsNullOrWhiteSpace($line)) { continue }
+              if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
+                $key = $Matches[1]
+                $value = $Matches[2].Trim()
+                if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+                  $value = $value.Substring(1, $value.Length - 2)
+                }
+                $map[$key] = $value
+              }
+            }
+            return $map
+          }
+
+          function Safe-Host([string]$Value) {
+            if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+            try {
+              $uri = [Uri]$Value
+              if ($uri.IsAbsoluteUri) {
+                return [pscustomobject]@{
+                  scheme = $uri.Scheme
+                  host = $uri.Host
+                  port = if ($uri.IsDefaultPort) { $null } else { $uri.Port }
+                }
+              }
+            } catch {}
+            return [pscustomobject]@{ scheme = $null; host = $null; port = $null }
+          }
+
+          function Safe-Value([hashtable]$Map, [string]$Key, [ValidateSet('presence','plain','host')]$Mode) {
+            $present = $Map.ContainsKey($Key) -and -not [string]::IsNullOrWhiteSpace([string]$Map[$Key])
+            if (-not $present) {
+              return [pscustomobject]@{ present = $false; value = $null }
+            }
+            if ($Mode -eq 'presence') {
+              return [pscustomobject]@{ present = $true; value = $null }
+            }
+            if ($Mode -eq 'host') {
+              return [pscustomobject]@{ present = $true; value = (Safe-Host ([string]$Map[$Key])) }
+            }
+            return [pscustomobject]@{ present = $true; value = [string]$Map[$Key] }
+          }
+
+          $cfg = Read-DotEnv $envFile
+          $selected = [ordered]@{}
+          foreach ($item in @(
+            @('ADMIN_RUNTIME_PROFILE','plain'),
+            @('ADMIN_WORLD_RUNTIME_MODE','plain'),
+            @('ADMIN_EXTERNAL_EFFECTS_ENABLED','plain'),
+            @('ADMIN_AUTH_MODE','plain'),
+            @('ADMIN_HRIS_SOURCE_KIND','plain'),
+            @('ADMIN_ODOO_BASE_URL','host'),
+            @('ADMIN_ODOO_DATABASE','plain'),
+            @('ADMIN_ODOO_READER_USERNAME','plain'),
+            @('ADMIN_ODOO_WRITER_USERNAME','plain'),
+            @('ADMIN_ODOO_VERIFIER_USERNAME','plain'),
+            @('ADMIN_ODOO_FINANCIAL_WRITER_USERNAME','plain'),
+            @('ADMIN_ODOO_FINANCIAL_VERIFIER_USERNAME','plain'),
+            @('ADMIN_KEYCLOAK_BASE_URL','host'),
+            @('ADMIN_KEYCLOAK_REALM','plain'),
+            @('ADMIN_KEYCLOAK_WRITER_CLIENT_ID','plain'),
+            @('ADMIN_KEYCLOAK_VERIFIER_CLIENT_ID','plain'),
+            @('ADMIN_OIDC_ISSUER','host'),
+            @('ADMIN_OIDC_AUDIENCE','plain'),
+            @('ADMIN_DATABASE_URL','presence'),
+            @('ADMIN_WORKER_DATABASE_URL','presence'),
+            @('ADMIN_DBOS_SYSTEM_DATABASE_URL','presence')
+          )) {
+            $selected[$item[0]] = Safe-Value $cfg $item[0] $item[1]
+          }
+
+          # Secret values are never read. Report only whether the configured
+          # secret-reference key exists in .env and the name of the env var it points to.
+          $secretRefs = [ordered]@{}
+          foreach ($key in @(
+            'ADMIN_ODOO_READER_SECRET_ENV',
+            'ADMIN_ODOO_WRITER_SECRET_ENV',
+            'ADMIN_ODOO_VERIFIER_SECRET_ENV',
+            'ADMIN_ODOO_FINANCIAL_WRITER_SECRET_ENV',
+            'ADMIN_ODOO_FINANCIAL_VERIFIER_SECRET_ENV',
+            'ADMIN_KEYCLOAK_WRITER_SECRET_ENV',
+            'ADMIN_KEYCLOAK_VERIFIER_SECRET_ENV'
+          )) {
+            $secretRefs[$key] = if ($cfg.ContainsKey($key) -and $cfg[$key]) {
+              [pscustomobject]@{ present = $true; referenced_env_name = [string]$cfg[$key] }
+            } else {
+              [pscustomobject]@{ present = $false; referenced_env_name = $null }
+            }
+          }
+
+          $cmdkeyTargets = @()
+          if (Get-Command cmdkey.exe -ErrorAction SilentlyContinue) {
+            $raw = & cmdkey.exe /list
+            foreach ($line in $raw) {
+              if ($line -match '^\s*Target:\s*(.+?)\s*$') {
+                $target = $Matches[1]
+                if ($target -match '(?i)(odoo|keycloak|aios|administrative)') {
+                  $cmdkeyTargets += $target
+                }
+              }
+            }
+          }
+          $cmdkeyTargets = @($cmdkeyTargets | Sort-Object -Unique)
+
+          $containers = @()
+          $dockerReachable = $false
+          if (Get-Command docker.exe -ErrorAction SilentlyContinue) {
+            & docker.exe info *> $null
+            if ($LASTEXITCODE -eq 0) {
+              $dockerReachable = $true
+              $rows = & docker.exe ps --format '{{.Names}}|{{.Status}}|{{.Ports}}'
+              foreach ($row in $rows) {
+                $parts = $row -split '\|',3
+                if ($parts[0] -match '(?i)(odoo|keycloak|aios|world.?runtime|postgres|administrative)') {
+                  $containers += [pscustomobject]@{
+                    name = $parts[0]
+                    status = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+                    ports = if ($parts.Count -gt 2) { $parts[2] } else { '' }
+                  }
+                }
+              }
+            }
+          }
+
+          $endpointChecks = [ordered]@{}
+          foreach ($pair in @(
+            @('odoo','ADMIN_ODOO_BASE_URL'),
+            @('keycloak','ADMIN_KEYCLOAK_BASE_URL'),
+            @('oidc','ADMIN_OIDC_ISSUER')
+          )) {
+            $name = $pair[0]; $key = $pair[1]
+            if ($cfg.ContainsKey($key) -and $cfg[$key]) {
+              try {
+                $uri = [Uri]$cfg[$key]
+                $response = Invoke-WebRequest -Uri $uri.AbsoluteUri -Method Head -TimeoutSec 5 -SkipHttpErrorCheck
+                $endpointChecks[$name] = [pscustomobject]@{
+                  configured = $true
+                  reachable = $true
+                  status_code = [int]$response.StatusCode
+                  host = $uri.Host
+                }
+              } catch {
+                $host = $null
+                try { $host = ([Uri]$cfg[$key]).Host } catch {}
+                $endpointChecks[$name] = [pscustomobject]@{
+                  configured = $true
+                  reachable = $false
+                  status_code = $null
+                  host = $host
+                  error_type = $_.Exception.GetType().Name
+                }
+              }
+            } else {
+              $endpointChecks[$name] = [pscustomobject]@{
+                configured = $false
+                reachable = $false
+                status_code = $null
+                host = $null
+              }
+            }
+          }
+
+          $report = [pscustomobject]@{
+            checked_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+            local_checkout_present = (Test-Path -LiteralPath $localRoot -PathType Container)
+            dotenv_present = (Test-Path -LiteralPath $envFile -PathType Leaf)
+            config = $selected
+            secret_references = $secretRefs
+            matching_credential_manager_targets = $cmdkeyTargets
+            docker_reachable = $dockerReachable
+            matching_running_containers = $containers
+            endpoint_checks = $endpointChecks
+          }
+
+          $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $outDir 'readiness.json') -Encoding UTF8
+          Write-Host "readiness artifact written; secret values were not read or emitted"
+
+      - name: Upload readiness metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: administrative-real-readiness-${{ github.run_id }}
+          path: ${{ runner.temp }}/administrative-real-readiness/readiness.json
+          if-no-files-found: error
+          retention-days: 3
