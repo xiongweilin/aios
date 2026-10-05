@@ -25,6 +25,7 @@ services:
     image: ${AIOS_IMAGE:?set AIOS_IMAGE}
     command: ["python", "/acceptance/runtime_service.py"]
     environment:
+      PYTHONPATH: /app
       ADMIN_RUNTIME_PROFILE: staging
       ADMIN_AUTH_MODE: oidc
       ADMIN_OIDC_ISSUER: https://issuer.example.test
