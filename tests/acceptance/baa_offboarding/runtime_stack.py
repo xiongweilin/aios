@@ -3,8 +3,12 @@ from __future__ import annotations
 import os
 
 import httpx
+from administrative_orchestrator.integrations.runtime_capabilities import (
+    ADMINISTRATIVE_HRIS_EMPLOYEE_DEACTIVATE,
+    ADMINISTRATIVE_IAM_IDENTITY_DISABLE,
+    ADMINISTRATIVE_IAM_SESSIONS_REVOKE,
+)
 from world_runtime import WorldRuntime
-from world_runtime.identity import DelegationGrant
 from world_runtime.execution import (
     CapabilityEffectRule,
     CapabilityRequest,
@@ -13,13 +17,7 @@ from world_runtime.execution import (
     ProviderDescriptor,
     ProviderHealth,
 )
-
-from administrative_orchestrator.integrations.runtime_capabilities import (
-    ADMINISTRATIVE_HRIS_EMPLOYEE_DEACTIVATE,
-    ADMINISTRATIVE_IAM_IDENTITY_DISABLE,
-    ADMINISTRATIVE_IAM_SESSIONS_REVOKE,
-)
-
+from world_runtime.identity import DelegationGrant
 
 CAPABILITIES = (
     ADMINISTRATIVE_HRIS_EMPLOYEE_DEACTIVATE,
