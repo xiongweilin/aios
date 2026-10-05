@@ -81,7 +81,9 @@ from administrative_orchestrator.production_verification import (
     complete_readback_postcondition,
 )
 from aios_gate import BAAGatedAIOSProvider
-from pydantic import SecretStr\n\nCASE_ID = UUID("00000000-0000-4000-8000-00000000baa4")
+from pydantic import SecretStr
+
+CASE_ID = UUID("00000000-0000-4000-8000-00000000baa4")
 PRINCIPAL = "service:administrative-orchestrator"
 DELEGATION_ID = "delegation:baa-real-products-administrative"
 ODOO_DATABASE = "baa_real_e2e"
