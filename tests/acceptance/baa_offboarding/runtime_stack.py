@@ -194,7 +194,15 @@ def build() -> WorldRuntime:
             id=delegation_id,
             grantor=principal,
             grantee=controller,
-            scope={},
+            scope={
+                "case_id": "00000000-0000-4000-8000-00000000baa1",
+                "authority_epoch": 1,
+                "obligation_id": [
+                    "ac745a5c-dea4-5a3f-a3a9-6976421ac42f",
+                    "9738edec-4de4-5b2b-acbc-32eeab008d4c",
+                    "d2411d33-7bc9-5211-bb62-bb722000cb0c",
+                ],
+            },
             authority_ceiling={
                 "operation": "*",
                 "action": "*",
