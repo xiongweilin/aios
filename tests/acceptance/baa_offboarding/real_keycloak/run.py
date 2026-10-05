@@ -1,3 +1,4 @@
+# Standalone connector acceptance; also reused by the composed real-product E2E harness.
 from __future__ import annotations
 
 import argparse
