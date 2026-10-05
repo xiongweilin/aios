@@ -52,6 +52,7 @@ from aios_gate import BAAGatedAIOSProvider
 from pydantic import SecretStr
 
 PRINCIPAL = "service:administrative-orchestrator"
+DELEGATION_ID = "delegation:baa-network-administrative"
 
 
 def _json_request(
@@ -60,12 +61,15 @@ def _json_request(
     payload: dict[str, Any] | None = None,
     *,
     token: str | None = None,
+    delegation_id: str | None = None,
     timeout: float = 5.0,
 ) -> tuple[int, dict[str, Any]]:
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if delegation_id:
+        headers["X-World-Runtime-Delegation"] = delegation_id
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -306,7 +310,7 @@ def _engine(
         world_runtime_timeout_seconds=2.0,
         world_runtime_principal=PRINCIPAL,
         world_runtime_bearer_token=SecretStr(token),
-        world_runtime_delegation_id="delegation:baa-network-administrative",
+        world_runtime_delegation_id=DELEGATION_ID,
     )
     bridge = WorldRuntimeBridge(store, settings)
     fallback = HttpEffectProvider(sandbox_base, timeout_seconds=1.0)
@@ -339,6 +343,7 @@ def _probe_runtime_mandate(runtime_base: str, token: str) -> dict[str, Any]:
         f"{runtime_base}/v1/mandates",
         payload,
         token=token,
+        delegation_id=DELEGATION_ID,
     )
     if status != 200:
         raise AssertionError(
@@ -481,6 +486,7 @@ def _run_runtime_bypass(runtime_base: str, sandbox_base: str, token: str) -> dic
         f"{runtime_base}/v1/invoke",
         payload,
         token=token,
+        delegation_id=DELEGATION_ID,
     )
     after = _sandbox_state(sandbox_base)
     if status < 400:
@@ -509,6 +515,7 @@ def main() -> None:
         "GET",
         f"{args.runtime_base}/v1/capabilities",
         token=args.runtime_token,
+        delegation_id=DELEGATION_ID,
     )
     if status != 200:
         raise RuntimeError(f"Runtime capability catalog unavailable: HTTP {status}: {catalog}")
