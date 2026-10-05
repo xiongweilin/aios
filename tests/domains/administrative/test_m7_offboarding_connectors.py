@@ -49,6 +49,33 @@ def _keycloak() -> KeycloakIdentityEffectConnector:
 
 
 @pytest.mark.asyncio
+async def test_odoo_identity_lookup_includes_inactive_employees(monkeypatch) -> None:
+    base = _odoo()
+    execute = AsyncMock(
+        return_value=[
+            {
+                "id": 42,
+                "x_administrative_deactivate_request_ref": "request:offboard:1",
+            }
+        ]
+    )
+    monkeypatch.setattr(base, "_execute_kw", execute)
+
+    rows = await base._lookup(
+        "x_administrative_deactivate_request_ref",
+        "request:offboard:1",
+    )
+
+    assert rows == [
+        {
+            "id": 42,
+            "x_administrative_deactivate_request_ref": "request:offboard:1",
+        }
+    ]
+    assert execute.await_args.args[3]["context"] == {"active_test": False}
+
+
+@pytest.mark.asyncio
 async def test_odoo_deactivate_uses_exact_employee_and_durable_request_ref(
     monkeypatch,
 ) -> None:

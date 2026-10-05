@@ -180,7 +180,11 @@ class OdooEmployeeEffectConnector:
             "hr.employee",
             "search_read",
             [[(field, "=", value)]],
-            {"fields": ["id", field], "limit": 2},
+            {
+                "fields": ["id", field],
+                "limit": 2,
+                "context": {"active_test": False},
+            },
         )
         return rows if isinstance(rows, list) else []
 
