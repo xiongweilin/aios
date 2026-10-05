@@ -413,17 +413,36 @@ def drive_episode(*, fault: bool) -> dict[str, object]:
     ]
     metrics = _get("/control/metrics")
 
+    runtime_state = bridge.client.get("/v1/state/export")
+    runtime_attempts = {
+        str(row.get("key")): dict(row.get("value") or {})
+        for row in runtime_state.get("projections", [])
+        if row.get("namespace") == "execution.provider-attempt"
+    }
+    runtime_idempotency = {
+        str(row.get("key")): dict(row.get("value") or {})
+        for row in runtime_state.get("projections", [])
+        if row.get("namespace") == "execution.provider-idempotency"
+    }
+
     identity_effect = next(
         (item for item in effects if item.operation == "identity.disable"),
         None,
     )
-    runtime_reconciliation = None
+    runtime_reconciliation: dict[str, object] | None = None
+    expected_identity_key = None
     if fault and identity_effect is not None:
-        idempotency_key = bridge.idempotency_key_for_effect(identity_effect.effect_id)
-        runtime_reconciliation = bridge.client.post(
-            f"/v1/reconcile/{idempotency_key}",
-            {},
-        )
+        expected_identity_key = bridge.idempotency_key_for_effect(identity_effect.effect_id)
+        if expected_identity_key in runtime_attempts:
+            runtime_reconciliation = bridge.client.post(
+                f"/v1/reconcile/{expected_identity_key}",
+                {},
+            )
+        else:
+            runtime_reconciliation = {
+                "status": "provider-attempt-missing",
+                "expected_idempotency_key": expected_identity_key,
+            }
 
     bridge.close()
     return {
@@ -432,6 +451,25 @@ def drive_episode(*, fault: bool) -> dict[str, object]:
         "completed": states[-1] == CaseStatus.COMPLETED.value,
         "effects": effect_summary,
         "enterprise": metrics,
+        "runtime_expected_identity_key": expected_identity_key,
+        "runtime_provider_attempts": {
+            key: {
+                "request_id": value.get("request_id"),
+                "provider_id": value.get("provider_id"),
+                "capability": value.get("capability"),
+                "status": value.get("status"),
+            }
+            for key, value in runtime_attempts.items()
+        },
+        "runtime_provider_idempotency": {
+            key: {
+                "request_id": value.get("request_id"),
+                "provider_id": value.get("provider_id"),
+                "status": value.get("status"),
+                "error": value.get("error"),
+            }
+            for key, value in runtime_idempotency.items()
+        },
         "runtime_reconciliation": runtime_reconciliation,
     }
 
