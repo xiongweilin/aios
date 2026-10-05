@@ -211,6 +211,21 @@ def build() -> WorldRuntime:
         ),
         context=grantor_context,
     )
+
+    original_register_mandate_attested = runtime.governance.register_mandate_attested
+
+    def _diagnostic_register_mandate_attested(mandate, *, context):
+        if mandate.principal != context.effective_principal:
+            raise PermissionError(
+                "acceptance mandate principal mismatch: "
+                f"mandate={mandate.principal!r}; "
+                f"authenticated={context.authenticated_principal!r}; "
+                f"effective={context.effective_principal!r}; "
+                f"delegation_chain={context.delegation_chain!r}"
+            )
+        return original_register_mandate_attested(mandate, context=context)
+
+    runtime.governance.register_mandate_attested = _diagnostic_register_mandate_attested
     runtime.registry.register(
         NetworkEffectProvider(sandbox_base, timeout_seconds=timeout)
     )
