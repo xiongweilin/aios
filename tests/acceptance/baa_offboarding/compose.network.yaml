@@ -1,0 +1,64 @@
+name: baa-offboarding-network
+
+services:
+  sandbox:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command:
+      - python
+      - -m
+      - uvicorn
+      - sandbox_app:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8090"
+    environment:
+      PYTHONPATH: /acceptance
+    volumes:
+      - ./sandbox_app.py:/acceptance/sandbox_app.py:ro
+    ports:
+      - "127.0.0.1:${BAA_SANDBOX_HOST_PORT:?set BAA_SANDBOX_HOST_PORT}:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz', timeout=1).read()"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  world-runtime:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command:
+      - python
+      - -m
+      - uvicorn
+      - world_runtime.service:create_configured_app
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8086"
+    environment:
+      PYTHONPATH: /acceptance
+      WORLD_RUNTIME_FACTORY: runtime_stack:build
+      BAA_NETWORK_RUNTIME_STATE_PATH: /state/runtime.db
+      BAA_NETWORK_SANDBOX_BASE: http://sandbox:8090
+      BAA_NETWORK_RUNTIME_TOKEN: ${BAA_NETWORK_RUNTIME_TOKEN:?set BAA_NETWORK_RUNTIME_TOKEN}
+      BAA_NETWORK_RUNTIME_PRINCIPAL: service:administrative-orchestrator
+      BAA_NETWORK_RUNTIME_CONTROLLER: controller:administrative-orchestrator
+      BAA_NETWORK_RUNTIME_DELEGATION_ID: delegation:baa-network-administrative
+      BAA_NETWORK_PROVIDER_TIMEOUT_SECONDS: "0.35"
+    volumes:
+      - ./runtime_stack.py:/acceptance/runtime_stack.py:ro
+      - runtime-state:/state
+    ports:
+      - "127.0.0.1:${BAA_RUNTIME_HOST_PORT:?set BAA_RUNTIME_HOST_PORT}:8086"
+    depends_on:
+      sandbox:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8086/healthz', timeout=1).read()"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  runtime-state:
