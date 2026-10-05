@@ -43,6 +43,7 @@ from administrative_orchestrator.effect_provider import (
     ProviderExecutionStatus,
     RealityObservation,
 )
+from administrative_orchestrator.execution_repository import ExecutionRepository
 from administrative_orchestrator.governance import GovernanceRepository
 from administrative_orchestrator.integrations.credentials import CredentialRef
 from administrative_orchestrator.integrations.effect_common import ConnectorStatus
@@ -787,9 +788,10 @@ def main() -> None:
             if not isinstance(marker, str) or not marker:
                 raise AssertionError(f"durable product request marker missing: {product}")
 
-        effects = store.list_effects(case.case_id, case.authority_epoch)
-        outcomes = store.list_outcomes(case.case_id, case.authority_epoch)
-        realizations = store.list_realizations(case.case_id, case.authority_epoch)
+        execution = ExecutionRepository(store)
+        effects = execution.list_effects(case.case_id, case.authority_epoch)
+        outcomes = execution.list_outcomes(case.case_id, case.authority_epoch)
+        realizations = execution.list_realizations(case.case_id, case.authority_epoch)
         if len(effects) != 3 or len(outcomes) != 3 or len(realizations) != 3:
             raise AssertionError(
                 "real-product E2E requires three effects, realizations, and outcomes: "
