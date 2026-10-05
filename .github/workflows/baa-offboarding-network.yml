@@ -60,7 +60,25 @@ jobs:
 
       - name: Build isolated AIOS image
         shell: pwsh
-        run: docker build --build-arg AIOS_APP_ROOT=/app -t $env:AIOS_IMAGE .
+        run: |
+          $docker = Get-Command docker.exe -ErrorAction SilentlyContinue
+          if (-not $docker) { $docker = Get-Command docker -ErrorAction Stop }
+          $dockerDir = Split-Path $docker.Source -Parent
+          $pluginsDir = Join-Path (Split-Path $dockerDir -Parent) "cli-plugins"
+          $buildx = Join-Path $pluginsDir "docker-buildx.exe"
+          if (-not (Test-Path $buildx)) {
+            throw "Docker Buildx executable not found at $buildx"
+          }
+          $args = @(
+            "build",
+            "--network=host",
+            "--allow", "network.host",
+            "--load",
+            "--tag", $env:AIOS_IMAGE,
+            "--build-arg", "AIOS_APP_ROOT=/app",
+            "."
+          )
+          & $buildx @args
 
       - name: Start network experiment stack
         shell: pwsh
