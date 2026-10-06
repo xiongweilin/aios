@@ -1,0 +1,159 @@
+name: BAA Prospective Real-Model Study v4
+# Frozen BAA preregistration head: 2f55730ec587833f961b762e88a037cd97255c71
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-model-v4
+    paths:
+      - ".github/workflows/baa-prospective-model-v4.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-prospective-real-model-v4-selfhosted
+  cancel-in-progress: true
+
+jobs:
+  prospective-model-v4:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol v4 study
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 2f55730ec587833f961b762e88a037cd97255c71
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-prospective-model-v4"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=2f55730ec587833f961b762e88a037cd97255c71" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify local model gateway
+        shell: pwsh
+        run: |
+          $health = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+          $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+          $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+          if ($ids -notcontains $env:BAA_MODEL_ID) {
+            throw "required model is absent from local gateway catalog: $env:BAA_MODEL_ID"
+          }
+          $gatewayRepo = "D:\agent\llm-gateway"
+          $gatewaySha = $null
+          if (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git")) {
+            $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          }
+          if ($gatewaySha) {
+            "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+          @{
+            checked_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $gatewaySha
+            model_ids = $ids
+          } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
+
+      - name: Verify frozen v4 study fingerprint
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python -c "import json,pathlib; p=pathlib.Path('baa-protocol/experiments/prospective_offboarding_v4.json'); d=json.loads(p.read_text(encoding='utf-8')); assert d['version']=='prospective-offboarding-v4'; assert d.get('prompt_profile')=='evidence-neutral-v4-tool'; assert len(d['episodes'])==12; assert all('control_context' in e and 'public_context' in e for e in d['episodes']); print('v4 fingerprint qualified')"
+
+      - name: Run prospective real-model delegation study v4
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python baa-protocol/scripts/run_prospective_model_study.py --workload baa-protocol/experiments/prospective_offboarding_v4.json --gateway-base $env:BAA_GATEWAY_BASE --model $env:BAA_MODEL_ID --output "$env:BAA_MODEL_EVIDENCE_DIR/result.json" --timeout-seconds 180 --proposal-tool
+
+      - name: Qualify model evidence
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $resultPath)) {
+            throw "prospective v4 result.json is missing"
+          }
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+          if ($result.workload_version -ne "prospective-offboarding-v4") {
+            throw "unexpected workload version: $($result.workload_version)"
+          }
+          if ($result.model_interface -ne "function_tool") {
+            throw "unexpected model interface: $($result.model_interface)"
+          }
+          if ([int]$result.physical_sampling.calls -le 0) {
+            throw "expected physical model calls"
+          }
+          if ([int]$result.physical_sampling.calls_with_errors -ne 0) {
+            throw "model-call errors invalidate the run: $($result.physical_sampling.calls_with_errors)"
+          }
+          foreach ($field in @("transport_errors", "schema_errors", "model_errors")) {
+            if ([int]$result.physical_sampling.$field -ne 0) {
+              throw "$field invalidate the run: $($result.physical_sampling.$field)"
+            }
+          }
+          if (@($result.levels).Count -ne 3) {
+            throw "expected exactly three C levels"
+          }
+          foreach ($level in $result.levels) {
+            foreach ($regime in @("self_check", "external_record_audit", "bounded_action_protocol")) {
+              if ([int]$level.summary.$regime.episodes -ne 12) {
+                throw "incomplete episode denominator for $regime at C$($level.capability.level)"
+              }
+            }
+          }
+
+      - name: Extract compact summary
+        if: always()
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (Test-Path -LiteralPath $resultPath) {
+            $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+            $summary = [ordered]@{
+              workload_version = $result.workload_version
+              model_id = $result.model_id
+              model_interface = $result.model_interface
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
+              budget = $result.budget
+              physical_sampling = $result.physical_sampling
+              levels = @(
+                $result.levels | ForEach-Object {
+                  [ordered]@{
+                    capability = $_.capability
+                    summary = $_.summary
+                  }
+                }
+              )
+            }
+            $summary | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/summary.json"
+          }
+
+      - name: Upload prospective-model v4 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-prospective-model-v4-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-prospective-model-v4/
+          if-no-files-found: warn
+          retention-days: 14
