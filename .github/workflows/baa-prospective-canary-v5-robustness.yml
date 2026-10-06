@@ -1,0 +1,366 @@
+name: BAA Prospective Canary Study v5 Robustness
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-canary-v5-robustness
+    paths:
+      - ".github/workflows/baa-prospective-canary-v5-robustness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-prospective-canary-v5-robustness-selfhosted
+  cancel-in-progress: true
+
+jobs:
+  prospective-canary-v5-robustness:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout frozen BAA canary v5 study
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: de6352785584b9b58e1c72c466f6435496a0e239
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-prospective-canary-v5-robustness"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=de6352785584b9b58e1c72c466f6435496a0e239" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_WORKLOAD_SHA256=e1c5802edcbc9c1f33d5a72c18a102d6af406ca7e25962a71a2fb62b2b232bd9" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_REQUIRED_SHA=6fe86653da104bd0c00637a856e352303774fc01" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Pin local model gateway revision
+        shell: pwsh
+        run: |
+          $gatewayRepo = "D:\agent\llm-gateway"
+          if (-not (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git"))) {
+            throw "local gateway checkout is missing: $gatewayRepo"
+          }
+          $dirty = @(& git -C $gatewayRepo status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0) { throw "failed to inspect local gateway worktree" }
+          if ($dirty.Count -ne 0) { throw "local gateway worktree is not clean" }
+          $branch = (& git -C $gatewayRepo branch --show-current).Trim()
+          if ($branch -ne "main") { throw "local gateway checkout must be on main; actual=$branch" }
+          $current = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          if ($current -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            & git -C $gatewayRepo fetch origin main
+            if ($LASTEXITCODE -ne 0) { throw "failed to fetch llm-gateway origin/main" }
+            & git -C $gatewayRepo cat-file -e "$($env:BAA_GATEWAY_REQUIRED_SHA)^{commit}"
+            if ($LASTEXITCODE -ne 0) { throw "required llm-gateway commit unavailable" }
+            & git -C $gatewayRepo merge-base --is-ancestor $current $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) { throw "local gateway cannot fast-forward to required revision" }
+            & git -C $gatewayRepo merge --ff-only $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) { throw "failed to fast-forward local gateway" }
+            "BAA_GATEWAY_RESTART_REQUIRED=true" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+          $pinned = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          if ($pinned -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            throw "local gateway revision mismatch after pin: $pinned"
+          }
+
+      - name: Ensure local model gateway
+        shell: pwsh
+        run: |
+          $ready = $false
+          if ($env:BAA_GATEWAY_RESTART_REQUIRED -ne "true") {
+            try {
+              $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+              $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+              $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+              if ($ids -contains $env:BAA_MODEL_ID) { $ready = $true }
+            } catch {
+              $ready = $false
+            }
+          }
+          if (-not $ready) {
+            $gatewayRepo = "D:\agent\llm-gateway"
+            $startScript = Join-Path $gatewayRepo "scripts\start-agent-gateway.ps1"
+            if (-not (Test-Path -LiteralPath $startScript -PathType Leaf)) {
+              throw "gateway recovery script is missing: $startScript"
+            }
+            & pwsh -NoProfile -NonInteractive -File $startScript
+            if ($LASTEXITCODE -ne 0) { throw "gateway recovery failed with exit code $LASTEXITCODE" }
+          }
+
+      - name: Verify local model gateway
+        shell: pwsh
+        run: |
+          $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+          $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+          $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+          if ($ids -notcontains $env:BAA_MODEL_ID) {
+            throw "required model is absent from local gateway catalog: $env:BAA_MODEL_ID"
+          }
+          $gatewayRepo = "D:\agent\llm-gateway"
+          $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          if ($gatewaySha -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            throw "running gateway checkout revision mismatch: expected=$env:BAA_GATEWAY_REQUIRED_SHA actual=$gatewaySha"
+          }
+          "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          @{
+            checked_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $gatewaySha
+            model_ids = $ids
+          } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
+
+      - name: Verify frozen canary v5 fingerprint
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python -m unittest discover -s baa-protocol/tests -p "test_prospective_transport.py"
+          python -m unittest discover -s baa-protocol/tests -p "test_prospective_canary_evidence_horizon_study.py"
+          python -m unittest discover -s baa-protocol/tests -p "test_prospective_canary_v5_robustness_workload.py"
+          python -m unittest discover -s baa-protocol/tests -p "test_prospective_canary_robustness_study.py"
+          python baa-protocol/scripts/generate_prospective_canary_v5_robustness.py --output "$env:BAA_MODEL_EVIDENCE_DIR/workload.json"
+          @'
+          import hashlib
+          import json
+          import os
+          from collections import Counter
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, "baa-protocol")
+
+          from baa_protocol.prospective_canary_evidence_horizon_study import HORIZONS
+          from baa_protocol.prospective_canary_evidence_study import EVIDENCE_POLICIES
+          from baa_protocol.prospective_canary_feedback_study import _adaptive_feedback_prompt
+          from baa_protocol.prospective_canary_robustness_study import (
+              CONTROL_GROUPS,
+              RECOVERY_GROUPS,
+          )
+          from baa_protocol.prospective_canary_study import (
+              CanarySimulator,
+              canary_model_client,
+              load_canary_workload,
+          )
+          from baa_protocol.delegation_frontier import DelegationBudget
+          from baa_protocol.experiment import Regime
+
+          path = Path(os.environ["BAA_MODEL_EVIDENCE_DIR"]) / "workload.json"
+          payload = path.read_bytes()
+          digest = hashlib.sha256(payload).hexdigest()
+          assert digest == "e1c5802edcbc9c1f33d5a72c18a102d6af406ca7e25962a71a2fb62b2b232bd9"
+
+          raw = json.loads(payload)
+          assert raw["version"] == "prospective-canary-v5-robustness"
+          assert len(raw["episodes"]) == 24
+          assert Counter(ep["study_group"] for ep in raw["episodes"]) == {
+              "recoverable_lag_early": 4,
+              "recoverable_lag_mid": 4,
+              "recoverable_lag_late": 4,
+              "missing_observer_control": 4,
+              "guardrail_control": 4,
+              "clean_control": 4,
+          }
+          assert EVIDENCE_POLICIES == ("no_reacquire", "reacquire")
+          assert HORIZONS == (4, 8)
+          assert RECOVERY_GROUPS == (
+              "recoverable_lag_early",
+              "recoverable_lag_mid",
+              "recoverable_lag_late",
+          )
+          assert CONTROL_GROUPS == (
+              "missing_observer_control",
+              "guardrail_control",
+              "clean_control",
+          )
+
+          client = canary_model_client()
+          request = client._request_payload("fingerprint")
+          assert client.interface_mode == "function_tool"
+          assert request["tool_choice"] == {
+              "type": "function",
+              "name": "submit_canary_proposal",
+          }
+          assert request["parallel_tool_calls"] is False
+          assert request["tools"][0]["strict"] is True
+
+          _, episodes = load_canary_workload(path)
+          target = episodes[0]
+          simulator = CanarySimulator(
+              target,
+              Regime.BAA,
+              DelegationBudget(min_useful_delivery=1),
+          )
+          prompt = _adaptive_feedback_prompt(
+              target,
+              simulator,
+              feedback_policy="corrective",
+          )
+          forbidden = list(EVIDENCE_POLICIES) + list(RECOVERY_GROUPS) + list(CONTROL_GROUPS) + ["H4", "H8"]
+          for label in forbidden:
+              assert label not in prompt
+
+          print("prospective canary v5 fingerprint qualified")
+          '@ | python -
+
+      - name: Run prospective real-model canary robustness study v5
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python baa-protocol/scripts/run_prospective_canary_v5_robustness_study.py --generator baa-protocol/scripts/generate_prospective_canary_v5_robustness.py --workload-output "$env:BAA_MODEL_EVIDENCE_DIR/workload.json" --gateway-base $env:BAA_GATEWAY_BASE --model $env:BAA_MODEL_ID --output "$env:BAA_MODEL_EVIDENCE_DIR/result.json" --timeout-seconds 180
+
+      - name: Qualify model evidence
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $resultPath)) {
+            throw "prospective canary v5 result.json is missing"
+          }
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+
+          if ($result.study_version -ne "prospective-canary-v5-robustness") {
+            throw "unexpected study version: $($result.study_version)"
+          }
+          if ($result.source_workload_version -ne "prospective-canary-v5-robustness") {
+            throw "unexpected source workload: $($result.source_workload_version)"
+          }
+          if ($result.source_workload_sha256 -ne $env:BAA_WORKLOAD_SHA256) {
+            throw "workload SHA mismatch: $($result.source_workload_sha256)"
+          }
+          if ($result.feedback_policy -ne "corrective") {
+            throw "unexpected feedback policy: $($result.feedback_policy)"
+          }
+          if ($result.model_interface -ne "function_tool") {
+            throw "unexpected model interface: $($result.model_interface)"
+          }
+          if (@($result.evidence_policies).Count -ne 2 -or
+              $result.evidence_policies[0] -ne "no_reacquire" -or
+              $result.evidence_policies[1] -ne "reacquire") {
+            throw "unexpected evidence policies"
+          }
+          if (@($result.horizons).Count -ne 2 -or
+              [int]$result.horizons[0] -ne 4 -or
+              [int]$result.horizons[1] -ne 8) {
+            throw "expected exactly H4/H8"
+          }
+
+          foreach ($field in @("calls_with_errors", "transport_errors", "schema_errors", "model_errors")) {
+            if ([int]$result.physical_sampling.$field -ne 0) {
+              throw "$field invalidate the run: $($result.physical_sampling.$field)"
+            }
+          }
+          $calls = [int]$result.physical_sampling.calls
+          $httpAttempts = [int]$result.physical_sampling.http_attempts
+          $transportRetries = [int]$result.physical_sampling.transport_retries
+          $transportSeen = [int]$result.physical_sampling.transport_failures_seen
+          $recovered = [int]$result.physical_sampling.recovered_transport_calls
+          if ($calls -le 0) { throw "expected physical model calls" }
+          if ($httpAttempts -ne ($calls + $transportRetries)) {
+            throw "transport accounting mismatch"
+          }
+          if ($transportSeen -ne $transportRetries -or $recovered -ne $transportRetries) {
+            throw "transport retry accounting is not fully recovered"
+          }
+
+          foreach ($policy in @("no_reacquire", "reacquire")) {
+            foreach ($h in @("4", "8")) {
+              $cell = $result.cells.$policy.$h
+              if ([int]$cell.episodes -ne 24) {
+                throw "incomplete denominator for $policy H$h"
+              }
+            }
+          }
+          if ([int]$result.cells.no_reacquire."4".evidence_reacquisitions -ne 0 -or
+              [int]$result.cells.no_reacquire."8".evidence_reacquisitions -ne 0) {
+            throw "no_reacquire unexpectedly performed evidence reacquisition"
+          }
+
+          $groups = @(
+            "recoverable_lag_early",
+            "recoverable_lag_mid",
+            "recoverable_lag_late",
+            "missing_observer_control",
+            "guardrail_control",
+            "clean_control"
+          )
+          foreach ($group in $groups) {
+            foreach ($policy in @("no_reacquire", "reacquire")) {
+              foreach ($h in @("4", "8")) {
+                $cell = $result.robustness.group_cells.$group.$policy.$h
+                if ([int]$cell.episodes -ne 4) {
+                  throw "incomplete group denominator: $group $policy H$h"
+                }
+              }
+            }
+          }
+
+          if (@($result.robustness.recovery_groups).Count -ne 3 -or
+              @($result.robustness.control_groups).Count -ne 3) {
+            throw "unexpected robustness group definitions"
+          }
+          foreach ($name in @("contrast_h4", "contrast_h8", "interaction")) {
+            if ($null -eq $result.robustness.recovery_aggregate.$name) {
+              throw "missing recovery aggregate endpoint: $name"
+            }
+          }
+          foreach ($group in @("recoverable_lag_early", "recoverable_lag_mid", "recoverable_lag_late")) {
+            if ($null -eq $result.robustness.recovery_by_group.$group.interaction) {
+              throw "missing recovery stratum interaction: $group"
+            }
+          }
+          if ($null -eq $result.robustness.positive_recovery_interaction_strata) {
+            throw "missing positive-strata count"
+          }
+          if ($null -eq $result.robustness.strong_robustness_criterion_met) {
+            throw "missing strong robustness criterion result"
+          }
+
+      - name: Extract compact summary
+        if: always()
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (Test-Path -LiteralPath $resultPath) {
+            $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+            $summary = [ordered]@{
+              study_version = $result.study_version
+              source_workload_version = $result.source_workload_version
+              source_workload_sha256 = $result.source_workload_sha256
+              model_id = $result.model_id
+              model_interface = $result.model_interface
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
+              budget = $result.budget
+              feedback_policy = $result.feedback_policy
+              evidence_policies = $result.evidence_policies
+              horizons = $result.horizons
+              physical_sampling = $result.physical_sampling
+              robustness = $result.robustness
+              cells = $result.cells
+            }
+            $summary | ConvertTo-Json -Depth 32 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/summary.json"
+          }
+
+      - name: Upload prospective canary v5 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-prospective-canary-v5-robustness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-prospective-canary-v5-robustness/
+          if-no-files-found: warn
+          retention-days: 14
