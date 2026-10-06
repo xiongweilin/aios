@@ -1,5 +1,5 @@
 name: BAA Prospective Real-Model Study v5
-# Frozen BAA preregistration head: 7d7d1b46134de4bc8bc59f3a68b22b507cdddecf
+# Frozen BAA preregistration head: 59180c03daa3c5709cf974feb43b8dbe992c4427
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 7d7d1b46134de4bc8bc59f3a68b22b507cdddecf
+          ref: 59180c03daa3c5709cf974feb43b8dbe992c4427
           path: baa-protocol
           persist-credentials: false
 
@@ -46,7 +46,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "BAA_PROTOCOL_SHA=7d7d1b46134de4bc8bc59f3a68b22b507cdddecf" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=59180c03daa3c5709cf974feb43b8dbe992c4427" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Verify local model gateway
@@ -92,6 +92,29 @@ jobs:
           assert events["V210"] == [{"after_turn": 1, "type": "independent_readback", "source": "external-verifier"}]
           assert events["V212"] == [{"after_turn": 1, "type": "advance_time", "current_time": 210, "source": "system-clock"}]
           assert all(not value for key, value in events.items() if key not in {"V204", "V210", "V212"})
+
+          import sys
+          sys.path.insert(0, "baa-protocol")
+          from baa_protocol.experiment import Regime
+          from baa_protocol.prospective_model_study import adaptive_prompt
+          from baa_protocol.prospective_types import AdaptiveResource, load_workload
+
+          _, loaded = load_workload(path)
+          episode = next(item for item in loaded if item.episode_id == "V204")
+          common = dict(
+              episode=episode,
+              capability=AdaptiveResource(level=2, extra_turns=4),
+              history=[{"phase": "admission", "disposition": "hold", "reason": "effective time not reached"}],
+              remaining=["obl:identity", "obl:sessions", "obl:hris"],
+              runtime_state={"current_time": 180},
+          )
+          direct_prompt = adaptive_prompt(regime=Regime.SELF_CHECK, **common)
+          baa_prompt = adaptive_prompt(regime=Regime.BAA, **common)
+          assert direct_prompt == baa_prompt
+          assert "feedback_class" not in direct_prompt
+          assert "bounded_action_protocol" not in baa_prompt
+          assert "direct_execution" not in direct_prompt
+
           print("v5 fingerprint qualified")
           '@ | python -
 
