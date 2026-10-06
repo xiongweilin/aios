@@ -57,9 +57,18 @@ jobs:
           if ($ids -notcontains $env:BAA_MODEL_ID) {
             throw "required model is absent from local gateway catalog: $env:BAA_MODEL_ID"
           }
+          $gatewayRepo = "D:\agent\llm-gateway"
+          $gatewaySha = $null
+          if (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git")) {
+            $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          }
+          if ($gatewaySha) {
+            "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
           @{
             checked_at = (Get-Date).ToUniversalTime().ToString("o")
             gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $gatewaySha
             model_ids = $ids
           } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
 
@@ -81,6 +90,7 @@ jobs:
               model_id = $result.model_id
               baa_protocol_sha = $env:BAA_PROTOCOL_SHA
               aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
               budget = $result.budget
               levels = @(
                 $result.levels | ForEach-Object {
