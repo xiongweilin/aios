@@ -106,7 +106,6 @@ jobs:
           @'
           import copy
           import json
-          import os
           from collections import Counter
           from pathlib import Path
           import sys
@@ -132,22 +131,31 @@ jobs:
               load_canary_workload,
           )
 
-          report = {}
           path = Path("baa-protocol/experiments/prospective_canary_v1.json")
           raw = json.loads(path.read_text(encoding="utf-8"))
-          report["workload_version"] = raw.get("version")
-          report["episode_count"] = len(raw.get("episodes", []))
-          report["groups"] = dict(Counter(ep["study_group"] for ep in raw["episodes"]))
-          report["evidence_policies"] = list(EVIDENCE_POLICIES)
-          report["horizons"] = list(HORIZONS)
-          report["stale_reason"] = STALE_EVIDENCE_REASON
+          assert raw["version"] == "prospective-canary-v1"
+          assert len(raw["episodes"]) == 18
+          assert Counter(ep["study_group"] for ep in raw["episodes"]) == {
+              "clean_progression": 3,
+              "evidence_maturation": 3,
+              "guardrail_recovery": 3,
+              "lost_ack_recovery": 3,
+              "stale_route_refresh": 3,
+              "irrecoverable_control": 3,
+          }
+          assert EVIDENCE_POLICIES == ("no_reacquire", "reacquire")
+          assert HORIZONS == (4,)
+          assert STALE_EVIDENCE_REASON == "stage evidence is stale or mismatched"
 
           client = canary_model_client()
           payload = client._request_payload("fingerprint")
-          report["client_interface"] = client.interface_mode
-          report["tool_choice"] = payload.get("tool_choice")
-          report["parallel_tool_calls"] = payload.get("parallel_tool_calls")
-          report["tool_strict"] = payload.get("tools", [{}])[0].get("strict")
+          assert client.interface_mode == "function_tool"
+          assert payload["tool_choice"] == {
+              "type": "function",
+              "name": "submit_canary_proposal",
+          }
+          assert payload["parallel_tool_calls"] is False
+          assert payload["tools"][0]["strict"] is True
 
           _, episodes = load_canary_workload(path)
           target = next(
@@ -156,26 +164,48 @@ jobs:
           )
           state_version = target.control_context["state_version"]
 
-          for turn in (0, 1, 2):
-              templates = _observer_templates(target, through_turn=turn)
-              report[f"observer_keys_turn_{turn}"] = [
-                  list(key) for key in sorted(templates)
-              ]
+          assert _observer_templates(target, through_turn=0) == {}
+          turn1 = _observer_templates(target, through_turn=1)
+          assert (
+              target.control_context["experiment_id"],
+              0,
+              10,
+              state_version,
+          ) in turn1
+          assert (
+              target.control_context["experiment_id"],
+              2,
+              100,
+              state_version,
+          ) in turn1
+          assert (
+              target.control_context["experiment_id"],
+              1,
+              50,
+              state_version,
+          ) not in turn1
+          turn2 = _observer_templates(target, through_turn=2)
+          assert (
+              target.control_context["experiment_id"],
+              1,
+              50,
+              state_version,
+          ) in turn2
 
           simulator = CanarySimulator(
               target,
               Regime.BAA,
               DelegationBudget(min_useful_delivery=1),
           )
-          report["initial_visible_route"] = [
+          # Initial public route is stale relative to realized route.
+          assert (
               simulator.visible["current_stage_index"],
               simulator.visible["current_weight_percent"],
-          ]
-          report["initial_realized_route"] = [
+          ) != (
               simulator.context["current_stage_index"],
               simulator.context["current_weight_percent"],
-          ]
-          report["reacquire_turn_0"] = _reacquire_current_stage_evidence(
+          )
+          assert not _reacquire_current_stage_evidence(
               target,
               simulator,
               through_turn=0,
@@ -183,46 +213,33 @@ jobs:
 
           simulator.apply_events(1)
           simulator.apply_events(2)
-          report["after_turn_2_visible_route"] = [
-              simulator.visible["current_stage_index"],
-              simulator.visible["current_weight_percent"],
-          ]
-          report["after_turn_2_realized_route"] = [
-              simulator.context["current_stage_index"],
-              simulator.context["current_weight_percent"],
-          ]
-          report["after_turn_2_evidence"] = copy.deepcopy(
-              simulator.visible.get("stage_evidence")
-          )
           hidden_before = copy.deepcopy(simulator.context)
-          report["reacquire_turn_2"] = _reacquire_current_stage_evidence(
+          assert simulator.visible["stage_evidence"]["stage_index"] == 1
+          assert _reacquire_current_stage_evidence(
               target,
               simulator,
               through_turn=2,
           )
-          report["hidden_unchanged"] = simulator.context == hidden_before
-          report["after_reacquire_evidence"] = copy.deepcopy(
-              simulator.visible.get("stage_evidence")
-          )
-          report["last_history"] = copy.deepcopy(
-              simulator.history[-1] if simulator.history else None
-          )
+          assert simulator.context == hidden_before
+          assert simulator.visible["stage_evidence"]["stage_index"] == 0
+          assert simulator.visible["stage_evidence"]["weight_percent"] == 10
+          assert simulator.history[-1]["state_version"] == state_version
+          assert simulator.history[-1]["observed_turn"] == 2
 
           prompt = _adaptive_feedback_prompt(
               target,
               simulator,
               feedback_policy="corrective",
           )
-          forbidden = (
-              "no_reacquire",
-              "reacquire",
+          assert '"evidence_policy":' not in prompt
+          for policy in EVIDENCE_POLICIES:
+              assert json.dumps(policy) not in prompt
+          for forbidden in (
               "bounded_action_protocol",
               "external_record_audit",
               "self_check",
-          )
-          report["forbidden_prompt_hits"] = [
-              item for item in forbidden if item in prompt
-          ]
+          ):
+              assert forbidden not in prompt
 
           class CountingWaitModel:
               model_id = "fingerprint-counting-wait"
@@ -242,30 +259,23 @@ jobs:
                   self.calls += 1
                   return json.dumps({"actions": [{"kind": "wait"}]}), {}, 0.0
 
+          counting = CountingWaitModel()
           clean = (
               next(
                   ep for ep in episodes
                   if ep.study_group == "clean_progression"
               ),
           )
-          counting = CountingWaitModel()
-          probe = run_canary_evidence_study(counting, clean)
-          report["counting_calls"] = counting.calls
-          report["physical_calls"] = probe["physical_sampling"]["calls"]
-          report["logical_calls"] = {
-              policy: probe["cells"][policy]["logical_model_calls"]
-              for policy in EVIDENCE_POLICIES
-          }
+          sharing_probe = run_canary_evidence_study(
+              counting,
+              clean,
+          )
+          assert counting.calls == 5
+          assert sharing_probe["physical_sampling"]["calls"] == 5
+          for policy in EVIDENCE_POLICIES:
+              assert sharing_probe["cells"][policy]["logical_model_calls"] == 5
 
-          output = Path(os.environ["BAA_MODEL_EVIDENCE_DIR"]) / "fingerprint.json"
-          output.write_text(
-              json.dumps(report, indent=2, sort_keys=True),
-              encoding="utf-8",
-          )
-          print(json.dumps(report, indent=2, sort_keys=True))
-          raise SystemExit(
-              "diagnostic-only fingerprint run; model sampling intentionally blocked"
-          )
+          print("prospective canary v3 fingerprint qualified")
           '@ | python -
 
       - name: Run prospective real-model canary evidence study v3
