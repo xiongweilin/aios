@@ -47,20 +47,70 @@ jobs:
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_PROTOCOL_SHA=c9681ec6c1c54313f7e21467c4942e412b52583d" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_REQUIRED_SHA=6fe86653da104bd0c00637a856e352303774fc01" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Pin local model gateway revision
+        shell: pwsh
+        run: |
+          $gatewayRepo = "D:\agent\llm-gateway"
+          if (-not (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git"))) {
+            throw "local gateway checkout is missing: $gatewayRepo"
+          }
+
+          $dirty = @(& git -C $gatewayRepo status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to inspect local gateway worktree"
+          }
+          if ($dirty.Count -ne 0) {
+            throw "local gateway worktree is not clean; refusing automated revision change"
+          }
+
+          $branch = (& git -C $gatewayRepo branch --show-current).Trim()
+          if ($branch -ne "main") {
+            throw "local gateway checkout must be on main for automated fast-forward; actual=$branch"
+          }
+
+          $current = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          if ($current -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            & git -C $gatewayRepo fetch origin main
+            if ($LASTEXITCODE -ne 0) {
+              throw "failed to fetch llm-gateway origin/main"
+            }
+            & git -C $gatewayRepo cat-file -e "$($env:BAA_GATEWAY_REQUIRED_SHA)^{commit}"
+            if ($LASTEXITCODE -ne 0) {
+              throw "required llm-gateway commit is unavailable after fetch"
+            }
+            & git -C $gatewayRepo merge-base --is-ancestor $current $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) {
+              throw "local gateway cannot fast-forward to required revision"
+            }
+            & git -C $gatewayRepo merge --ff-only $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) {
+              throw "failed to fast-forward local gateway to required revision"
+            }
+            "BAA_GATEWAY_RESTART_REQUIRED=true" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+
+          $pinned = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          if ($pinned -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            throw "local gateway revision mismatch after pin: $pinned"
+          }
 
       - name: Ensure local model gateway
         shell: pwsh
         run: |
           $ready = $false
-          try {
-            $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
-            $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
-            $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
-            if ($ids -contains $env:BAA_MODEL_ID) {
-              $ready = $true
+          if ($env:BAA_GATEWAY_RESTART_REQUIRED -ne "true") {
+            try {
+              $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+              $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+              $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+              if ($ids -contains $env:BAA_MODEL_ID) {
+                $ready = $true
+              }
+            } catch {
+              $ready = $false
             }
-          } catch {
-            $ready = $false
           }
 
           if (-not $ready) {
@@ -89,9 +139,13 @@ jobs:
           if (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git")) {
             $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
           }
-          if ($gatewaySha) {
-            "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          if (-not $gatewaySha) {
+            throw "unable to resolve local gateway revision"
           }
+          if ($gatewaySha -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            throw "running gateway checkout revision mismatch: expected=$env:BAA_GATEWAY_REQUIRED_SHA actual=$gatewaySha"
+          }
+          "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
           @{
             checked_at = (Get-Date).ToUniversalTime().ToString("o")
             gateway = $env:BAA_GATEWAY_BASE
