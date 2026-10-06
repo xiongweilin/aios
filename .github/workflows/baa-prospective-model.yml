@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: baa-prospective-real-model-selfhosted
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   prospective-model:
