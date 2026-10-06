@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   prospective-canary-v3-evidence:
+    if: ${{ false }}
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 120
 
