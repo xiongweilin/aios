@@ -1,0 +1,145 @@
+name: BAA Delegation Cost Frontier v1
+
+on:
+  push:
+    branches:
+      - experiment/baa-delegation-cost-frontier-v1
+    paths:
+      - ".github/workflows/baa-delegation-cost-frontier-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: baa-delegation-cost-frontier-v1
+  cancel-in-progress: true
+
+jobs:
+  cost-frontier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol analyzer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 667d41bb94c34a77aedbbb96a78ab49254ffd612
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directories
+        run: |
+          mkdir -p evidence/offboarding evidence/canary output
+
+      - name: Download accepted offboarding v6 evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: baa-prospective-model-v6-37406741476-1
+          path: evidence/offboarding
+          github-token: ${{ github.token }}
+          repository: xiongweilin/aios
+          run-id: 37406741476
+
+      - name: Download accepted canary v5 evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: baa-prospective-canary-v5-robustness-37466492295-1
+          path: evidence/canary
+          github-token: ${{ github.token }}
+          repository: xiongweilin/aios
+          run-id: 37466492295
+
+      - name: Run retrospective cost-frontier analysis
+        env:
+          PYTHONPATH: ${{ github.workspace }}/baa-protocol
+        run: |
+          python baa-protocol/scripts/run_delegation_cost_frontier.py \
+            --offboarding-result evidence/offboarding/result.json \
+            --canary-result evidence/canary/result.json \
+            --output output/result.json
+
+      - name: Qualify frozen accounting thresholds
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("output/result.json").read_text(encoding="utf-8"))
+          assert result["study_version"] == "delegation-cost-frontier-v1"
+          assert result["provenance"]["offboarding"]["run_id"] == 37406741476
+          assert result["provenance"]["offboarding"]["artifact_id"] == 11386984007
+          assert result["provenance"]["canary"]["run_id"] == 37466492295
+          assert result["provenance"]["canary"]["artifact_id"] == 11416980785
+
+          architecture = result["baseline"]["architecture"]
+          expected_c2 = {
+              "0": {
+                  "self_check": 14,
+                  "external_record_audit": 14,
+                  "bounded_action_protocol": 13,
+              },
+              "1": {
+                  "self_check": 14,
+                  "external_record_audit": 14,
+                  "bounded_action_protocol": 16,
+              },
+              "2": {
+                  "self_check": 14,
+                  "external_record_audit": 14,
+                  "bounded_action_protocol": 20,
+              },
+              "3": {
+                  "self_check": 14,
+                  "external_record_audit": 14,
+                  "bounded_action_protocol": 20,
+              },
+          }
+          for intervention_ceiling, expected in expected_c2.items():
+              observed = architecture["2"][intervention_ceiling]
+              for regime, count in expected.items():
+                  assert observed[regime]["delegable_episodes"] == count, (
+                      intervention_ceiling,
+                      regime,
+                      observed[regime]["delegable_episodes"],
+                      count,
+                  )
+
+          canary = result["baseline"]["canary_assurance_mechanism"]
+          expected_h8 = {
+              "0": {"no_reacquire": 3, "reacquire": 3},
+              "5": {"no_reacquire": 3, "reacquire": 5},
+              "11": {"no_reacquire": 3, "reacquire": 6},
+              "17": {"no_reacquire": 3, "reacquire": 6},
+          }
+          for intervention_ceiling, expected in expected_h8.items():
+              observed = canary["8"][intervention_ceiling]
+              for policy, count in expected.items():
+                  assert observed[policy]["delegable_episodes"] == count, (
+                      intervention_ceiling,
+                      policy,
+                      observed[policy]["delegable_episodes"],
+                      count,
+                  )
+
+          print("delegation cost-frontier v1 accounting qualified")
+          PY
+
+      - name: Upload derived cost-frontier evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-delegation-cost-frontier-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 30
