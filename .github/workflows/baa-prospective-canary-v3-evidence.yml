@@ -48,6 +48,33 @@ jobs:
           "BAA_PROTOCOL_SHA=c9681ec6c1c54313f7e21467c4942e412b52583d" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Ensure local model gateway
+        shell: pwsh
+        run: |
+          $ready = $false
+          try {
+            $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+            $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+            $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+            if ($ids -contains $env:BAA_MODEL_ID) {
+              $ready = $true
+            }
+          } catch {
+            $ready = $false
+          }
+
+          if (-not $ready) {
+            $gatewayRepo = "D:\agent\llm-gateway"
+            $startScript = Join-Path $gatewayRepo "scripts\start-agent-gateway.ps1"
+            if (-not (Test-Path -LiteralPath $startScript -PathType Leaf)) {
+              throw "gateway recovery script is missing: $startScript"
+            }
+            & pwsh -NoProfile -NonInteractive -File $startScript
+            if ($LASTEXITCODE -ne 0) {
+              throw "gateway recovery failed with exit code $LASTEXITCODE"
+            }
+          }
+
       - name: Verify local model gateway
         shell: pwsh
         run: |
