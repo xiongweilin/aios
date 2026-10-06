@@ -1,5 +1,4 @@
-name: BAA Prospective Canary Study v3 Evidence
-# execution retrigger after merge; frozen study remains BAA 7152532c1b5f5d331c42da011a64a5e1d88ce26b
+name: BAA Prospective Canary Study v3 Evidence Recovery
 
 on:
   push:
@@ -18,7 +17,6 @@ concurrency:
 
 jobs:
   prospective-canary-v3-evidence:
-    if: ${{ false }}
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 120
 
@@ -32,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 7152532c1b5f5d331c42da011a64a5e1d88ce26b
+          ref: 4b2fddd83f1299e9c9032051a963042b11c5761a
           path: baa-protocol
           persist-credentials: false
 
@@ -47,7 +45,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "BAA_PROTOCOL_SHA=7152532c1b5f5d331c42da011a64a5e1d88ce26b" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=4b2fddd83f1299e9c9032051a963042b11c5761a" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Verify local model gateway
@@ -79,6 +77,7 @@ jobs:
         run: |
           $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
           @'
+          import copy
           import json
           from collections import Counter
           from pathlib import Path
@@ -87,16 +86,20 @@ jobs:
           sys.path.insert(0, "baa-protocol")
 
           from baa_protocol.delegation_frontier import DelegationBudget
+          from baa_protocol.experiment import Regime
           from baa_protocol.prospective_canary_evidence_study import (
               EVIDENCE_POLICIES,
               HORIZONS,
-              EvidenceRetentionSimulator,
+              STALE_EVIDENCE_REASON,
+              _observer_templates,
+              _reacquire_current_stage_evidence,
               run_canary_evidence_study,
           )
           from baa_protocol.prospective_canary_feedback_study import (
               _adaptive_feedback_prompt,
           )
           from baa_protocol.prospective_canary_study import (
+              CanarySimulator,
               canary_model_client,
               load_canary_workload,
           )
@@ -113,12 +116,9 @@ jobs:
               "stale_route_refresh": 3,
               "irrecoverable_control": 3,
           }
-
-          assert EVIDENCE_POLICIES == (
-              "latest_only",
-              "versioned_current_stage",
-          )
-          assert HORIZONS == (4, 8)
+          assert EVIDENCE_POLICIES == ("no_reacquire", "reacquire")
+          assert HORIZONS == (4,)
+          assert STALE_EVIDENCE_REASON == "stage evidence is stale or mismatched"
 
           client = canary_model_client()
           payload = client._request_payload("fingerprint")
@@ -133,84 +133,86 @@ jobs:
           _, episodes = load_canary_workload(path)
           target = next(
               ep for ep in episodes
-              if ep.logical_name == "stale-route-refresh-a"
+              if ep.logical_name == "stale-route-refresh-b"
           )
-          budget = DelegationBudget(min_useful_delivery=1)
+          state_version = target.control_context["state_version"]
 
-          latest = EvidenceRetentionSimulator(
+          assert _observer_templates(target, through_turn=0) == {}
+          turn1 = _observer_templates(target, through_turn=1)
+          assert (
+              target.control_context["experiment_id"],
+              0,
+              10,
+              state_version,
+          ) in turn1
+          assert (
+              target.control_context["experiment_id"],
+              2,
+              100,
+              state_version,
+          ) in turn1
+          assert (
+              target.control_context["experiment_id"],
+              1,
+              50,
+              state_version,
+          ) not in turn1
+          turn2 = _observer_templates(target, through_turn=2)
+          assert (
+              target.control_context["experiment_id"],
+              1,
+              50,
+              state_version,
+          ) in turn2
+
+          simulator = CanarySimulator(
               target,
-              budget,
-              evidence_policy="latest_only",
+              Regime.BAA,
+              DelegationBudget(min_useful_delivery=1),
           )
-          versioned = EvidenceRetentionSimulator(
+          # Initial public route is stale relative to realized route.
+          assert (
+              simulator.visible["current_stage_index"],
+              simulator.visible["current_weight_percent"],
+          ) != (
+              simulator.context["current_stage_index"],
+              simulator.context["current_weight_percent"],
+          )
+          assert not _reacquire_current_stage_evidence(
               target,
-              budget,
-              evidence_policy="versioned_current_stage",
+              simulator,
+              through_turn=0,
           )
 
-          # No future authoritative evidence may be preloaded.
-          assert set(versioned.evidence_store) == {
-              (
-                  target.public_context["runtime_state"]["stage_evidence"]["experiment_id"],
-                  target.public_context["runtime_state"]["stage_evidence"]["stage_index"],
-                  target.public_context["runtime_state"]["stage_evidence"]["weight_percent"],
-              )
-          }
-
-          for simulator in (latest, versioned):
-              simulator.apply_events(1)
-              assert simulator.context["current_stage_index"] == 0
-              assert simulator.context["current_weight_percent"] == 10
-              assert simulator.visible["current_stage_index"] == 0
-              assert simulator.visible["current_weight_percent"] == 10
-              assert simulator.visible["stage_evidence"]["stage_index"] == 0
-              simulator.apply_events(2)
-              assert simulator.context["current_stage_index"] == 0
-              assert simulator.context["current_weight_percent"] == 10
-              assert simulator.visible["current_stage_index"] == 0
-              assert simulator.visible["current_weight_percent"] == 10
-              assert simulator.visible["stage_evidence"]["stage_index"] == 1
-
-          latest_evidence = latest._evidence()
-          assert latest_evidence is not None
-          assert latest_evidence.stage_index == 1
-
-          before_hidden = (
-              versioned.context["current_stage_index"],
-              versioned.context["current_weight_percent"],
+          simulator.apply_events(1)
+          simulator.apply_events(2)
+          hidden_before = copy.deepcopy(simulator.context)
+          assert simulator.visible["stage_evidence"]["stage_index"] == 1
+          assert _reacquire_current_stage_evidence(
+              target,
+              simulator,
+              through_turn=2,
           )
-          before_visible = dict(versioned.visible["stage_evidence"])
-          retained = versioned._evidence()
-          after_hidden = (
-              versioned.context["current_stage_index"],
-              versioned.context["current_weight_percent"],
+          assert simulator.context == hidden_before
+          assert simulator.visible["stage_evidence"]["stage_index"] == 0
+          assert simulator.visible["stage_evidence"]["weight_percent"] == 10
+          assert simulator.history[-1]["state_version"] == state_version
+          assert simulator.history[-1]["observed_turn"] == 2
+
+          prompt = _adaptive_feedback_prompt(
+              target,
+              simulator,
+              feedback_policy="corrective",
           )
-          assert retained is not None
-          assert retained.stage_index == 0
-          assert retained.weight_percent == 10
-          assert before_hidden == after_hidden == (0, 10)
-          assert versioned.visible["stage_evidence"] == before_visible
-          assert versioned.visible["stage_evidence"]["stage_index"] == 1
-          assert versioned.evidence_retrievals >= 1
+          for forbidden in (
+              "no_reacquire",
+              "reacquire",
+              "bounded_action_protocol",
+              "external_record_audit",
+              "self_check",
+          ):
+              assert forbidden not in prompt
 
-          # Retrieval may not substitute evidence for another current route.
-          versioned.visible["current_stage_index"] = 2
-          versioned.visible["current_weight_percent"] = 100
-          assert versioned._evidence() is None
-          assert versioned.evidence_misses >= 1
-
-          # Treatment identity is not model-visible.
-          for simulator in (latest, versioned):
-              prompt = _adaptive_feedback_prompt(
-                  target,
-                  simulator,
-                  feedback_policy="corrective",
-              )
-              for forbidden in EVIDENCE_POLICIES:
-                  assert forbidden not in prompt
-              assert '"evidence_policy":' not in prompt
-
-          # Byte-identical prompts must share physical samples.
           class CountingWaitModel:
               model_id = "fingerprint-counting-wait"
 
@@ -229,18 +231,21 @@ jobs:
                   self.calls += 1
                   return json.dumps({"actions": [{"kind": "wait"}]}), {}, 0.0
 
+          counting = CountingWaitModel()
           clean = (
               next(
                   ep for ep in episodes
                   if ep.study_group == "clean_progression"
               ),
           )
-          counting = CountingWaitModel()
-          probe = run_canary_evidence_study(counting, clean)
-          assert counting.calls == probe["physical_sampling"]["calls"]
-          assert probe["physical_sampling"]["calls"] == 9
+          sharing_probe = run_canary_evidence_study(
+              counting,
+              clean,
+          )
+          assert counting.calls == 5
+          assert sharing_probe["physical_sampling"]["calls"] == 5
           for policy in EVIDENCE_POLICIES:
-              assert probe["cells"][policy]["8"]["logical_model_calls"] == 9
+              assert sharing_probe["cells"][policy]["logical_model_calls"] == 5
 
           print("prospective canary v3 fingerprint qualified")
           '@ | python -
@@ -259,7 +264,8 @@ jobs:
             throw "prospective canary v3 result.json is missing"
           }
           $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-          if ($result.study_version -ne "prospective-canary-v3-evidence") {
+
+          if ($result.study_version -ne "prospective-canary-v3-evidence-recovery") {
             throw "unexpected study version: $($result.study_version)"
           }
           if ($result.source_workload_version -ne "prospective-canary-v1") {
@@ -271,6 +277,15 @@ jobs:
           if ($result.model_interface -ne "function_tool") {
             throw "unexpected model interface: $($result.model_interface)"
           }
+          if (@($result.evidence_policies).Count -ne 2) {
+            throw "expected two evidence policies"
+          }
+          if ($result.evidence_policies[0] -ne "no_reacquire" -or $result.evidence_policies[1] -ne "reacquire") {
+            throw "unexpected evidence policy order"
+          }
+          if (@($result.horizons).Count -ne 1 -or [int]$result.horizons[0] -ne 4) {
+            throw "expected exactly H4"
+          }
           if ([int]$result.physical_sampling.calls -le 0) {
             throw "expected physical model calls"
           }
@@ -280,29 +295,20 @@ jobs:
             }
           }
 
-          if (@($result.evidence_policies).Count -ne 2) {
-            throw "expected exactly two evidence policies"
-          }
-          if ($result.evidence_policies[0] -ne "latest_only" -or $result.evidence_policies[1] -ne "versioned_current_stage") {
-            throw "unexpected evidence policies"
-          }
-          if (@($result.horizons).Count -ne 2 -or [int]$result.horizons[0] -ne 4 -or [int]$result.horizons[1] -ne 8) {
-            throw "unexpected frozen horizons"
-          }
-
-          foreach ($policy in @("latest_only", "versioned_current_stage")) {
-            foreach ($horizon in @("4", "8")) {
-              $cell = $result.cells.$policy.$horizon
-              if ([int]$cell.episodes -ne 18) {
-                throw "incomplete denominator for $policy H$horizon"
-              }
-              if ([int]$cell.stale_route.episodes -ne 3) {
-                throw "incomplete stale-route denominator for $policy H$horizon"
-              }
-              if ([int]$cell.non_stale.episodes -ne 15) {
-                throw "incomplete non-stale denominator for $policy H$horizon"
-              }
+          foreach ($policy in @("no_reacquire", "reacquire")) {
+            $cell = $result.cells.$policy
+            if ([int]$cell.episodes -ne 18) {
+              throw "incomplete denominator for $policy"
             }
+            if ([int]$cell.stale_route.episodes -ne 3) {
+              throw "incomplete stale-route denominator for $policy"
+            }
+            if ([int]$cell.non_stale.episodes -ne 15) {
+              throw "incomplete non-stale denominator for $policy"
+            }
+          }
+          if ([int]$result.cells.no_reacquire.evidence_reacquisitions -ne 0) {
+            throw "no_reacquire unexpectedly performed evidence reacquisition"
           }
 
       - name: Extract compact summary
