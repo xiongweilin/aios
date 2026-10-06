@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 4b2fddd83f1299e9c9032051a963042b11c5761a
+          ref: c9681ec6c1c54313f7e21467c4942e412b52583d
           path: baa-protocol
           persist-credentials: false
 
@@ -45,7 +45,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "BAA_PROTOCOL_SHA=4b2fddd83f1299e9c9032051a963042b11c5761a" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=c9681ec6c1c54313f7e21467c4942e412b52583d" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Verify local model gateway
