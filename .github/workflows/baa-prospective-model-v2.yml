@@ -72,6 +72,12 @@ jobs:
             model_ids = $ids
           } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
 
+      - name: Verify frozen v2 study fingerprint
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python -c "import json,pathlib; p=pathlib.Path('baa-protocol/experiments/prospective_offboarding_v2.json'); d=json.loads(p.read_text(encoding='utf-8')); assert d['version']=='prospective-offboarding-v2'; assert d.get('prompt_profile')=='evidence-neutral-v2'; assert len(d['episodes'])==12; assert all('control_context' in e and 'public_context' in e for e in d['episodes']); print('v2 fingerprint qualified')"
+
       - name: Run prospective real-model delegation study v2
         shell: pwsh
         run: |
