@@ -1,0 +1,260 @@
+name: BAA Prospective Real-Model Study v6
+# Frozen BAA preregistration head: bea523e386193fde9fcdc2657917345b7da4c70a
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-model-v6
+    paths:
+      - ".github/workflows/baa-prospective-model-v6.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-prospective-real-model-v6-selfhosted
+  cancel-in-progress: true
+
+jobs:
+  prospective-model-v6:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned BAA-Protocol v6 study
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: bea523e386193fde9fcdc2657917345b7da4c70a
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-prospective-model-v6"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=bea523e386193fde9fcdc2657917345b7da4c70a" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify local model gateway
+        shell: pwsh
+        run: |
+          $health = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+          $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+          $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+          if ($ids -notcontains $env:BAA_MODEL_ID) {
+            throw "required model is absent from local gateway catalog: $env:BAA_MODEL_ID"
+          }
+          $gatewayRepo = "D:\agent\llm-gateway"
+          $gatewaySha = $null
+          if (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git")) {
+            $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          }
+          if ($gatewaySha) {
+            "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+          @{
+            checked_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $gatewaySha
+            model_ids = $ids
+          } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
+
+      - name: Verify frozen v6 study fingerprint
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          @'
+          import json
+          from collections import Counter
+          from copy import deepcopy
+          from pathlib import Path
+          import sys
+
+          path = Path("baa-protocol/experiments/prospective_offboarding_v6.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["version"] == "prospective-offboarding-v6"
+          assert data.get("prompt_profile") == "evidence-neutral-v6-generalization"
+          assert len(data["episodes"]) == 24
+          assert all("control_context" in e and "public_context" in e for e in data["episodes"])
+
+          expected_groups = {
+              "clean_baseline": 4,
+              "time_recovery": 4,
+              "readback_recovery": 4,
+              "subject_evidence_refresh": 4,
+              "authority_evidence_refresh": 4,
+              "irrecoverable_control": 4,
+          }
+          assert Counter(e["study_group"] for e in data["episodes"]) == expected_groups
+
+          by_id = {e["id"]: e for e in data["episodes"]}
+          for episode_id in ("G601", "G602", "G603", "G604", "G621", "G622", "G623", "G624"):
+              assert by_id[episode_id].get("runtime_events", []) == []
+
+          for episode_id in ("G605", "G606", "G607", "G608"):
+              events = by_id[episode_id]["runtime_events"]
+              assert events == [{
+                  "after_turn": 1,
+                  "type": "advance_time",
+                  "current_time": by_id[episode_id]["control_context"]["effective_at"],
+                  "source": "system-clock",
+              }]
+
+          for episode_id in ("G609", "G610", "G611", "G612"):
+              assert by_id[episode_id]["runtime_events"] == [{
+                  "after_turn": 1,
+                  "type": "independent_readback",
+                  "source": "external-verifier",
+              }]
+
+          for episode_id in ("G613", "G614", "G615", "G616"):
+              event = by_id[episode_id]["runtime_events"][0]
+              assert event["after_turn"] == 1
+              assert event["type"] == "evidence_update"
+              assert event["claim"]["case_subject"] == by_id[episode_id]["control_context"]["subject_ref"]
+
+          for episode_id in ("G617", "G618", "G619", "G620"):
+              event = by_id[episode_id]["runtime_events"][0]
+              assert event["after_turn"] == 1
+              assert event["type"] == "evidence_update"
+              assert event["claim"]["authority_epoch"] == by_id[episode_id]["control_context"]["authoritative_authority_epoch"]
+
+          sys.path.insert(0, "baa-protocol")
+          from baa_protocol.delegation_frontier import DelegationBudget
+          from baa_protocol.experiment import Regime
+          from baa_protocol.prospective_model_study import adaptive_prompt
+          from baa_protocol.prospective_simulator import EpisodeSimulator
+          from baa_protocol.prospective_types import AdaptiveResource, load_workload
+
+          _, loaded = load_workload(path)
+          episode = next(item for item in loaded if item.episode_id == "G613")
+          before = deepcopy(episode.control_context)
+          simulator = EpisodeSimulator(episode, Regime.BAA, DelegationBudget())
+          simulator.apply_runtime_events(1)
+          assert episode.control_context == before
+          runtime_state = simulator.visible_runtime_state()
+          assert runtime_state["evidence_updates"][0]["claim"]["case_subject"] == before["subject_ref"]
+
+          common = dict(
+              episode=episode,
+              capability=AdaptiveResource(level=2, extra_turns=4),
+              history=[{"phase": "planner", "disposition": "wait"}],
+              remaining=["obl:identity", "obl:sessions", "obl:hris"],
+              runtime_state=runtime_state,
+          )
+          direct_prompt = adaptive_prompt(regime=Regime.SELF_CHECK, **common)
+          baa_prompt = adaptive_prompt(regime=Regime.BAA, **common)
+          assert direct_prompt == baa_prompt
+          assert "feedback_class" not in direct_prompt
+          assert "bounded_action_protocol" not in baa_prompt
+          assert "direct_execution" not in direct_prompt
+
+          print("v6 fingerprint qualified")
+          '@ | python -
+
+      - name: Run prospective real-model delegation study v6
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python baa-protocol/scripts/run_prospective_model_study.py --workload baa-protocol/experiments/prospective_offboarding_v6.json --gateway-base $env:BAA_GATEWAY_BASE --model $env:BAA_MODEL_ID --output "$env:BAA_MODEL_EVIDENCE_DIR/result.json" --timeout-seconds 180 --proposal-tool
+
+      - name: Qualify model evidence
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $resultPath)) {
+            throw "prospective v6 result.json is missing"
+          }
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+          if ($result.workload_version -ne "prospective-offboarding-v6") {
+            throw "unexpected workload version: $($result.workload_version)"
+          }
+          if ($result.model_interface -ne "function_tool") {
+            throw "unexpected model interface: $($result.model_interface)"
+          }
+          if ([int]$result.physical_sampling.calls -le 0) {
+            throw "expected physical model calls"
+          }
+          if ([int]$result.physical_sampling.calls_with_errors -ne 0) {
+            throw "model-call errors invalidate the run: $($result.physical_sampling.calls_with_errors)"
+          }
+          foreach ($field in @("transport_errors", "schema_errors", "model_errors")) {
+            if ([int]$result.physical_sampling.$field -ne 0) {
+              throw "$field invalidate the run: $($result.physical_sampling.$field)"
+            }
+          }
+          if (@($result.levels).Count -ne 3) {
+            throw "expected exactly three C levels"
+          }
+          $groups = @(
+            "clean_baseline",
+            "time_recovery",
+            "readback_recovery",
+            "subject_evidence_refresh",
+            "authority_evidence_refresh",
+            "irrecoverable_control"
+          )
+          foreach ($level in $result.levels) {
+            foreach ($regime in @("self_check", "external_record_audit", "bounded_action_protocol")) {
+              if ([int]$level.summary.$regime.episodes -ne 24) {
+                throw "incomplete episode denominator for $regime at C$($level.capability.level)"
+              }
+              foreach ($group in $groups) {
+                if ([int]$level.group_summary.$group.$regime.episodes -ne 4) {
+                  throw "incomplete group denominator for $group/$regime at C$($level.capability.level)"
+                }
+              }
+            }
+          }
+
+      - name: Extract compact summary
+        if: always()
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (Test-Path -LiteralPath $resultPath) {
+            $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+            $summary = [ordered]@{
+              workload_version = $result.workload_version
+              model_id = $result.model_id
+              model_interface = $result.model_interface
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
+              budget = $result.budget
+              physical_sampling = $result.physical_sampling
+              levels = @(
+                $result.levels | ForEach-Object {
+                  [ordered]@{
+                    capability = $_.capability
+                    summary = $_.summary
+                    group_summary = $_.group_summary
+                  }
+                }
+              )
+            }
+            $summary | ConvertTo-Json -Depth 16 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/summary.json"
+          }
+
+      - name: Upload prospective-model v6 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-prospective-model-v6-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-prospective-model-v6/
+          if-no-files-found: warn
+          retention-days: 14
