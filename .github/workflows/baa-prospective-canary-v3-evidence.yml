@@ -1,4 +1,5 @@
 name: BAA Prospective Canary Study v3 Evidence
+# execution retrigger after merge; frozen study remains BAA 7152532c1b5f5d331c42da011a64a5e1d88ce26b
 
 on:
   push:
