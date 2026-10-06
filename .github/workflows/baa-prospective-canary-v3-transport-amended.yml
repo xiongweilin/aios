@@ -1,0 +1,171 @@
+name: BAA Prospective Canary Study v3 Transport-Amended
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-canary-v3-evidence
+    paths:
+      - ".github/workflows/baa-prospective-canary-v3-transport-amended.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-prospective-canary-v3-evidence-selfhosted
+  cancel-in-progress: true
+
+jobs:
+  prospective-canary-v3-transport-amended:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout controlling BAA canary v3 study
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: ac3fc8abacb06f64baea07760e66e46956d4eae4
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-prospective-canary-v3-transport-amended"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=ac3fc8abacb06f64baea07760e66e46956d4eae4" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_REQUIRED_SHA=6fe86653da104bd0c00637a856e352303774fc01" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Pin local model gateway revision
+        shell: pwsh
+        run: |
+          $repo = "D:\agent\llm-gateway"
+          if (-not (Test-Path -LiteralPath (Join-Path $repo ".git"))) { throw "gateway checkout missing" }
+          if (@(& git -C $repo status --porcelain --untracked-files=all).Count -ne 0) { throw "gateway worktree is dirty" }
+          if ((& git -C $repo branch --show-current).Trim() -ne "main") { throw "gateway must be on main" }
+          $current = (& git -C $repo rev-parse HEAD).Trim()
+          if ($current -ne $env:BAA_GATEWAY_REQUIRED_SHA) {
+            & git -C $repo fetch origin main
+            if ($LASTEXITCODE -ne 0) { throw "gateway fetch failed" }
+            & git -C $repo merge-base --is-ancestor $current $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) { throw "gateway cannot fast-forward to required revision" }
+            & git -C $repo merge --ff-only $env:BAA_GATEWAY_REQUIRED_SHA
+            if ($LASTEXITCODE -ne 0) { throw "gateway fast-forward failed" }
+          }
+          if ((& git -C $repo rev-parse HEAD).Trim() -ne $env:BAA_GATEWAY_REQUIRED_SHA) { throw "gateway revision mismatch" }
+
+      - name: Start and verify local model gateway
+        shell: pwsh
+        run: |
+          & pwsh -NoProfile -NonInteractive -File D:\agent\llm-gateway\scripts\start-agent-gateway.ps1
+          if ($LASTEXITCODE -ne 0) { throw "gateway start failed" }
+          $null = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+          $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+          $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+          if ($ids -notcontains $env:BAA_MODEL_ID) { throw "required model absent from gateway catalog" }
+          $sha = (& git -C D:\agent\llm-gateway rev-parse HEAD).Trim()
+          if ($sha -ne $env:BAA_GATEWAY_REQUIRED_SHA) { throw "running gateway revision mismatch" }
+          "BAA_GATEWAY_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          @{
+            checked_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $sha
+            model_ids = $ids
+          } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
+
+      - name: Verify frozen v3 and transport amendment
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python -m unittest baa-protocol/tests/test_prospective_canary_evidence_study.py baa-protocol/tests/test_prospective_transport.py
+
+      - name: Run prospective real-model canary v3
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python baa-protocol/scripts/run_prospective_canary_evidence_study.py --workload baa-protocol/experiments/prospective_canary_v1.json --gateway-base $env:BAA_GATEWAY_BASE --model $env:BAA_MODEL_ID --output "$env:BAA_MODEL_EVIDENCE_DIR/result.json" --timeout-seconds 180
+
+      - name: Qualify model evidence
+        shell: pwsh
+        run: |
+          $path = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $path)) { throw "result.json missing" }
+          $r = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+
+          if ($r.study_version -ne "prospective-canary-v3-evidence-recovery") { throw "unexpected study version" }
+          if ($r.source_workload_version -ne "prospective-canary-v1") { throw "unexpected workload" }
+          if ($r.feedback_policy -ne "corrective") { throw "unexpected feedback policy" }
+          if ($r.model_interface -ne "function_tool") { throw "unexpected model interface" }
+          if (@($r.evidence_policies).Count -ne 2 -or $r.evidence_policies[0] -ne "no_reacquire" -or $r.evidence_policies[1] -ne "reacquire") { throw "unexpected evidence policies" }
+          if (@($r.horizons).Count -ne 1 -or [int]$r.horizons[0] -ne 4) { throw "expected H4 only" }
+
+          foreach ($field in @("calls_with_errors", "transport_errors", "schema_errors", "model_errors")) {
+            if ([int]$r.physical_sampling.$field -ne 0) { throw "$field invalidate the run: $($r.physical_sampling.$field)" }
+          }
+
+          $calls = [int]$r.physical_sampling.calls
+          $attempts = [int]$r.physical_sampling.http_attempts
+          $seen = [int]$r.physical_sampling.transport_failures_seen
+          $retries = [int]$r.physical_sampling.transport_retries
+          $recovered = [int]$r.physical_sampling.recovered_transport_calls
+          if ($calls -le 0) { throw "expected physical calls" }
+          if ($attempts -ne ($calls + $retries)) { throw "HTTP attempt accounting mismatch" }
+          if ($seen -ne $retries) { throw "qualified run must recover every observed retryable transport failure" }
+          if ($recovered -ne $retries) { throw "qualified run must account every transport retry as recovered" }
+          if ($retries -gt $calls) { throw "more than one retry per physical call is impossible under the frozen wrapper" }
+
+          foreach ($policy in @("no_reacquire", "reacquire")) {
+            $cell = $r.cells.$policy
+            if ([int]$cell.episodes -ne 18) { throw "incomplete denominator for $policy" }
+            if ([int]$cell.stale_route.episodes -ne 3) { throw "incomplete stale denominator for $policy" }
+            if ([int]$cell.non_stale.episodes -ne 15) { throw "incomplete non-stale denominator for $policy" }
+          }
+          if ([int]$r.cells.no_reacquire.evidence_reacquisitions -ne 0) { throw "control unexpectedly reacquired evidence" }
+
+          @{
+            qualified = $true
+            qualified_at = (Get-Date).ToUniversalTime().ToString("o")
+            transport_amendment = "single replay-safe pre-response retry"
+          } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/qualification.json"
+
+      - name: Extract compact summary
+        if: always()
+        shell: pwsh
+        run: |
+          $path = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (Test-Path -LiteralPath $path) {
+            $r = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            [ordered]@{
+              study_version = $r.study_version
+              source_workload_version = $r.source_workload_version
+              model_id = $r.model_id
+              model_interface = $r.model_interface
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
+              physical_sampling = $r.physical_sampling
+              cells = $r.cells
+            } | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/summary.json"
+          }
+
+      - name: Upload prospective canary v3 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-prospective-canary-v3-transport-amended-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-prospective-canary-v3-transport-amended/
+          if-no-files-found: warn
+          retention-days: 14
