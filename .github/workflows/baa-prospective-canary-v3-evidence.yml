@@ -231,9 +231,10 @@ jobs:
               simulator,
               feedback_policy="corrective",
           )
+          assert '"evidence_policy":' not in prompt
+          for policy in EVIDENCE_POLICIES:
+              assert json.dumps(policy) not in prompt
           for forbidden in (
-              "no_reacquire",
-              "reacquire",
               "bounded_action_protocol",
               "external_record_audit",
               "self_check",
