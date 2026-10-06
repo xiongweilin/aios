@@ -137,6 +137,7 @@ jobs:
           @'
           import hashlib
           import json
+          import os
           from collections import Counter
           from pathlib import Path
           import sys
@@ -158,7 +159,7 @@ jobs:
           from baa_protocol.delegation_frontier import DelegationBudget
           from baa_protocol.experiment import Regime
 
-          path = Path(r"""$env:BAA_MODEL_EVIDENCE_DIR/workload.json""")
+          path = Path(os.environ["BAA_MODEL_EVIDENCE_DIR"]) / "workload.json"
           payload = path.read_bytes()
           digest = hashlib.sha256(payload).hexdigest()
           assert digest == "e1c5802edcbc9c1f33d5a72c18a102d6af406ca7e25962a71a2fb62b2b232bd9"
