@@ -1,0 +1,60 @@
+name: BAA Gateway Diagnostic Snapshot
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-canary-v3-evidence
+    paths:
+      - ".github/workflows/baa-gateway-diagnostics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-diagnostics:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 15
+
+    steps:
+      - name: Capture sanitized gateway log tails
+        shell: pwsh
+        run: |
+          $root = "D:\agent\llm-gateway\core\.run"
+          $out = Join-Path $env:RUNNER_TEMP "baa-gateway-diagnostics"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $files = @(
+            "core.err.log",
+            "responses.err.log",
+            "agent.err.log",
+            "chat.err.log",
+            "core.out.log",
+            "responses.out.log",
+            "agent.out.log",
+            "chat.out.log"
+          )
+
+          foreach ($name in $files) {
+            $src = Join-Path $root $name
+            if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
+              continue
+            }
+            $text = (Get-Content -LiteralPath $src -Tail 300 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+            $text = $text -replace '(?i)Bearer\s+[A-Za-z0-9._~+\-/=]+', 'Bearer [REDACTED]'
+            $text = $text -replace '(?i)(access_token|refresh_token|id_token|authorization)(["''\s:=]+)[^\s,"''}]+', '$1$2[REDACTED]'
+            $text | Set-Content -LiteralPath (Join-Path $out $name) -Encoding UTF8
+          }
+
+          @{
+            captured_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway_root = "D:\agent\llm-gateway"
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $out "metadata.json") -Encoding UTF8
+
+      - name: Upload gateway diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-gateway-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-gateway-diagnostics/
+          if-no-files-found: error
+          retention-days: 2
