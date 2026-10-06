@@ -1,4 +1,5 @@
 name: BAA Gateway Diagnostic Snapshot
+# capture after replay-safe retry run
 
 on:
   push:
