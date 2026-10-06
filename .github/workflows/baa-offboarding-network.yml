@@ -15,13 +15,13 @@ on:
 permissions:
   contents: read
 
-# Portable image is built on hosted Linux; Windows only loads and executes it.
+# Linux wheelhouse is built on hosted Linux; Windows Docker Desktop assembles and executes the image.
 concurrency:
   group: baa-offboarding-network-selfhosted
   cancel-in-progress: true
 
 jobs:
-  linux-image:
+  linux-wheelhouse:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout AIOS
@@ -40,22 +40,16 @@ jobs:
             --wheel-dir tests/acceptance/baa_offboarding/wheelhouse \
             .
 
-      - name: Build portable acceptance image
-        run: |
-          image="aios:baa-network-${GITHUB_RUN_ID}"
-          docker build             --tag "$image"             --build-arg AIOS_APP_ROOT=/app             --file tests/acceptance/baa_offboarding/Dockerfile.network             .
-          docker save --output tests/acceptance/baa_offboarding/baa-network-image.tar "$image"
-
-      - name: Upload portable acceptance image
+      - name: Upload Linux wheelhouse
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: baa-offboarding-linux-image-${{ github.run_id }}
-          path: tests/acceptance/baa_offboarding/baa-network-image.tar
+          name: baa-offboarding-linux-wheelhouse-${{ github.run_id }}
+          path: tests/acceptance/baa_offboarding/wheelhouse/
           if-no-files-found: error
           retention-days: 1
 
   network-acceptance:
-    needs: linux-image
+    needs: linux-wheelhouse
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 45
 
@@ -77,11 +71,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Download portable acceptance image
+      - name: Download Linux wheelhouse
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: baa-offboarding-linux-image-${{ github.run_id }}
-          path: ${{ runner.temp }}/baa-offboarding-image
+          name: baa-offboarding-linux-wheelhouse-${{ github.run_id }}
+          path: tests/acceptance/baa_offboarding/wheelhouse
 
       - name: Prepare isolated experiment identity
         shell: pwsh
@@ -99,10 +93,10 @@ jobs:
       - name: Install host AIOS package
         run: python -m pip install --disable-pip-version-check -e .
 
-      - name: Load portable AIOS image
+      - name: Build portable AIOS image locally
         shell: pwsh
         run: |
-          docker load --input "$env:RUNNER_TEMP\baa-offboarding-image\baa-network-image.tar"
+          docker build --tag $env:AIOS_IMAGE --build-arg AIOS_APP_ROOT=/app --file tests/acceptance/baa_offboarding/Dockerfile.network .
 
       - name: Start network experiment stack
         shell: pwsh
