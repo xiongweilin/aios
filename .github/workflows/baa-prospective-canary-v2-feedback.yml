@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 4a4570df7419b480dbd49550cdaa8ed82dd374bf
+          ref: abfe4af0e65a8ff3d2c8fdd0322937cc20f47947
           path: baa-protocol
           persist-credentials: false
 
@@ -45,7 +45,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "BAA_PROTOCOL_SHA=4a4570df7419b480dbd49550cdaa8ed82dd374bf" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=abfe4af0e65a8ff3d2c8fdd0322937cc20f47947" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Verify local model gateway
@@ -91,6 +91,7 @@ jobs:
               HORIZONS,
               _adaptive_feedback_prompt,
               _mechanical_correction,
+              run_canary_feedback_study,
           )
           from baa_protocol.prospective_canary_study import (
               CanaryAction,
@@ -167,6 +168,41 @@ jobs:
                   "self_check",
               ):
                   assert forbidden not in prompt
+
+          class CountingWaitModel:
+              model_id = "fingerprint-counting-wait"
+
+              def __init__(self):
+                  self.calls = 0
+
+              def generate(
+                  self,
+                  prompt,
+                  *,
+                  episode_id,
+                  capability_level,
+                  phase,
+                  regime,
+              ):
+                  self.calls += 1
+                  return json.dumps({"actions": [{"kind": "wait"}]}), {}, 0.0
+
+          counting = CountingWaitModel()
+          clean = (
+              next(
+                  episode for episode in episodes
+                  if episode.study_group == "clean_progression"
+              ),
+          )
+          sharing_probe = run_canary_feedback_study(
+              counting,
+              clean,
+              horizons=(2,),
+          )
+          assert counting.calls == 3
+          assert sharing_probe["physical_sampling"]["calls"] == 3
+          for policy in FEEDBACK_POLICIES:
+              assert sharing_probe["cells"][policy]["2"]["logical_model_calls"] == 3
 
           print("prospective canary v2 fingerprint qualified")
           '@ | python -
