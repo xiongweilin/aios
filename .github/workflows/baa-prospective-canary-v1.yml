@@ -1,0 +1,293 @@
+name: BAA Prospective Canary Study v1
+# Frozen BAA preregistration head: 5835e75e724ec1c2e6622affd63d75e48564df3d
+
+on:
+  push:
+    branches:
+      - experiment/baa-prospective-canary-v1
+    paths:
+      - ".github/workflows/baa-prospective-canary-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baa-prospective-canary-v1-selfhosted
+  cancel-in-progress: true
+
+jobs:
+  prospective-canary-v1:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout AIOS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout frozen BAA canary v1 study
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: xiongweilin/BAA-Protocol
+          ref: 5835e75e724ec1c2e6622affd63d75e48564df3d
+          path: baa-protocol
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "baa-prospective-canary-v1"
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          "BAA_MODEL_EVIDENCE_DIR=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_MODEL_ID=gpt-6-luna" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_PROTOCOL_SHA=5835e75e724ec1c2e6622affd63d75e48564df3d" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BAA_GATEWAY_BASE=http://127.0.0.1:4101" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify local model gateway
+        shell: pwsh
+        run: |
+          $health = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/health/liveliness" -TimeoutSec 5
+          $catalog = Invoke-RestMethod -Uri "$env:BAA_GATEWAY_BASE/v1/models" -TimeoutSec 10
+          $ids = @($catalog.data | ForEach-Object { [string]$_.id } | Sort-Object -Unique)
+          if ($ids -notcontains $env:BAA_MODEL_ID) {
+            throw "required model is absent from local gateway catalog: $env:BAA_MODEL_ID"
+          }
+          $gatewayRepo = "D:\agent\llm-gateway"
+          $gatewaySha = $null
+          if (Test-Path -LiteralPath (Join-Path $gatewayRepo ".git")) {
+            $gatewaySha = (& git -C $gatewayRepo rev-parse HEAD).Trim()
+          }
+          if ($gatewaySha) {
+            "BAA_GATEWAY_SHA=$gatewaySha" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+          @{
+            checked_at = (Get-Date).ToUniversalTime().ToString("o")
+            gateway = $env:BAA_GATEWAY_BASE
+            gateway_sha = $gatewaySha
+            model_ids = $ids
+          } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/gateway.json"
+
+      - name: Verify frozen canary v1 fingerprint
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          @'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          import sys
+
+          path = Path("baa-protocol/experiments/prospective_canary_v1.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+
+          assert data["version"] == "prospective-canary-v1"
+          assert data["task_domain"] == "canary-release-promotion"
+          assert data["frozen_endpoint"] == (
+              "Delta_C2 = D_BAA(C2) - max(D_self_check(C2), D_post_hoc_audit(C2))"
+          )
+          assert len(data["episodes"]) == 18
+          assert len({episode["id"] for episode in data["episodes"]}) == 18
+
+          expected_groups = {
+              "clean_progression": 3,
+              "evidence_maturation": 3,
+              "guardrail_recovery": 3,
+              "lost_ack_recovery": 3,
+              "stale_route_refresh": 3,
+              "irrecoverable_control": 3,
+          }
+          assert Counter(episode["study_group"] for episode in data["episodes"]) == expected_groups
+
+          for episode in data["episodes"]:
+              assert "control_context" in episode
+              assert "public_context" in episode
+              assert episode["control_context"]["experiment_id"].startswith("experiment:canary-v1:")
+              assert not episode["id"].startswith(("E", "V", "G6"))
+
+          stale = [
+              episode for episode in data["episodes"]
+              if episode["study_group"] == "stale_route_refresh"
+          ]
+          for episode in stale:
+              event = episode["runtime_events"][0]
+              assert event["after_turn"] == 1
+              assert event["type"] == "route_evidence_refresh"
+              assert event["follow_hidden_route"] is True
+              assert "current_weight_percent" not in event
+              assert "current_stage_index" not in event
+              assert set(event["stage_evidence_by_stage"]) == {"0", "2"}
+
+          lost_ack = [
+              episode for episode in data["episodes"]
+              if episode["study_group"] == "lost_ack_recovery"
+          ]
+          for episode in lost_ack:
+              assert episode["fault"]["mode"] == "lost_confirmation_first_apply"
+              assert episode["runtime_events"] == [{
+                  "after_turn": 2,
+                  "type": "route_readback",
+                  "source": "traffic-route-observer",
+              }]
+
+          irrecoverable = [
+              episode for episode in data["episodes"]
+              if episode["study_group"] == "irrecoverable_control"
+          ]
+          assert all(not episode["control_context"]["rollback_available"] for episode in irrecoverable)
+
+          sys.path.insert(0, "baa-protocol")
+          from baa_protocol.experiment import Regime
+          from baa_protocol.prospective_canary_study import (
+              CanarySimulator,
+              _adaptive_prompt,
+              canary_model_client,
+              load_canary_workload,
+          )
+          from baa_protocol.delegation_frontier import DelegationBudget
+
+          client = canary_model_client()
+          payload = client._request_payload("fingerprint")
+          assert client.interface_mode == "function_tool"
+          assert payload["tool_choice"] == {
+              "type": "function",
+              "name": "submit_canary_proposal",
+          }
+          assert payload["parallel_tool_calls"] is False
+          assert len(payload["tools"]) == 1
+          assert payload["tools"][0]["name"] == "submit_canary_proposal"
+          assert payload["tools"][0]["strict"] is True
+
+          _, loaded = load_canary_workload(path)
+          target = next(
+              episode for episode in loaded
+              if episode.study_group == "stale_route_refresh"
+          )
+          direct = CanarySimulator(
+              target,
+              Regime.SELF_CHECK,
+              DelegationBudget(min_useful_delivery=1),
+          )
+          before_hidden = (
+              direct.context["current_stage_index"],
+              direct.context["current_weight_percent"],
+          )
+          direct.apply_events(1)
+          assert (
+              direct.context["current_stage_index"],
+              direct.context["current_weight_percent"],
+          ) == before_hidden
+
+          prompt = _adaptive_prompt(
+              loaded[0],
+              [{"phase": "planner", "disposition": "wait"}],
+              loaded[0].public_context["runtime_state"],
+          )
+          for forbidden in (
+              "bounded_action_protocol",
+              "external_record_audit",
+              "self_check",
+          ):
+              assert forbidden not in prompt
+
+          print("prospective canary v1 fingerprint qualified")
+          '@ | python -
+
+      - name: Run prospective real-model canary study v1
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
+          python baa-protocol/scripts/run_prospective_canary_study.py --workload baa-protocol/experiments/prospective_canary_v1.json --gateway-base $env:BAA_GATEWAY_BASE --model $env:BAA_MODEL_ID --output "$env:BAA_MODEL_EVIDENCE_DIR/result.json" --timeout-seconds 180
+
+      - name: Qualify model evidence
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $resultPath)) {
+            throw "prospective canary result.json is missing"
+          }
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+          if ($result.workload_version -ne "prospective-canary-v1") {
+            throw "unexpected workload version: $($result.workload_version)"
+          }
+          if ($result.model_interface -ne "function_tool") {
+            throw "unexpected model interface: $($result.model_interface)"
+          }
+          if ([int]$result.physical_sampling.calls -le 0) {
+            throw "expected physical model calls"
+          }
+          if ([int]$result.physical_sampling.calls_with_errors -ne 0) {
+            throw "model-call errors invalidate the run: $($result.physical_sampling.calls_with_errors)"
+          }
+          foreach ($field in @("transport_errors", "schema_errors", "model_errors")) {
+            if ([int]$result.physical_sampling.$field -ne 0) {
+              throw "$field invalidate the run: $($result.physical_sampling.$field)"
+            }
+          }
+          if (@($result.levels).Count -ne 3) {
+            throw "expected exactly three C levels"
+          }
+
+          $groups = @(
+            "clean_progression",
+            "evidence_maturation",
+            "guardrail_recovery",
+            "lost_ack_recovery",
+            "stale_route_refresh",
+            "irrecoverable_control"
+          )
+          foreach ($level in $result.levels) {
+            foreach ($regime in @("self_check", "external_record_audit", "bounded_action_protocol")) {
+              if ([int]$level.summary.$regime.episodes -ne 18) {
+                throw "incomplete episode denominator for $regime at C$($level.capability.level)"
+              }
+              foreach ($group in $groups) {
+                if ([int]$level.group_summary.$group.$regime.episodes -ne 3) {
+                  throw "incomplete group denominator for $group/$regime at C$($level.capability.level)"
+                }
+              }
+            }
+          }
+
+      - name: Extract compact summary
+        if: always()
+        shell: pwsh
+        run: |
+          $resultPath = "$env:BAA_MODEL_EVIDENCE_DIR/result.json"
+          if (Test-Path -LiteralPath $resultPath) {
+            $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+            $summary = [ordered]@{
+              workload_version = $result.workload_version
+              model_id = $result.model_id
+              model_interface = $result.model_interface
+              baa_protocol_sha = $env:BAA_PROTOCOL_SHA
+              aios_sha = $env:GITHUB_SHA
+              gateway_sha = $env:BAA_GATEWAY_SHA
+              budget = $result.budget
+              physical_sampling = $result.physical_sampling
+              levels = @(
+                $result.levels | ForEach-Object {
+                  [ordered]@{
+                    capability = $_.capability
+                    summary = $_.summary
+                    group_summary = $_.group_summary
+                  }
+                }
+              )
+            }
+            $summary | ConvertTo-Json -Depth 16 | Set-Content -Encoding UTF8 "$env:BAA_MODEL_EVIDENCE_DIR/summary.json"
+          }
+
+      - name: Upload prospective canary v1 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: baa-prospective-canary-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/baa-prospective-canary-v1/
+          if-no-files-found: warn
+          retention-days: 14
