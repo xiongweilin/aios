@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.14.7-alpine3.24@sha256:4677924bcc0e94505a3270e87cb1601c2af54cd92d021b8dc306618a14333bbe AS builder
+FROM --platform=linux/amd64 python:3.14.8-alpine3.24@sha256:7f2ec713f0436c59df2362d973b6a05af9e87ba78f0e94f5245c302984a7a1fd AS builder
 
 ARG ZLIB_FIX_COMMIT=df84af25dc1942490e1d1c899a07619152a46148
 
@@ -33,7 +33,7 @@ RUN set -eux; \
         --files /tmp/zlib-root \
         --output /tmp/zlib-1.3.2.1-r0.apk
 
-FROM --platform=linux/amd64 python:3.14.7-alpine3.24@sha256:4677924bcc0e94505a3270e87cb1601c2af54cd92d021b8dc306618a14333bbe
+FROM --platform=linux/amd64 python:3.14.8-alpine3.24@sha256:7f2ec713f0436c59df2362d973b6a05af9e87ba78f0e94f5245c302984a7a1fd
 
 WORKDIR /app
 COPY --from=builder /build/site-packages /opt/site-packages
