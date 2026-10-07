@@ -81,6 +81,12 @@ from administrative_orchestrator.production_verification import (
     complete_readback_postcondition,
 )
 from aios_gate import BAAGatedAIOSProvider
+from baa_protocol.exposure_bridge import (
+    ManagedSubjectStateChangeMeasurement,
+    assess_metric_bound,
+    realized_exposure_for_settlement,
+)
+from baa_protocol.offboarding import exposure_declaration_for_proposal
 from pydantic import SecretStr
 
 CASE_ID = UUID("00000000-0000-4000-8000-00000000baa4")
@@ -94,6 +100,7 @@ KEYCLOAK_WRITER = "baa-writer"
 KEYCLOAK_VERIFIER = "baa-verifier"
 KEYCLOAK_SESSION_CLIENT = "baa-session-client"
 KEYCLOAK_USERNAME = "baa-real-e2e-user"
+EXPOSURE_METRIC_V1 = "managed-subject-state-change-count-v1"
 
 
 def _load_acceptance_helper(name: str, relative: str) -> ModuleType:
@@ -211,6 +218,7 @@ def _setup_products(
         group_id=verifier_group,
     )
     employee_id = odoo.create_employee()
+    odoo.create_employee("BAA Real E2E Exposure Control Employee")
     subject_ref = f"odoo:hr.employee:{employee_id}"
 
     keycloak_mod = _load_acceptance_helper(
@@ -250,6 +258,11 @@ def _setup_products(
         ("view-users", "query-users"),
     )
     keycloak_user_id = keycloak.create_subject_user(keycloak_user_password)
+    keycloak.create_subject_user(
+        keycloak_user_password,
+        username=f"{KEYCLOAK_USERNAME}-exposure-control",
+        subject_ref=f"{subject_ref}:control",
+    )
     keycloak.create_user_session(keycloak_user_password)
     if keycloak.active_sessions(keycloak_user_id) < 1:
         raise AssertionError("real E2E requires an active Keycloak session before offboarding")
@@ -461,6 +474,104 @@ def _authorized_case(
     return store, case
 
 
+def _odoo_managed_subject_snapshot(odoo: Any) -> dict[str, dict[str, Any]]:
+    rows = odoo.admin(
+        "hr.employee",
+        "search_read",
+        [[]],
+        {
+            "fields": [
+                "id",
+                "active",
+                "x_administrative_deactivate_request_ref",
+            ],
+            "context": {"active_test": False},
+        },
+    )
+    if not isinstance(rows, list):
+        raise AssertionError("Odoo managed-subject snapshot is not a list")
+    snapshot: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("id"), int):
+            raise AssertionError(f"malformed Odoo managed-subject row: {row!r}")
+        subject_ref = f"odoo:hr.employee:{row['id']}"
+        snapshot[subject_ref] = {
+            "active": bool(row.get("active", True)),
+            "deactivate_request_ref": row.get(
+                "x_administrative_deactivate_request_ref"
+            )
+            or None,
+        }
+    return snapshot
+
+
+def _keycloak_managed_subject_snapshot(
+    keycloak: Any,
+) -> dict[str, dict[str, Any]]:
+    users: list[dict[str, Any]] = []
+    first = 0
+    page_size = 100
+    while True:
+        response = keycloak.request(
+            "GET",
+            f"/admin/realms/{KEYCLOAK_REALM}/users",
+            params={
+                "first": str(first),
+                "max": str(page_size),
+                "briefRepresentation": "false",
+            },
+            expected={200},
+        )
+        batch = response.json()
+        if not isinstance(batch, list):
+            raise AssertionError("Keycloak managed-subject snapshot is not a list")
+        users.extend(item for item in batch if isinstance(item, dict))
+        if len(batch) < page_size:
+            break
+        first += page_size
+
+    snapshot: dict[str, dict[str, Any]] = {}
+    for row in users:
+        user_id = row.get("id")
+        if not isinstance(user_id, str) or not user_id:
+            raise AssertionError(f"malformed Keycloak user row: {row!r}")
+        detail = keycloak.request(
+            "GET",
+            f"/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+            expected={200},
+        ).json()
+        if not isinstance(detail, dict):
+            raise AssertionError(f"malformed Keycloak user detail: {detail!r}")
+        attributes = detail.get("attributes")
+        subject_ref = _first_attribute(attributes, "administrative_subject_ref")
+        if not subject_ref:
+            continue
+        snapshot[subject_ref] = {
+            "enabled": bool(detail.get("enabled", False)),
+            "active_sessions": keycloak.active_sessions(user_id),
+            "disable_request_ref": _first_attribute(
+                attributes,
+                "administrative_disable_request_ref",
+            ),
+            "session_revoke_request_ref": _first_attribute(
+                attributes,
+                "administrative_session_revoke_request_ref",
+            ),
+        }
+    return snapshot
+
+
+def _changed_subject_refs(
+    before: dict[str, dict[str, Any]],
+    after: dict[str, dict[str, Any]],
+) -> list[str]:
+    return sorted(
+        subject_ref
+        for subject_ref in set(before) | set(after)
+        if before.get(subject_ref) != after.get(subject_ref)
+    )
+
+
 class RealProductReadbackProvider:
     """Independent product read-back; execution must remain on World Runtime."""
 
@@ -470,10 +581,18 @@ class RealProductReadbackProvider:
         *,
         odoo_base: str,
         keycloak_base: str,
+        odoo_admin: Any,
+        keycloak_admin: Any,
         fault_mode: str = "none",
     ) -> None:
         self.store = store
         self.readbacks: list[dict[str, Any]] = []
+        self.exposure_measurements: list[dict[str, Any]] = []
+        self._measured_effect_ids: set[str] = set()
+        self._odoo_admin = odoo_admin
+        self._keycloak_admin = keycloak_admin
+        self._odoo_scope = _odoo_managed_subject_snapshot(odoo_admin)
+        self._keycloak_scope = _keycloak_managed_subject_snapshot(keycloak_admin)
         self.readback_fault_pending = fault_mode == "readback_outage"
         self.odoo = OdooEmployeeDeactivateVerifier(
             OdooEmployeeDeactivateConnector(
@@ -536,6 +655,54 @@ class RealProductReadbackProvider:
             if obligation.obligation_id == effect.obligation_id:
                 return dict(obligation.expected_postcondition)
         raise RuntimeError("read-back could not resolve effect obligation")
+
+    def _record_exposure_measurement(
+        self,
+        effect,
+        *,
+        observed_postcondition: dict[str, Any],
+    ) -> None:
+        effect_id = str(effect.effect_id)
+        if effect_id in self._measured_effect_ids:
+            return
+
+        if effect.operation == "employee.deactivate":
+            before = self._odoo_scope
+            after = _odoo_managed_subject_snapshot(self._odoo_admin)
+            self._odoo_scope = after
+        elif effect.operation in {"identity.disable", "sessions.revoke"}:
+            before = self._keycloak_scope
+            after = _keycloak_managed_subject_snapshot(self._keycloak_admin)
+            self._keycloak_scope = after
+        else:
+            raise AssertionError(
+                f"unsupported exposure measurement operation: {effect.operation}"
+            )
+
+        changed_subject_refs = _changed_subject_refs(before, after)
+        if changed_subject_refs != [effect.subject_ref]:
+            raise AssertionError(
+                "real-product effect changed the wrong managed-subject scope: "
+                f"operation={effect.operation!r}, expected={[effect.subject_ref]!r}, "
+                f"observed={changed_subject_refs!r}"
+            )
+
+        self.exposure_measurements.append(
+            {
+                "effect_id": effect_id,
+                "proposal_id": f"effect:{effect_id}",
+                "obligation_id": str(effect.obligation_id),
+                "metric_id": EXPOSURE_METRIC_V1,
+                "declared_subject_ref": effect.subject_ref,
+                "observed_postcondition": dict(observed_postcondition),
+                "managed_subject_count_before": len(before),
+                "managed_subject_count_after": len(after),
+                "changed_subject_refs": changed_subject_refs,
+                "realized_exposure": len(changed_subject_refs),
+                "scope_complete": True,
+            }
+        )
+        self._measured_effect_ids.add(effect_id)
 
     def observe(self, effect) -> RealityObservation:
         expected = self._expected(effect)
@@ -604,6 +771,10 @@ class RealProductReadbackProvider:
             )
 
         semantic_view = complete_readback_postcondition(expected, raw)
+        self._record_exposure_measurement(
+            effect,
+            observed_postcondition=semantic_view,
+        )
         digest = hashlib.sha256(
             json.dumps(semantic_view, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
@@ -640,6 +811,8 @@ def _build_engine(
     keycloak_base: str,
     runtime_token: str,
     now: datetime,
+    odoo_admin: Any,
+    keycloak_admin: Any,
     fault_mode: str = "none",
 ) -> tuple[
     OffboardingExecutionEngine,
@@ -661,6 +834,8 @@ def _build_engine(
         store,
         odoo_base=odoo_base,
         keycloak_base=keycloak_base,
+        odoo_admin=odoo_admin,
+        keycloak_admin=keycloak_admin,
         fault_mode=fault_mode,
     )
     runtime_provider = WorldRuntimeEffectProvider(readback, bridge)
@@ -1069,6 +1244,8 @@ def main() -> None:
             keycloak_base=args.keycloak_base,
             runtime_token=args.runtime_token,
             now=now,
+            odoo_admin=odoo,
+            keycloak_admin=keycloak,
             fault_mode=args.scenario,
         )
 
@@ -1124,6 +1301,76 @@ def main() -> None:
         if len(kernels) != 1 or not kernels[0].externally_complete():
             raise AssertionError("BAA kernel did not verify all external obligations")
 
+        if len(readback.exposure_measurements) != 3:
+            raise AssertionError(
+                "real-product E2E requires one exposure measurement per external effect: "
+                f"{readback.exposure_measurements!r}"
+            )
+        measurement_by_effect = {
+            str(item["effect_id"]): item
+            for item in readback.exposure_measurements
+        }
+        admitted_proposals = {
+            event.proposal_id
+            for event in gated.refinement_trace
+            if event.event == "admit"
+        }
+        exposure_bindings: list[dict[str, Any]] = []
+        for effect in effects:
+            effect_id = str(effect.effect_id)
+            measurement_payload = measurement_by_effect.get(effect_id)
+            if measurement_payload is None:
+                raise AssertionError(
+                    f"missing exposure measurement for effect {effect_id}"
+                )
+            proposal = gated._proposal_for_refinement(effect)
+            declaration = exposure_declaration_for_proposal(proposal)
+            measurement = ManagedSubjectStateChangeMeasurement(
+                proposal_id=str(measurement_payload["proposal_id"]),
+                metric_id=str(measurement_payload["metric_id"]),
+                declared_subject_ref=str(
+                    measurement_payload["declared_subject_ref"]
+                ),
+                observed_postcondition=dict(
+                    measurement_payload["observed_postcondition"]
+                ),
+                managed_subject_count_before=int(
+                    measurement_payload["managed_subject_count_before"]
+                ),
+                managed_subject_count_after=int(
+                    measurement_payload["managed_subject_count_after"]
+                ),
+                changed_subject_refs=tuple(
+                    str(item)
+                    for item in measurement_payload["changed_subject_refs"]
+                ),
+                scope_complete=bool(measurement_payload["scope_complete"]),
+            )
+            assessment = assess_metric_bound(declaration, measurement)
+            realized = realized_exposure_for_settlement(assessment)
+            if proposal.proposal_id not in admitted_proposals:
+                raise AssertionError(
+                    f"exposure measurement is not tied to an admitted proposal: "
+                    f"{proposal.proposal_id}"
+                )
+            if realized != 1:
+                raise AssertionError(
+                    f"unexpected realized exposure for {proposal.proposal_id}: {realized}"
+                )
+            exposure_bindings.append(
+                {
+                    "effect_id": effect_id,
+                    "obligation_id": str(effect.obligation_id),
+                    "proposal_id": proposal.proposal_id,
+                    "metric_id": declaration.metric_id,
+                    "declared_subject_ref": declaration.declared_subject_ref,
+                    "exposure_bound": declaration.exposure_bound,
+                    "realized_exposure": realized,
+                    "assessment_established": assessment.established,
+                    "assessment_reason": assessment.reason,
+                }
+            )
+
         _write_evidence(
             args.evidence_path,
             {
@@ -1159,6 +1406,8 @@ def main() -> None:
                         obligation_id: state.knowledge.value
                         for obligation_id, state in kernels[0].effects.items()
                     },
+                    "admitted_proposal_ids": sorted(admitted_proposals),
+                    "exposure_bindings": exposure_bindings,
                 },
                 "aios": {
                     "effect_count": len(effects),
@@ -1178,6 +1427,7 @@ def main() -> None:
                 },
                 "product_state": product,
                 "independent_readback": readback.readbacks,
+                "exposure_measurements": readback.exposure_measurements,
                 "credential_separation": {
                     "odoo_writer": ODOO_WRITER,
                     "odoo_verifier": ODOO_VERIFIER,
