@@ -206,20 +206,26 @@ class KeycloakAdmin:
             expected={204},
         )
 
-    def create_subject_user(self, password: str) -> str:
+    def create_subject_user(
+        self,
+        password: str,
+        *,
+        username: str = USERNAME,
+        subject_ref: str = SUBJECT_REF,
+    ) -> str:
         response = self.request(
             "POST",
             f"/admin/realms/{REALM}/users",
             json_body={
-                "username": USERNAME,
+                "username": username,
                 "firstName": "BAA",
                 "lastName": "Acceptance",
-                "email": "baa-real-keycloak@example.test",
+                "email": f"{username}@example.test",
                 "emailVerified": True,
                 "enabled": True,
                 "requiredActions": [],
                 "attributes": {
-                    "administrative_subject_ref": [SUBJECT_REF],
+                    "administrative_subject_ref": [subject_ref],
                     "preserve_me": ["yes"],
                 },
                 "credentials": [
@@ -289,7 +295,91 @@ class KeycloakAdmin:
         return None
 
 
-async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str) -> dict[str, Any]:
+def _first_attribute(attributes: object, name: str) -> str | None:
+    if not isinstance(attributes, dict):
+        return None
+    value = attributes.get(name)
+    if isinstance(value, list) and value and isinstance(value[0], str):
+        return value[0]
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _keycloak_managed_subject_snapshot(
+    admin: KeycloakAdmin,
+) -> dict[str, dict[str, Any]]:
+    users: list[dict[str, Any]] = []
+    first = 0
+    page_size = 100
+    while True:
+        response = admin.request(
+            "GET",
+            f"/admin/realms/{REALM}/users",
+            params={
+                "first": str(first),
+                "max": str(page_size),
+                "briefRepresentation": "false",
+            },
+            expected={200},
+        )
+        batch = response.json()
+        if not isinstance(batch, list):
+            raise AssertionError("Keycloak managed-subject snapshot is not a list")
+        users.extend(item for item in batch if isinstance(item, dict))
+        if len(batch) < page_size:
+            break
+        first += page_size
+
+    snapshot: dict[str, dict[str, Any]] = {}
+    for row in users:
+        user_id = row.get("id")
+        if not isinstance(user_id, str) or not user_id:
+            raise AssertionError(f"malformed Keycloak user row: {row!r}")
+        detail = admin.request(
+            "GET",
+            f"/admin/realms/{REALM}/users/{user_id}",
+            expected={200},
+        ).json()
+        if not isinstance(detail, dict):
+            raise AssertionError(f"malformed Keycloak user detail: {detail!r}")
+        attributes = detail.get("attributes")
+        subject_ref = _first_attribute(attributes, "administrative_subject_ref")
+        if not subject_ref:
+            continue
+        snapshot[subject_ref] = {
+            "enabled": bool(detail.get("enabled", False)),
+            "active_sessions": admin.active_sessions(user_id),
+            "disable_request_ref": _first_attribute(
+                attributes,
+                "administrative_disable_request_ref",
+            ),
+            "session_revoke_request_ref": _first_attribute(
+                attributes,
+                "administrative_session_revoke_request_ref",
+            ),
+        }
+    return snapshot
+
+
+def _changed_subject_refs(
+    before: dict[str, dict[str, Any]],
+    after: dict[str, dict[str, Any]],
+) -> list[str]:
+    return sorted(
+        subject_ref
+        for subject_ref in set(before) | set(after)
+        if before.get(subject_ref) != after.get(subject_ref)
+    )
+
+
+async def run_connectors(
+    base_url: str,
+    writer_secret: str,
+    verifier_secret: str,
+    *,
+    admin: KeycloakAdmin,
+) -> dict[str, Any]:
     os.environ["BAA_KEYCLOAK_WRITER_SECRET"] = writer_secret
     os.environ["BAA_KEYCLOAK_VERIFIER_SECRET"] = verifier_secret
 
@@ -318,6 +408,12 @@ async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str
         )
     )
 
+    before_disable_scope = _keycloak_managed_subject_snapshot(admin)
+    if SUBJECT_REF not in before_disable_scope or len(before_disable_scope) < 2:
+        raise AssertionError(
+            "Keycloak exposure snapshot requires the target plus at least one managed control subject"
+        )
+
     disable_request = f"request:disable:{uuid4()}"
     disable = await KeycloakIdentityDisableConnector(writer).invoke(
         request_ref=disable_request,
@@ -326,6 +422,17 @@ async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str
     )
     if disable.status is not ConnectorStatus.SUCCEEDED:
         raise AssertionError(f"disable failed: {disable}")
+
+    after_disable_scope = _keycloak_managed_subject_snapshot(admin)
+    disable_changed_subject_refs = _changed_subject_refs(
+        before_disable_scope,
+        after_disable_scope,
+    )
+    if disable_changed_subject_refs != [SUBJECT_REF]:
+        raise AssertionError(
+            "Keycloak disable changed the wrong managed-subject scope: "
+            f"expected={[SUBJECT_REF]!r}, observed={disable_changed_subject_refs!r}"
+        )
 
     disable_observed = await KeycloakIdentityDisableVerifier(verifier).observe(
         subject_ref=SUBJECT_REF,
@@ -349,6 +456,7 @@ async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str
     if disable_reconcile is None or disable_reconcile.status is not ConnectorStatus.SUCCEEDED:
         raise AssertionError(f"disable reconciliation failed: {disable_reconcile}")
 
+    before_session_scope = _keycloak_managed_subject_snapshot(admin)
     session_request = f"request:sessions:{uuid4()}"
     revoke = await KeycloakSessionRevokeConnector(writer).invoke(
         request_ref=session_request,
@@ -357,6 +465,17 @@ async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str
     )
     if revoke.status is not ConnectorStatus.SUCCEEDED:
         raise AssertionError(f"session revoke failed: {revoke}")
+
+    after_session_scope = _keycloak_managed_subject_snapshot(admin)
+    session_changed_subject_refs = _changed_subject_refs(
+        before_session_scope,
+        after_session_scope,
+    )
+    if session_changed_subject_refs != [SUBJECT_REF]:
+        raise AssertionError(
+            "Keycloak session revoke changed the wrong managed-subject scope: "
+            f"expected={[SUBJECT_REF]!r}, observed={session_changed_subject_refs!r}"
+        )
 
     session_observed = await KeycloakSessionVerifier(verifier).observe(
         subject_ref=SUBJECT_REF,
@@ -385,11 +504,27 @@ async def run_connectors(base_url: str, writer_secret: str, verifier_secret: str
             "status": disable.status.value,
             "reconciled": bool(disable_reconcile.reconciled),
             "observed": disable_observed.observed_postcondition,
+            "exposure_snapshot": {
+                "metric": "managed-subject-state-change-count-v1",
+                "scope_complete": True,
+                "managed_subject_count_before": len(before_disable_scope),
+                "managed_subject_count_after": len(after_disable_scope),
+                "changed_subject_refs": disable_changed_subject_refs,
+                "realized_exposure": len(disable_changed_subject_refs),
+            },
         },
         "session_revoke": {
             "status": revoke.status.value,
             "reconciled": bool(session_reconcile.reconciled),
             "observed": session_observed.observed_postcondition,
+            "exposure_snapshot": {
+                "metric": "managed-subject-state-change-count-v1",
+                "scope_complete": True,
+                "managed_subject_count_before": len(before_session_scope),
+                "managed_subject_count_after": len(after_session_scope),
+                "changed_subject_refs": session_changed_subject_refs,
+                "realized_exposure": len(session_changed_subject_refs),
+            },
         },
     }
 
@@ -423,6 +558,11 @@ def main() -> None:
             ("view-users", "query-users"),
         )
         user_id = admin.create_subject_user(user_password)
+        admin.create_subject_user(
+            user_password,
+            username=f"{USERNAME}-exposure-control",
+            subject_ref=f"{SUBJECT_REF}:control",
+        )
         admin.create_user_session(user_password)
         sessions_before = admin.active_sessions(user_id)
         if sessions_before < 1:
@@ -444,7 +584,12 @@ def main() -> None:
             )
 
         connector_evidence = asyncio.run(
-            run_connectors(args.base_url, writer_secret, verifier_secret)
+            run_connectors(
+                args.base_url,
+                writer_secret,
+                verifier_secret,
+                admin=admin,
+            )
         )
         sessions_after = admin.active_sessions(user_id)
         if sessions_after != 0:
