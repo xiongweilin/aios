@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: f6ceca7168fb7503e61a14a36b42d62b9cffa763
+          ref: b3215d940cf7c9bd6b208ed5915eaa3c92ab10e3
           path: baa-protocol
           persist-credentials: false
 
