@@ -257,7 +257,11 @@ def _setup_products(
         verifier_client,
         ("view-users", "query-users"),
     )
-    keycloak_user_id = keycloak.create_subject_user(keycloak_user_password)
+    keycloak_user_id = keycloak.create_subject_user(
+        keycloak_user_password,
+        username=KEYCLOAK_USERNAME,
+        subject_ref=subject_ref,
+    )
     keycloak.create_subject_user(
         keycloak_user_password,
         username=f"{KEYCLOAK_USERNAME}-exposure-control",
