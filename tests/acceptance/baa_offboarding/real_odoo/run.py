@@ -258,15 +258,50 @@ class OdooRpc:
         self.authenticate(login, password)
         return user_id
 
-    def create_employee(self) -> int:
+    def create_employee(self, name: str = "BAA Real Odoo Employee") -> int:
         employee_id = self.admin(
             "hr.employee",
             "create",
-            [{"name": "BAA Real Odoo Employee", "active": True}],
+            [{"name": name, "active": True}],
         )
         if not isinstance(employee_id, int) or employee_id <= 0:
             raise RuntimeError("failed to create Odoo employee")
         return employee_id
+
+
+def _odoo_subject_snapshot(rpc: OdooRpc) -> dict[str, dict[str, Any]]:
+    rows = rpc.admin(
+        "hr.employee",
+        "search_read",
+        [[]],
+        {
+            "fields": ["id", "active", REQUEST_FIELD],
+            "context": {"active_test": False},
+        },
+    )
+    if not isinstance(rows, list):
+        raise AssertionError("Odoo managed-subject snapshot is not a list")
+    snapshot: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("id"), int):
+            raise AssertionError(f"malformed Odoo employee snapshot row: {row!r}")
+        subject_ref = f"odoo:hr.employee:{row['id']}"
+        snapshot[subject_ref] = {
+            "active": bool(row.get("active", True)),
+            "deactivate_request_ref": row.get(REQUEST_FIELD) or None,
+        }
+    return snapshot
+
+
+def _changed_subject_refs(
+    before: dict[str, dict[str, Any]],
+    after: dict[str, dict[str, Any]],
+) -> list[str]:
+    return sorted(
+        subject_ref
+        for subject_ref in set(before) | set(after)
+        if before.get(subject_ref) != after.get(subject_ref)
+    )
 
 
 async def run_connectors(
@@ -275,6 +310,7 @@ async def run_connectors(
     employee_id: int,
     writer_password: str,
     verifier_password: str,
+    admin_rpc: OdooRpc,
 ) -> dict[str, Any]:
     os.environ["BAA_ODOO_WRITER_SECRET"] = writer_password
     os.environ["BAA_ODOO_VERIFIER_SECRET"] = verifier_password
@@ -308,6 +344,12 @@ async def run_connectors(
     request_ref = f"request:deactivate:{uuid4()}"
 
     writer = OdooEmployeeDeactivateConnector(writer_transport)
+    before_scope = _odoo_subject_snapshot(admin_rpc)
+    if subject_ref not in before_scope or len(before_scope) < 2:
+        raise AssertionError(
+            "Odoo exposure snapshot requires the target plus at least one managed control subject"
+        )
+
     result = await writer.invoke(
         request_ref=request_ref,
         subject_ref=subject_ref,
@@ -315,6 +357,14 @@ async def run_connectors(
     )
     if result.status is not ConnectorStatus.SUCCEEDED:
         raise AssertionError(f"Odoo deactivate failed: {result}")
+
+    after_scope = _odoo_subject_snapshot(admin_rpc)
+    changed_subject_refs = _changed_subject_refs(before_scope, after_scope)
+    if changed_subject_refs != [subject_ref]:
+        raise AssertionError(
+            "Odoo deactivate changed the wrong managed-subject scope: "
+            f"expected={[subject_ref]!r}, observed={changed_subject_refs!r}"
+        )
 
     verifier = OdooEmployeeDeactivateVerifier(
         OdooEmployeeDeactivateConnector(verifier_transport)
@@ -349,6 +399,14 @@ async def run_connectors(
         "status": result.status.value,
         "reconciled": bool(reconciled.reconciled),
         "observed": observed.observed_postcondition,
+        "exposure_snapshot": {
+            "metric": "managed-subject-state-change-count-v1",
+            "scope_complete": True,
+            "managed_subject_count_before": len(before_scope),
+            "managed_subject_count_after": len(after_scope),
+            "changed_subject_refs": changed_subject_refs,
+            "realized_exposure": len(changed_subject_refs),
+        },
     }
 
 
@@ -399,6 +457,7 @@ def main() -> None:
             group_id=verifier_group,
         )
         employee_id = rpc.create_employee()
+        rpc.create_employee("BAA Odoo Exposure Control Employee")
 
         connector_evidence = asyncio.run(
             run_connectors(
@@ -406,6 +465,7 @@ def main() -> None:
                 employee_id=employee_id,
                 writer_password=writer_password,
                 verifier_password=verifier_password,
+                admin_rpc=rpc,
             )
         )
 
