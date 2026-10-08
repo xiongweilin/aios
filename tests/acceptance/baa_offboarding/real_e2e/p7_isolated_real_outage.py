@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from p7_maintenance_triage import TriageStatus, assess_maintenance
-from p7_shadow_readonly import SOURCES, ShadowMonitor, read_only_probe
+from p7_shadow_readonly import ShadowMonitor, read_only_probe
 
 COMPOSE_PATH = Path(__file__).resolve().with_name("compose.yaml")
 MAX_REACQUISITION_ROUNDS = 8
