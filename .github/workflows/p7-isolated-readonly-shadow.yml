@@ -82,8 +82,34 @@ jobs:
       - name: Build disposable AIOS image
         run: docker build --build-arg AIOS_APP_ROOT=/app -t "$AIOS_IMAGE" .
 
-      - name: Start only isolated products (no effect or subject provision)
-        run: docker compose -f tests/acceptance/baa_offboarding/real_e2e/compose.yaml up -d
+      - name: Start only isolated products with bounded fixture qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=tests/acceptance/baa_offboarding/real_e2e/compose.yaml
+          mkdir -p "$P7_EVIDENCE_DIR"
+          attempted=0
+          failed=0
+          qualified=false
+          for attempt in 1 2; do
+            attempted="$attempt"
+            if docker compose -f "$compose" up -d; then
+              qualified=true
+              break
+            fi
+            failed=$((failed + 1))
+            echo "::warning title=Disposable fixture startup failed::Attempt $attempt of 2; no scientific episode has started"
+            # Rebuild ONLY this runner's disposable test stack. A failed
+            # Odoo bootstrap must never leave a partially initialized DB.
+            docker compose -f "$compose" down -v --remove-orphans || true
+            if (( attempt < 2 )); then sleep 3; fi
+          done
+          printf '{"schema":"p7-disposable-startup-v1","max_attempts":2,"attempted":%s,"failed":%s,"qualified":%s}\n' \
+            "$attempted" "$failed" "$qualified" > "$P7_EVIDENCE_DIR/fixture-startup.json"
+          if [[ "$qualified" != true ]]; then
+            echo "::error title=Disposable fixture unavailable::Two bootstrap attempts failed; not a P7 recovery episode"
+            exit 1
+          fi
 
       - name: Qualify baseline health before fixed shadow window
         shell: bash
