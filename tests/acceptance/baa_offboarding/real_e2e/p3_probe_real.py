@@ -28,6 +28,7 @@ from baa_protocol.temporal_outcome import (
     SubjectPolicy,
     measure_offboarding,
 )
+from p3_probe_timeline import AccessTimelineSampler, ProbeTarget
 from run import (
     KEYCLOAK_REALM,
     KEYCLOAK_SESSION_CLIENT,
@@ -458,10 +459,38 @@ def main() -> None:
             keycloak_admin=keycloak,
             fault_mode="none",
         )
-        result, status_trace, _, _, _ = _drive_episode(
-            engine, case, scenario="normal", odoo=odoo, keycloak=keycloak,
-            employee_id=employee_id, keycloak_user_id=user_id
+        # The observer performs independent read-only protected-resource
+        # probes while the real engine is running. All probe timestamps
+        # bracket HTTP requests; they are not backend effect timestamps.
+        timeline = AccessTimelineSampler(
+            (
+                ProbeTarget("target", lambda: probe(subject_ref)),
+                ProbeTarget("control", lambda: probe(control_ref)),
+            ),
+            interval_s=0.15,
+            max_rounds=256,
         )
+        first_round = timeline.capture_once("before_engine")
+        evidence["access_timeline_initial_round"] = [
+            item.public_dict() for item in first_round
+        ]
+        if (
+            len(first_round) != 2
+            or first_round[0].access is not AccessProbe.ALLOW
+            or first_round[1].access is not AccessProbe.ALLOW
+        ):
+            raise AssertionError("independent access timeline lacks valid pre-effect baseline")
+        timeline.start()
+        try:
+            result, status_trace, _, _, _ = _drive_episode(
+                engine, case, scenario="normal", odoo=odoo, keycloak=keycloak,
+                employee_id=employee_id, keycloak_user_id=user_id
+            )
+            timeline.capture_once("after_engine")
+        finally:
+            timeline.stop()
+            evidence["access_timeline"] = timeline.evidence()
+
         evidence["execution"] = {
             "final_state": result.status.value,
             "status_trace": status_trace,
@@ -512,6 +541,16 @@ def main() -> None:
             horizon_end_s=after_snap.observed_at_s,
             max_clock_error_s=0,
         )
+        # Timeline cutover candidates are local request-time brackets
+        # CONDITIONAL on a single irreversible access-state transition.
+        # No Keycloak event stream/clock calibration has been qualified.
+        evidence["timeline_interpretation"] = {
+            "grade": "point-probe timeline only",
+            "single_access_transition_assumption": "not verified",
+            "external_clock_error_bound": "not independently qualified",
+            "real_Y_identified": False,
+            "calibrated_risk_factor_registry": False,
+        }
         evidence["temporal_y"] = {
             "instrument_bound_subject_seconds": [
                 outcome.joint_violation.lower_s,
