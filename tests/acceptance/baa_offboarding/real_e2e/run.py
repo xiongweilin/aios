@@ -87,6 +87,7 @@ from baa_protocol.exposure_bridge import (
     realized_exposure_for_settlement,
 )
 from baa_protocol.offboarding import exposure_declaration_for_proposal
+from p6_quality import QualityRecorder, TimedEffectProvider
 from pydantic import SecretStr
 
 CASE_ID = UUID("00000000-0000-4000-8000-00000000baa4")
@@ -935,9 +936,25 @@ def _drive_episode(
     keycloak: Any,
     employee_id: int,
     keycloak_user_id: str,
+    quality: QualityRecorder | None = None,
 ) -> tuple[AdministrativeCase, list[str], dict[str, Any] | None, bool, float]:
+    # The measured span includes ALL internal BAA/AIOS driver work; it is not
+    # a separate admission-latency or reality-effect latency claim.
+    def run_once() -> AdministrativeCase:
+        if quality is None:
+            return engine.run(case.case_id)
+        return quality.measure(
+            "engine_drive",
+            "none",
+            lambda: engine.run(case.case_id),
+            status_from=lambda case: (
+                "succeeded" if case.status is CaseStatus.COMPLETED
+                else "not_applicable"
+            ),
+        )
+
     started = time.perf_counter()
-    current = engine.run(case.case_id)
+    current = run_once()
     status_trace = [current.status.value]
     product_after_first: dict[str, Any] | None = None
     marker_stable = True
@@ -972,7 +989,7 @@ def _drive_episode(
         for _ in range(8):
             if current.status is CaseStatus.COMPLETED:
                 break
-            current = engine.run(case.case_id)
+            current = run_once()
             status_trace.append(current.status.value)
         if current.status is not CaseStatus.COMPLETED:
             raise AssertionError(
@@ -1153,6 +1170,7 @@ def main() -> None:
     parser.add_argument("--runtime-token", required=True)
     parser.add_argument("--evidence-path", required=True)
     args = parser.parse_args()
+    quality = QualityRecorder()
 
     _wait_ready(f"{args.runtime_base}/healthz")
     _wait_ready(args.odoo_base)
@@ -1252,6 +1270,9 @@ def main() -> None:
             keycloak_admin=keycloak,
             fault_mode=args.scenario,
         )
+        # Test-only measurement boundary: the underlying BAA admission and
+        # result/observation semantics are untouched by the opaque wrapper.
+        engine.provider = TimedEffectProvider(gated, quality)
 
         (
             result,
@@ -1267,6 +1288,7 @@ def main() -> None:
             keycloak=keycloak,
             employee_id=employee_id,
             keycloak_user_id=keycloak_user_id,
+            quality=quality,
         )
 
         product = _product_state(
@@ -1443,6 +1465,12 @@ def main() -> None:
             },
         )
     finally:
+        # Quality evidence is emitted for both passed and failed runs.
+        # Counts and exception classes are preserved without raw payloads.
+        quality.write(
+            Path(args.evidence_path).with_name("p6-quality.json"),
+            scenario=args.scenario,
+        )
         if bridge is not None:
             bridge.close()
         if odoo is not None:
