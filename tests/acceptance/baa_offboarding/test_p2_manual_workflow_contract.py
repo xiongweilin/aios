@@ -3,8 +3,8 @@
 This test does not dispatch a run or call the model, and therefore cannot
 replace runtime source qualification or privacy review.
 """
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 WORKFLOW = (
     Path(__file__).resolve().parents[3]
