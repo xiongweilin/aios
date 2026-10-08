@@ -27,7 +27,6 @@ from baa_protocol.temporal_outcome import (
     SubjectPolicy,
     measure_offboarding,
 )
-
 from run import (
     KEYCLOAK_REALM,
     KEYCLOAK_SESSION_CLIENT,
@@ -317,7 +316,7 @@ def main() -> None:
                 "phase": label,
                 "samples": {
                     s: _snapshot_json(snapshots[s], classify_point(snapshots[s], policy=p))
-                    for s, p in zip((subject_ref, control_ref), policies)
+                    for s, p in zip((subject_ref, control_ref), policies, strict=True)
                 },
             }
             evidence["samples"].append(rec)
