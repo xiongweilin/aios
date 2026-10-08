@@ -48,6 +48,24 @@ disposable test controller calls Docker pause/unpause.
 - A GitHub runner startup or Odoo-init failure **before baseline** is a
   setup qualification failure and remains visible as such.
 
+## Startup qualification and failed attempts
+
+A previous (pre-lint-fix) isolation run qualified the real Keycloak pause
+experiment while the PR's static check failed. In a subsequent source-head
+check, `odoo-init` exited 2 **before baseline**, a fixture failure rather
+than an observed recovery failure. The opt-in ephemeral workflow therefore
+allows at most **two** fresh Compose bootstrap attempts, recreating **only
+its own disposable volumes** after a failed start. A
+`fixture-startup.json` artifact records attempted/failed counts even when
+the entire job fails. If both attempts fail, qualification fails; no fault
+episode is invented, and the data is not selected into a clean-run
+availability denominator.
+
+This is an implementation-only readiness refinement after qualification
+failures were observed. The source of intermittent `odoo-init` exit 2 remains
+unestablished. It does **not** change the frozen baseline, actual-pause,
+outage-discrimination, two-round recovery or bounded-horizon rules.
+
 ## Security and teardown
 
 Workflow must run on `ubuntu-latest`, not a self-hosted runner, and must
