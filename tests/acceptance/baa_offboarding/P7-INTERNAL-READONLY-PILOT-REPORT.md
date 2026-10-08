@@ -1,25 +1,27 @@
 # P7 Internal Read-Only Maintenance Pilot — Implementation and Readiness Report
 
 - Date: 2026-10-08
-- State: Instrument and isolated local-stack overlay implemented and offline-qualified; live preflight not yet started.
+- State: Instrument and isolated local-stack overlay implemented and offline-qualified; live preflight executed but unqualified; four-hour observation not started.
 - Frozen contract: `p7_internal_readonly_pilot_v1.json`, unchanged (`design_frozen_not_authorized`).
 
 ## 中文
 
 ### 结论
 
-独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据、只读 loopback relay，以及离线故障测试已实现。当前尚未启动预检，真实试点仍为**未启动（NOT QUALIFIED）**，不是服务健康/故障结论，也不是运营验收通过。
+独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据、只读 loopback relay，以及离线故障测试已实现。真实短时预检已运行，但因 Odoo 根路径重定向而**未合格（NOT QUALIFIED）**；四小时观测没有启动。这不是服务健康/故障率结论，也不是运营验收通过。
 
-本次没有向 staging 发 HTTP 请求：预检 **0 次**；四小时窗口 **0/960 个已观察槽位**。未调用模型，未访问真实员工数据，未执行业务写入。
+实际预检发送 **4 次 GET**（每源一次）；四小时窗口 **0/960 个已观察槽位**。Runtime health、Runtime capabilities 与 Keycloak realm 为 `ok`；Odoo `/` 分类为 `http_error / unexpected_redirect`，未跟随重定向。未调用模型，未访问真实员工数据，未执行业务写入。
 
 ### 当前 readiness 证据
 
-- 本机 Compose 项目 `aios` 仍只有 8 个 AIOS 组件在运行；该主项目没有 Keycloak/Odoo staging。`tests/acceptance/baa_offboarding/real_e2e/compose.yaml` 另有 Odoo 18 / Keycloak 26.8 / Runtime 合成验收栈，本次新增独立 `p7-local-compose.yaml` overlay 和一个空 Keycloak realm（`users=[]`、`clients=[]`）。overlay 将端口限于 `127.0.0.1`、关闭 Runtime 周期 healthcheck、移除 Runtime 直出端口，避免代理之外的访问和未计数 Runtime 读请求。首次隔离栈已启动后停止；观察器入口路径拼接错误导致 Python 未启动，未发出 P7 请求。新项目重试尚未启动。
+- 主 Compose 项目 `aios` 保持 8 个 AIOS 组件运行，未修改。第一次独立栈启动成功，但 wrapper 重复拼接 observer 路径，Python 未启动、P7 请求为 0；仅停止/移除该项目容器和网络。第二次新项目正常启动并执行一次预检，随后按失败门停止/移除容器和网络。两次各保留 Odoo/runtime 合成 volume（未使用 `down -v`）；现在没有 P7 容器运行，绑定端口已空闲。Odoo/Keycloak/Postgres 镜像现已缓存本机。
+- 本地栈来自 `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`，另用独立 `p7-local-compose.yaml` overlay 和空 Keycloak realm（`users=[]`、`clients=[]`）。端口仅绑定 `127.0.0.1`；Runtime 周期 healthcheck 关闭且直出端口移除，避免代理之外访问和未计数 Runtime 读请求。预检数据文件与 SHA-256 sidecar 在仓库外受限目录，checksum 已核验。
 - AIOS 仓库根 `.env` 与 BAA 子目录 `.env` 均不存在；`.env.example` 只是模板。Windows Credential Manager 未发现 BAA/P7/Keycloak/Odoo 对应目标，进程中也没有 `BAA_REAL_*` / `BAA_P7_*` 值。`commerce-orchestrator` 另有 `dev` Odoo 配置与 API key，但属于不同项目，未读取或转用其 secret。
 - 现有 `real_e2e/run.py` 会创建合成员工并调用写接口，本任务明确未执行它。局部栈只用于 empty-realm、无 demo employee 的准备；P7 sampler 通过独立 GET-only relay 访问 Runtime，使用短时 bearer token 和 loopback 端点。
-- 首次尝试创建了仓库外 activation 文件，但观察器入口将相对路径重复拼接，Python 返回文件不存在；因此预检程序未执行，P7 HTTP 请求 **0 次**，观测 **0/960 槽位**。脚本停止并移除了该唯一 Compose 项目的容器/网络，未使用 `down -v`；仅保留该次初始化的两个合成数据卷和 activation 文件以供核查。将使用新项目名和新 activation 重试。冻结 readiness gate 是否通过仍须由真实短时预检决定。
+- 用户批准已写入仓库外 activation；第二次预检实际发送四个 GET，结果已写入并通过 SHA-256 校验。由于 Odoo root 返回重定向，固定契约要求的无重定向 HTTP 200 不满足，故严格停止，未启动 observe、未尝试改用 `/web/login`、未放宽分类或阈值。旧 activation、失败预检记录和合成 volumes 保留，供独立复核。
+- 证据 lineage：preflight `status=unqualified_start`、`attempted_get_count=4`；来源提交 `2c9035d9eab9f3fbfee41fbd908a92d0c92600c2`，instrument SHA-256 `6d55adeb3a76e19b280c9fdba1c6011a532f6a7c4e8da9ba5222f80d61354ff7`，冻结契约 SHA-256 `0d17bcc59f93ec2e2a7eacb3f39a8b4193f5349dea195350d06a99ca1bd9050c`。私有 activation SHA-256 `f7636c13bc155dd696f53d0904850283eec8b116d91c7950b413c4650edb85a7`；preflight JSON SHA-256 `bd4de2408bceb00e236955f10116333b529f795e7bd6cfb60b8ffde6a3dc2651`。两个文件的 sidecar 都与实际哈希相符；无 observation manifest，因为 observe 未启动。
 
-用户随后明确批准在计划范围内继续，并指定由我查找本地授权/配置来源。本报告更新时正在准备独立 loopback staging；仍须先生成仓库外的逐项 activation 记录、跑短时预检并核验其资格，未通过就不得开始四小时观测。此前的“0 次请求”只描述本报告更新前的状态，不是健康结果。
+用户已批准本地隔离栈和短时预检；预检未合格，因此冻结停止条件禁止四小时观测。“0/960”表示试点未观察，不是 0% 错误率或健康服务结果。
 
 ### 实现范围
 
@@ -51,27 +53,28 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 - 上述完整窗口测试使用模拟时钟和本地伪响应，**不是**四小时真实 staging 运行，也不证明远端服务可用或授权有效。
 - 预注册 JSON 和阈值未修改；任何 live acceptance 仍须以外部授权、真实观测证据和独立审核为准。
 
-### 真实执行前必须具备
+### 结果与后续门槛
 
-启动前会将用户批准、本机账户 `metra`、四源 loopback 清单、GET-only relay 范围、独立 Compose stop/短时凭据过期路径，以及本机受限证据目录绑定到仓库外 activation record。随后只运行一次短时 `preflight`；只有资格通过，才由交互终端人工输入 `ON-DUTY` 启动四小时观测。任何前提无法验证或预检失败，都保留证据并停止，不扩大权限。
+此次短时 `preflight` 已运行一次；固定资源 `odoo_root=/` 返回重定向。严格遵守契约：不跟随重定向、不改用 `/web/login`、不改阈值、不启动四小时 `observe`。后续尝试必须先有仍在批准范围内、且固定 `/` 根路径返回 `200` 的 Odoo staging；否则维持停止状态。
 
 ## English
 
 ### Outcome
 
-The independent four-hour GET-only observer, preflight gate, operator stop/escalation, cost accounting, resumable evidence checkpoints, and offline fault tests are implemented. The current outcome is **pilot not started (NOT QUALIFIED)**—not a staging health/failure finding and not operational acceptance.
+The independent four-hour GET-only observer, preflight gate, operator stop/escalation, cost accounting, resumable evidence checkpoints, read-only loopback relay, and offline fault tests are implemented. The live short preflight ran but was **not qualified (NOT QUALIFIED)** because the Odoo root redirected; the four-hour observation did not start. This is neither a service error-rate finding nor operational acceptance.
 
-No staging HTTP requests were made: **0** preflight requests and **0/960** observed slots in the four-hour window. No model was called, no real employee data was accessed, and no business write was performed.
+The short preflight made **four GET requests**, one per source. Runtime health, Runtime capabilities, and the Keycloak realm were `ok`; Odoo `/` was classified `http_error / unexpected_redirect`, and the redirect was not followed. The four-hour window has **0/960** observed slots. No model was called, no real employee data was accessed, and no business write was performed.
 
 ### Readiness evidence
 
-- The local Compose project `aios` reports `running(8)`. Running containers are AIOS Runtime, Personal World, Control Plane, Administrative, Autonomous Development, Prometheus, and PostgreSQL components. No Keycloak or Odoo staging container is present.
-- The main local Compose project `aios` still runs only its eight AIOS components and has no Keycloak/Odoo staging. A separate synthetic acceptance stack exists at `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`; this change adds `p7-local-compose.yaml` and an empty Keycloak realm (`users=[]`, `clients=[]`). The overlay binds services to `127.0.0.1`, disables periodic Runtime healthchecks, and removes direct Runtime port publication, preventing out-of-band Runtime reads through the pilot window. One isolated project was started and then stopped; the observer path was accidentally duplicated, so Python never launched and no P7 request was sent. A new project retry has not started.
+- The main local Compose project `aios` still reports `running(8)` and was not changed; it has no Keycloak/Odoo staging container. The first isolated-stack attempt started successfully, but the wrapper duplicated the observer path, so Python did not launch and no P7 request occurred; only that project's containers/network were stopped and removed. A second unique project started, ran one preflight, then stopped on the failed gate. Two synthetic Odoo/runtime volumes per attempt were retained (no `down -v`); no P7 containers are now running and the host ports are free. Odoo/Keycloak/Postgres images are now cached locally.
+- The synthetic source stack is `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`, with a separate `p7-local-compose.yaml` overlay and empty Keycloak realm (`users=[]`, `clients=[]`). Ports bind only to `127.0.0.1`; Runtime's periodic healthcheck and direct host port were disabled to prevent reads outside the meter. Preflight JSON and SHA-256 sidecar are stored outside the repository in a restricted directory; the checksum was verified.
 - The repository-root `.env` and BAA-subdirectory `.env` are absent; `.env.example` is only a template. Windows Credential Manager has no BAA/P7/Keycloak/Odoo target, and no `BAA_REAL_*` / `BAA_P7_*` variables were present. A separate `commerce-orchestrator` `.env` describes a `dev` Odoo configuration and an API key, but belongs to another project; its secret was not read or reused.
 - The existing `real_e2e/run.py` creates synthetic employee records and invokes write endpoints, so it was not run. The local overlay prepares only an empty-realm, no-demo-employee stack. The P7 sampler uses a separate GET-only Runtime relay, short-lived bearer credential, and loopback endpoints.
-- An external activation file was created for the first attempt, but a duplicated relative path caused Python to exit with “file not found” before preflight. Thus preflight-program runs **0**, P7 HTTP requests **0**, and observed slots **0/960**. The unique project's containers/network were removed without `down -v`; two synthetic volumes and that activation file remain for audit. The retry uses a new project name and activation. Only a real short preflight can establish whether the readiness gate passes.
+- A private activation and evidence package were created. The first wrapper error is retained separately; the second preflight has four source records and a verified checksum. The Odoo root redirection fails the frozen gate, so observe was not invoked and observed slots remain **0/960**. The redirect was not followed, the path was not widened, and no retry was made after the preflight failure. Private activation and failure evidence remain for audit.
+- Evidence lineage: preflight `status=unqualified_start`, `attempted_get_count=4`; source revision `2c9035d9eab9f3fbfee41fbd908a92d0c92600c2`, instrument SHA-256 `6d55adeb3a76e19b280c9fdba1c6011a532f6a7c4e8da9ba5222f80d61354ff7`, and frozen-contract SHA-256 `0d17bcc59f93ec2e2a7eacb3f39a8b4193f5349dea195350d06a99ca1bd9050c`. Private activation SHA-256: `f7636c13bc155dd696f53d0904850283eec8b116d91c7950b413c4650edb85a7`; preflight JSON SHA-256: `bd4de2408bceb00e236955f10116333b529f795e7bd6cfb60b8ffde6a3dc2651`. Both sidecars match the actual files. There is no observation manifest because `observe` did not start.
 
-The user subsequently authorized continuing within plan scope and directed a search of local authorization/configuration sources. This report revision is preparing a separate loopback staging fixture; it still requires an external, itemized activation record and a qualifying short preflight before any four-hour observation. Failure of that gate means no observation. The “0 requests” count describes state before this report update, not a healthy-service result.
+The user authorized local staging setup and the preflight. The preflight did not qualify, so the frozen stop condition prohibits the four-hour observation. “0/960” is an unobserved pilot denominator, not a 0% error rate or healthy-service result.
 
 ### Implementation
 
@@ -103,6 +106,6 @@ The first command must run within the approved short preflight window. The secon
 - The full-window test used a simulated clock and local fake responses. It is **not** a four-hour staging run and does not prove remote service availability or authorization.
 - The preregistered JSON and thresholds were not changed. Any live acceptance decision still requires external authorization, real observations, and independent review.
 
-### Required before real execution
+### Outcome and next gate
 
-Before launch, the private activation record will bind the user's approval, local account `metra`, exact four-source loopback inventory, GET-only relay scope, independent Compose stop/short-lived credential expiry, and a restricted local evidence directory. Run only the short `preflight`; start the four-hour observer only if its qualification result is positive and a human enters `ON-DUTY` in the interactive terminal. If any prerequisite is unverified or fails, retain evidence and stop without widening privileges.
+The short `preflight` has run once, and the frozen `odoo_root=/` resource redirected. The contract was enforced: no redirect-follow, no substitution with `/web/login`, no threshold change, and no four-hour `observe`. A future attempt requires an in-scope approved Odoo staging instance whose fixed `/` root returns `200`; otherwise remain stopped.
