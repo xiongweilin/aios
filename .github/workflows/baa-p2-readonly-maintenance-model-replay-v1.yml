@@ -6,7 +6,7 @@ name: BAA P2 Isolated Read-Only Maintenance Model Replay v1
 on:
   workflow_dispatch:
     inputs:
-      approve_twelve_window_pilot:
+      approve_finite_model_sampling:
         description: "Explicitly authorize bounded archived-evidence model sampling (up to 96 distinct model calls; no product network)"
         type: choice
         required: true
@@ -35,7 +35,7 @@ jobs:
       - name: Require explicit finite model-sampling approval
         shell: pwsh
         env:
-          APPROVAL: ${{ inputs.approve_twelve_window_pilot }}
+          APPROVAL: ${{ inputs.approve_finite_model_sampling }}
         run: |
           if ($env:APPROVAL -ne "yes") {
             throw "Model API use was not explicitly authorized for this workflow dispatch."
