@@ -108,6 +108,33 @@ services:
       timeout: 2s
       retries: 30
 
+  # Opt-in only; existing offboarding real_e2e scenarios do not start it.
+  p3-protected-resource:
+    profiles: ["p3-probe"]
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "-u", "/probe/p3_protected_resource.py"]
+    # The issued JWT uses the host-published Keycloak issuer. Introspection
+    # must use that exact issuer origin; the container's service alias is NOT
+    # interchangeable with the issuer URL. Only runs on disposable Linux CI.
+    network_mode: host
+    environment:
+      P3_KEYCLOAK_BASE: http://127.0.0.1:${BAA_REAL_KEYCLOAK_HOST_PORT:-28180}
+      P3_KEYCLOAK_REALM: baa-real-e2e
+      P3_INTROSPECTION_CLIENT_ID: baa-verifier
+      P3_INTROSPECTION_CLIENT_SECRET: ${BAA_REAL_KEYCLOAK_VERIFIER_SECRET:?set BAA_REAL_KEYCLOAK_VERIFIER_SECRET}
+      P3_ALLOWED_BEARER_CLIENT_ID: baa-session-client
+      P3_LISTEN_HOST: 127.0.0.1
+      P3_LISTEN_PORT: ${BAA_REAL_PROBE_HOST_PORT:-28187}
+    depends_on:
+      - keycloak
+    volumes:
+      - ./p3_protected_resource.py:/probe/p3_protected_resource.py:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,os; urllib.request.urlopen('http://127.0.0.1:'+os.environ['P3_LISTEN_PORT']+'/healthz', timeout=2).read()\""]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
 volumes:
   odoo-data:
   runtime-state:
