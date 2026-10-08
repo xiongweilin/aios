@@ -17,6 +17,9 @@ on:
       - "tests/acceptance/baa_offboarding/real_e2e/p7_maintenance_triage.py"
       - "tests/acceptance/baa_offboarding/real_e2e/p7_maintenance_experiment.py"
       - "tests/acceptance/baa_offboarding/real_e2e/test_p7_maintenance_triage.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/p7_isolated_real_outage.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/test_p7_isolated_real_outage.py"
+      - "tests/acceptance/baa_offboarding/P7-ISOLATED-REAL-OUTAGE.md"
 
 permissions:
   contents: read
@@ -140,6 +143,19 @@ jobs:
             --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT" \
             --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT" \
             --evidence-path "$P7_EVIDENCE_DIR/maintenance-triage.json"
+
+      - name: Verify real, reversible Keycloak outage and conservative read-only recovery
+        shell: bash
+        env:
+          P7_ALLOW_EPHEMERAL_KEYCLOAK_PAUSE: approved-ci-only
+        run: |
+          set -euo pipefail
+          mkdir -p "$P7_EVIDENCE_DIR"
+          python tests/acceptance/baa_offboarding/real_e2e/p7_isolated_real_outage.py \
+            --runtime-base "http://127.0.0.1:$BAA_REAL_RUNTIME_HOST_PORT" \
+            --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT" \
+            --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT" \
+            --evidence-path "$P7_EVIDENCE_DIR/real-isolated-outage.json"
 
       - name: Record versioned provenance
         if: always()
