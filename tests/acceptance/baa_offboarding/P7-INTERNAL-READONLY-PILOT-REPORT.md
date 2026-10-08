@@ -1,31 +1,31 @@
 # P7 Internal Read-Only Maintenance Pilot — Implementation and Readiness Report
 
 - Date: 2026-10-08
-- State: Instrument implemented and offline-qualified; live staging pilot not started.
+- State: Instrument and isolated local-stack overlay implemented and offline-qualified; live preflight not yet started.
 - Frozen contract: `p7_internal_readonly_pilot_v1.json`, unchanged (`design_frozen_not_authorized`).
 
 ## 中文
 
 ### 结论
 
-独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据与离线故障测试已实现。当前结果是**未启动试点（NOT QUALIFIED）**，不是 staging 健康/故障结论，也不是运营验收通过。
+独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据、只读 loopback relay，以及离线故障测试已实现。当前尚未启动预检，真实试点仍为**未启动（NOT QUALIFIED）**，不是服务健康/故障结论，也不是运营验收通过。
 
 本次没有向 staging 发 HTTP 请求：预检 **0 次**；四小时窗口 **0/960 个已观察槽位**。未调用模型，未访问真实员工数据，未执行业务写入。
 
 ### 当前 readiness 证据
 
-- 本机 Compose 项目 `aios` 显示 `running(8)`；当前运行容器是 AIOS Runtime、Personal World、Control Plane、Administrative、Autonomous Development、Prometheus 与 PostgreSQL 等组件。没有 Keycloak 或 Odoo staging 容器。
-- 仓库没有 `.env`，只有 `.env.example` 模板；当前进程也没有 `BAA_P7_*` 凭据变量。模板值未作为授权或凭据使用。
-- `docker compose config --services` 在当前进程环境下无法解析，因为 Compose 所需变量未提供；没有为此创建 `.env`、启动或修改容器。
-- 本次没有提供可验证的四源 staging 清单、限时只读授权、只读身份/凭据范围证明、全窗口值守人及私密联络渠道、独立停止与试点凭据撤销途径、或受限证据存储批准。因此不满足冻结契约的 readiness gate。
+- 本机 Compose 项目 `aios` 仍只有 8 个 AIOS 组件在运行；该主项目没有 Keycloak/Odoo staging。`tests/acceptance/baa_offboarding/real_e2e/compose.yaml` 另有 Odoo 18 / Keycloak 26.8 / Runtime 合成验收栈，本次新增独立 `p7-local-compose.yaml` overlay 和一个空 Keycloak realm（`users=[]`、`clients=[]`）。overlay 将端口限于 `127.0.0.1`、关闭 Runtime 周期 healthcheck、移除 Runtime 直出端口，避免代理之外的访问和未计数 Runtime 读请求。**截至本报告更新，尚未启动该隔离栈。**
+- AIOS 仓库根 `.env` 与 BAA 子目录 `.env` 均不存在；`.env.example` 只是模板。Windows Credential Manager 未发现 BAA/P7/Keycloak/Odoo 对应目标，进程中也没有 `BAA_REAL_*` / `BAA_P7_*` 值。`commerce-orchestrator` 另有 `dev` Odoo 配置与 API key，但属于不同项目，未读取或转用其 secret。
+- 现有 `real_e2e/run.py` 会创建合成员工并调用写接口，本任务明确未执行它。局部栈只用于 empty-realm、无 demo employee 的准备；P7 sampler 通过独立 GET-only relay 访问 Runtime，使用短时 bearer token 和 loopback 端点。
+- 当前尚未创建本次 activation/preflight 证据，也未启动容器或发出 P7 HTTP 请求，因此预检 **0 次**、观测 **0/960 槽位**。冻结 readiness gate 是否通过须由真实短时预检决定。
 
-上述缺项意味着不得运行真实预检或四小时观测。也没有把“没有请求”转写成 0% 错误率或服务健康结果。
+用户随后明确批准在计划范围内继续，并指定由我查找本地授权/配置来源。本报告更新时正在准备独立 loopback staging；仍须先生成仓库外的逐项 activation 记录、跑短时预检并核验其资格，未通过就不得开始四小时观测。此前的“0 次请求”只描述本报告更新前的状态，不是健康结果。
 
 ### 实现范围
 
 - 新增独立入口 `real_e2e/p7_internal_readonly_pilot.py`：四源固定顺序、仅 `GET`、每槽位最多一次、单请求 3 秒超时；Runtime capability 指纹缺失、弱化或漂移时 fail-closed，漂移在下一源请求前立即停止。未配置重定向跟随，也不保存响应体、完整 URL、凭据或员工数据。
 - 运行窗口绑定外部 activation record 中的固定 UTC 起止，并以单调时钟计时；每 60 秒一轮、240 轮、960 个槽位。所有提前停止或未尝试槽位仍写入分母。原 `p7_shadow_readonly.py` 的 900 秒 / 300 轮限制未改。
-- Activation 必须在仓库外提供完整授权/责任/清单/只读范围/停止撤权/证据保留引用和逐项 attestations。准确路径及 realm 被校验；凡使用 bearer 凭据的资源必须为 HTTPS。脚本只从 `BAA_P7_RUNTIME_TOKEN`、`BAA_P7_KEYCLOAK_BEARER_TOKEN`、`BAA_P7_ODOO_BEARER_TOKEN` 环境变量读取需要的凭据，不打印其值。当前没有这些变量。
+- Activation 必须在仓库外提供完整授权/责任/清单/只读范围/停止撤权/证据保留引用和逐项 attestations。准确路径及 realm 被校验；远端 bearer 源必须为 HTTPS；此隔离测试栈仅接受绑定 `127.0.0.1` / `localhost` 的 HTTP loopback 地址。Runtime 的 P7 token 只由 loopback relay 接受，relay 仅放行 `GET /healthz` 和 `GET /v1/capabilities`，使用固定上游路径、独立 delegation 校验和 pilot-end 过期时间；上游 controller token 不注入 observer 进程。Keycloak/Odoo 使用无凭据 GET。秘密值不写入仓库或报告。
 - 观察期需交互式终端输入 `ON-DUTY`，并至少每 900 秒 `ACK`；支持 `STOP` 与 Ctrl+C。401/403、契约问题、未知分类、值守缺席、超预算或证据异常均停止并保留失败分类。网络 unknown 只有在之后两轮全源干净观测后才记为证据重新获取，不抹除先前 unknown。
 - `ATTENTION START/STOP` 与 `ASSURANCE START/STOP` 分别记录 principal attention 和第三方 assurance labor；自动监控时长与外部只读次数单独计数。成本超冻结预算即停止。
 - 观测槽位与操作事件使用独立 hash chain；checkpoint 对两条链的记录数和末端 hash 对账。正常结束输出 manifest、资格结果及 `SHA256SUMS`。证据目录必须位于仓库外；14 天访问/保留控制由运营方落实并由独立审核人核查，脚本不会伪称自行执行该治理。
@@ -45,14 +45,15 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 
 ### 验证结果
 
-- 定向 unittest：**11/11 通过**。包括模拟完整 240 轮/960 槽位、unknown 后两轮重新获取、超过 300 秒未恢复即停止、能力指纹漂移立即停止、人工 STOP、值守失联、成本超限、授权路径与 HTTPS 检查、预检证据 hash 绑定、槽位/事件 hash chain 与 checkpoint 对账、错误详情脱敏、以及原 900 秒限制保持不变。
+- 定向 unittest：**13/13 通过**。包括模拟完整 240 轮/960 槽位、unknown 后两轮重新获取、超过 300 秒未恢复即停止、能力指纹漂移立即停止、人工 STOP、值守失联、成本超限、授权路径/loopback 与 HTTPS 检查、只读代理 GET/路径/token/delegation/expiry gate、空 realm 与 loopback Compose 边界、预检证据 hash 绑定、槽位/事件 hash chain 与 checkpoint 对账、错误详情脱敏，以及原 900 秒限制保持不变。
+- Docker Compose overlay 静态合并检查通过：Runtime 无主机发布端口且禁用周期 healthcheck；Keycloak realm import 开启；只读代理仅绑定 loopback。检查使用 config-only dummy values，不启动服务、不创建容器。
 - 冻结契约静态检查通过；直接运行 observer 的 `--help` 入口通过。
 - 上述完整窗口测试使用模拟时钟和本地伪响应，**不是**四小时真实 staging 运行，也不证明远端服务可用或授权有效。
 - 预注册 JSON 和阈值未修改；任何 live acceptance 仍须以外部授权、真实观测证据和独立审核为准。
 
 ### 真实执行前必须具备
 
-运营方需先准备有效的私有 activation record、已批准四源准确清单、只读 HTTPS 凭据与隔离存储，确认 named owner/operator、全窗口覆盖、私密联络、独立 stop/revoke 路径和证据访问/14 天保留批准。随后在批准的短时窗口运行 `preflight`；只有预检资格通过，才可在同一代码与清单绑定下人工运行 `observe`。任何前提无法验证时继续停止，不扩大权限。
+启动前会将用户批准、本机账户 `metra`、四源 loopback 清单、GET-only relay 范围、独立 Compose stop/短时凭据过期路径，以及本机受限证据目录绑定到仓库外 activation record。随后只运行一次短时 `preflight`；只有资格通过，才由交互终端人工输入 `ON-DUTY` 启动四小时观测。任何前提无法验证或预检失败，都保留证据并停止，不扩大权限。
 
 ## English
 
@@ -65,17 +66,18 @@ No staging HTTP requests were made: **0** preflight requests and **0/960** obser
 ### Readiness evidence
 
 - The local Compose project `aios` reports `running(8)`. Running containers are AIOS Runtime, Personal World, Control Plane, Administrative, Autonomous Development, Prometheus, and PostgreSQL components. No Keycloak or Odoo staging container is present.
-- There is no repository `.env`; only the `.env.example` template exists. The current process has no `BAA_P7_*` credential variables. Template values were not treated as authorization or credentials.
-- `docker compose config --services` cannot resolve in the current process because required Compose variables are unset. No `.env` was created and no container was started or changed.
-- No verifiable four-source staging inventory, time-bounded read-only authorization, read-only identity/credential-scope proof, named operator and private contact route covering the full window, independent stop and pilot-credential revocation path, or restricted evidence-storage approval was supplied for this run. The frozen readiness gate is therefore unmet.
+- The main local Compose project `aios` still runs only its eight AIOS components and has no Keycloak/Odoo staging. A separate synthetic acceptance stack exists at `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`; this change adds `p7-local-compose.yaml` and an empty Keycloak realm (`users=[]`, `clients=[]`). The overlay binds services to `127.0.0.1`, disables periodic Runtime healthchecks, and removes direct Runtime port publication, preventing out-of-band Runtime reads through the pilot window. **The isolated stack has not yet been started as of this report update.**
+- The repository-root `.env` and BAA-subdirectory `.env` are absent; `.env.example` is only a template. Windows Credential Manager has no BAA/P7/Keycloak/Odoo target, and no `BAA_REAL_*` / `BAA_P7_*` variables were present. A separate `commerce-orchestrator` `.env` describes a `dev` Odoo configuration and an API key, but belongs to another project; its secret was not read or reused.
+- The existing `real_e2e/run.py` creates synthetic employee records and invokes write endpoints, so it was not run. The local overlay prepares only an empty-realm, no-demo-employee stack. The P7 sampler uses a separate GET-only Runtime relay, short-lived bearer credential, and loopback endpoints.
+- No per-run activation or preflight evidence has been created, and no P7 HTTP requests or containers have been started; preflight remains **0** and observed pilot slots remain **0/960**. Only a real short preflight can establish whether the readiness gate passes.
 
-These omissions prohibit the live preflight and four-hour observation. “No requests” is not reported as a 0% error rate or a healthy service result.
+The user subsequently authorized continuing within plan scope and directed a search of local authorization/configuration sources. This report revision is preparing a separate loopback staging fixture; it still requires an external, itemized activation record and a qualifying short preflight before any four-hour observation. Failure of that gate means no observation. The “0 requests” count describes state before this report update, not a healthy-service result.
 
 ### Implementation
 
 - Added the separate entry point `real_e2e/p7_internal_readonly_pilot.py`: fixed four-source order, `GET` only, at most one attempt per slot, and a three-second request timeout. Missing/weakened/drifting Runtime capability contracts fail closed; drift stops before the next source request. Redirects are not followed. Response bodies, full URLs, credentials, and employee data are not persisted.
 - The window is bound to fixed UTC start/end values in an external activation record and measured with a monotonic clock: one round every 60 seconds, 240 rounds, 960 slots. Early-stop and unattempted slots remain in the denominator. The existing `p7_shadow_readonly.py` limit of 900 seconds / 300 rounds is unchanged.
-- Activation requires external references and attestations for authorization, accountability, inventory, read-only scope, stop/revocation, and evidence handling. Exact paths and realm are checked; bearer-authenticated resources must use HTTPS. Required credentials are read only from `BAA_P7_RUNTIME_TOKEN`, `BAA_P7_KEYCLOAK_BEARER_TOKEN`, and `BAA_P7_ODOO_BEARER_TOKEN` when applicable; values are never printed. None are present in the current process.
+- Activation requires external references and attestations for authorization, accountability, inventory, read-only scope, stop/revocation, and evidence handling. Exact paths and realm are checked; remote bearer sources require HTTPS, while this isolated test stack permits HTTP only on `127.0.0.1` / `localhost`. The Runtime P7 token is accepted only by a loopback relay that allows `GET /healthz` and `GET /v1/capabilities`, validates the delegation, forwards fixed paths, and expires at pilot end. The upstream controller token is not passed to the observer process. Keycloak/Odoo use unauthenticated GETs. Secret values are not stored in the repository or report.
 - An interactive operator must enter `ON-DUTY` and acknowledge at least every 900 seconds. `STOP` and Ctrl+C are supported. 401/403, contract discrepancies, uncategorized outcomes, operator absence, budget overruns, and evidence faults stop sampling and preserve classifications. A network unknown is only classified as evidence reacquired after two subsequent clean full-source rounds; the original unknown remains recorded.
 - `ATTENTION START/STOP` and `ASSURANCE START/STOP` separately track principal attention and third-party assurance labor. Automated monitor runtime and external read count are separately reported. Exceeding a frozen cost budget stops sampling.
 - Observation slots and operator events have separate hash chains; checkpoints reconcile both record counts and terminal hashes. Normal termination emits a manifest, qualification result, and `SHA256SUMS`. Evidence must be stored outside the repository. Operators enforce the 14-day access/retention controls and an independent reviewer checks them; the script does not claim to enforce that governance itself.
@@ -95,11 +97,12 @@ The first command must run within the approved short preflight window. The secon
 
 ### Verification
 
-- Focused unittest suite: **11/11 passed**. Coverage includes a simulated 240-round/960-slot window, unknown followed by two-round reacquisition, stopping after the 300-second reacquisition budget expires, immediate stop on capability drift, manual STOP, operator loss, cost overrun, activation path and HTTPS checks, hash-bound preflight evidence, slot/event hash chains and checkpoint reconciliation, error-detail redaction, and preservation of the legacy 900-second limit.
+- Focused unittest suite: **13/13 passed**. Coverage includes a simulated 240-round/960-slot window, unknown followed by two-round reacquisition, stopping after the 300-second reacquisition budget expires, immediate stop on capability drift, manual STOP, operator loss, cost overrun, activation path/loopback/HTTPS checks, read-only proxy method/path/token/delegation/expiry checks, empty realm and loopback Compose boundary, hash-bound preflight evidence, slot/event hash chains and checkpoint reconciliation, error-detail redaction, and preservation of the legacy 900-second limit.
+- Docker Compose overlay merge validation passed: Runtime has no host-published port and no periodic healthcheck; Keycloak realm import is enabled; the read-only proxy binds only to loopback. This used config-only dummy values and did not start services or create containers.
 - The frozen-contract static checker passed; the observer's direct `--help` entry point passed.
 - The full-window test used a simulated clock and local fake responses. It is **not** a four-hour staging run and does not prove remote service availability or authorization.
 - The preregistered JSON and thresholds were not changed. Any live acceptance decision still requires external authorization, real observations, and independent review.
 
 ### Required before real execution
 
-The operator must provide a valid private activation record, approved exact four-source inventory, read-only HTTPS credentials and restricted evidence storage, and confirm the named owner/operator, full-window coverage, private contact, independent stop/revocation path, and evidence access/14-day retention approval. Then run the short `preflight` within its approved window. Only if it qualifies may `observe` be started manually with the same code and inventory binding. If any prerequisite cannot be verified, remain stopped and do not widen privileges.
+Before launch, the private activation record will bind the user's approval, local account `metra`, exact four-source loopback inventory, GET-only relay scope, independent Compose stop/short-lived credential expiry, and a restricted local evidence directory. Run only the short `preflight`; start the four-hour observer only if its qualification result is positive and a human enters `ON-DUTY` in the interactive terminal. If any prerequisite is unverified or fails, retain evidence and stop without widening privileges.

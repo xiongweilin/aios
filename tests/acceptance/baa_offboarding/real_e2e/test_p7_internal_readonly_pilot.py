@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import p7_internal_readonly_pilot as pilot
+import p7_readonly_runtime_proxy as runtime_proxy
 import p7_shadow_readonly as legacy_shadow
 
 FINGERPRINT_A = "a" * 64
@@ -176,6 +177,13 @@ class InternalReadonlyPilotTests(unittest.TestCase):
             with self.assertRaisesRegex(pilot.PilotError, "authenticated_resource_requires_https"):
                 pilot.load_activation(activation_path)
 
+            activation_data["resources"]["runtime_capabilities"] = "http://127.0.0.1:28086/v1/capabilities"
+            activation_path.write_text(json.dumps(activation_data), encoding="utf-8")
+            self.assertEqual(
+                pilot.load_activation(activation_path).resources["runtime_capabilities"],
+                "http://127.0.0.1:28086/v1/capabilities",
+            )
+
             activation_data["resources"]["runtime_capabilities"] = "https://runtime.example/admin"
             activation_path.write_text(json.dumps(activation_data), encoding="utf-8")
             with self.assertRaisesRegex(pilot.PilotError, "resource_scope_change"):
@@ -194,6 +202,14 @@ class InternalReadonlyPilotTests(unittest.TestCase):
         self.assertEqual(outcome.result, "ok")
         self.assertEqual(calls, [("GET", pilot.REQUEST_TIMEOUT_SECONDS)])
 
+        outcome = pilot.probe_once(
+            "runtime_health",
+            activation,
+            headers,
+            open_request=lambda _request, timeout: FakeResponse(status=302),
+        )
+        self.assertEqual(outcome.terminal_reason, "unexpected_redirect")
+
         def unauthorized(_request, *, timeout):
             raise urllib.error.HTTPError(
                 "https://private.invalid/secret-path",
@@ -208,6 +224,50 @@ class InternalReadonlyPilotTests(unittest.TestCase):
         self.assertEqual(outcome.terminal_reason, "http_401")
         self.assertNotIn("private.invalid", repr(outcome))
         self.assertNotIn("private response body", repr(outcome))
+
+    def test_readonly_runtime_proxy_only_allows_scoped_gets(self) -> None:
+        allow = runtime_proxy.request_is_allowed
+        self.assertTrue(allow("GET", "/healthz", None, None, "p7-token", "delegation:p7"))
+        self.assertTrue(allow(
+            "GET", "/v1/capabilities", "Bearer p7-token", "delegation:p7", "p7-token", "delegation:p7"
+        ))
+        self.assertFalse(allow(
+            "POST", "/v1/capabilities", "Bearer p7-token", "delegation:p7", "p7-token", "delegation:p7"
+        ))
+        self.assertFalse(allow(
+            "GET", "/admin/realms", "Bearer p7-token", "delegation:p7", "p7-token", "delegation:p7"
+        ))
+        self.assertFalse(allow(
+            "GET", "/v1/capabilities", "Bearer wrong", "delegation:p7", "p7-token", "delegation:p7"
+        ))
+        self.assertFalse(allow(
+            "GET", "/v1/capabilities", "Bearer p7-token", "delegation:other", "p7-token", "delegation:p7"
+        ))
+        self.assertFalse(allow(
+            "GET",
+            "/v1/capabilities",
+            "Bearer p7-token",
+            "delegation:p7",
+            "p7-token",
+            "delegation:p7",
+            now=PILOT_START + timedelta(seconds=1),
+            expires_at=PILOT_START,
+        ))
+
+    def test_p7_local_fixture_imports_no_users_and_keeps_runtime_loopback_only(self) -> None:
+        fixture_root = Path(__file__).resolve().parent
+        realm = json.loads(
+            (fixture_root / "p7-local" / "realm" / "baa-real-e2e-realm.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        compose_overlay = (fixture_root / "p7-local-compose.yaml").read_text(encoding="utf-8")
+        self.assertEqual(realm["realm"], "baa-real-e2e")
+        self.assertEqual(realm["users"], [])
+        self.assertEqual(realm["clients"], [])
+        self.assertIn("ports: !reset []", compose_overlay)
+        self.assertIn("disable: true", compose_overlay)
+        self.assertIn('127.0.0.1:${BAA_P7_RUNTIME_HOST_PORT', compose_overlay)
 
     def test_preflight_proof_is_hash_bound_to_activation_and_instrument(self) -> None:
         activation = make_activation()

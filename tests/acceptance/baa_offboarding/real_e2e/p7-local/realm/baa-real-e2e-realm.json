@@ -1,0 +1,19 @@
+{
+  "realm": "baa-real-e2e",
+  "enabled": true,
+  "displayName": "BAA P7 isolated read-only staging",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "clients": [],
+  "users": [],
+  "groups": [],
+  "roles": {
+    "realm": [],
+    "client": {}
+  }
+}

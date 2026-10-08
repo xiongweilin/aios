@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
 import queue
@@ -185,6 +186,18 @@ def _validate_url(source: str, url: Any, realm: str) -> str:
     return urllib.parse.urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, "", ""))
 
 
+def _is_loopback_url(url: str) -> bool:
+    host = urllib.parse.urlsplit(url).hostname
+    if host is None:
+        return False
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 @dataclass(frozen=True)
 class Activation:
     references: dict[str, str]
@@ -242,7 +255,9 @@ def load_activation(path_value: str | Path) -> Activation:
     ):
         raise PilotError("invalid_read_only_auth_configuration")
     if any(
-        auth_modes[source] == "bearer" and not resources[source].startswith("https://")
+        auth_modes[source] == "bearer"
+        and not resources[source].startswith("https://")
+        and not _is_loopback_url(resources[source])
         for source in auth_modes
     ):
         raise PilotError("authenticated_resource_requires_https")
@@ -324,6 +339,12 @@ def probe_once(
         response = opener(request, timeout=timeout_s)
         try:
             status = int(response.status)
+            if 300 <= status < 400:
+                return ProbeResult(
+                    "http_error",
+                    error_class="unexpected_redirect",
+                    terminal_reason="unexpected_redirect",
+                )
             if status != 200:
                 return ProbeResult("http_error", error_class=f"http_{status}")
             if source != "runtime_capabilities":
