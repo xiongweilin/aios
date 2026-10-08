@@ -12,7 +12,6 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-
 REALM = os.environ.get("P3_KEYCLOAK_REALM", "baa-real-e2e")
 KEYCLOAK_BASE = os.environ.get("P3_KEYCLOAK_BASE", "http://keycloak:8080").rstrip("/")
 CLIENT_ID = os.environ["P3_INTROSPECTION_CLIENT_ID"]
