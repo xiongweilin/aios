@@ -7,6 +7,7 @@ Secrets/bearer tokens are never written to evidence.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import time
@@ -39,6 +40,53 @@ from run import (
     _setup_products,
     _wait_ready,
 )
+
+
+def _diagnose_issued_token(keycloak: Any, token: str) -> dict[str, Any]:
+    """Non-authoritative metadata only: no raw JWT or confidential claims."""
+    result: dict[str, Any] = {}
+    try:
+        payload_b64 = token.split(".")[1]
+        decoded = base64.urlsafe_b64decode(
+            payload_b64 + "=" * (-len(payload_b64) % 4)
+        )
+        claims = json.loads(decoded)
+        if isinstance(claims, dict):
+            result["unverified_jwt_aud"] = claims.get("aud")
+            result["unverified_jwt_azp"] = claims.get("azp")
+    except (IndexError, ValueError, TypeError):
+        result["unverified_jwt_metadata"] = "not-decodable"
+
+    token_endpoint = (
+        f"{keycloak.base_url}/realms/{KEYCLOAK_REALM}/"
+        "protocol/openid-connect/token/introspect"
+    )
+    response = keycloak.client.post(
+        token_endpoint,
+        data={
+            "client_id": KEYCLOAK_VERIFIER,
+            "client_secret": os.environ["BAA_REAL_KEYCLOAK_VERIFIER_SECRET"],
+            "token": token,
+        },
+        timeout=10,
+    )
+    result["introspection_http_status"] = response.status_code
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            result["introspection_active"] = data.get("active")
+            result["introspection_client_id"] = data.get("client_id")
+    except ValueError:
+        result["introspection_payload"] = "invalid-json"
+
+    userinfo = keycloak.client.get(
+        f"{keycloak.base_url}/realms/{KEYCLOAK_REALM}/"
+        "protocol/openid-connect/userinfo",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10,
+    )
+    result["userinfo_http_status"] = userinfo.status_code
+    return result
 
 
 def _configure_probe_audience(keycloak: Any) -> None:
@@ -237,6 +285,15 @@ def main() -> None:
             control_ref: _password_token(keycloak, control_username, user_password),
         }
         identity_ids = {subject_ref: user_id, control_ref: control_user_id}
+        evidence["token_diagnostics"] = {
+            "target": _diagnose_issued_token(
+                keycloak, bearer_by_subject[subject_ref]
+            ),
+            "control": _diagnose_issued_token(
+                keycloak, bearer_by_subject[control_ref]
+            ),
+            "role": "instrument qualification only; JWT payload not trusted as authorization",
+        }
         employee_ids = {subject_ref: employee_id, control_ref: control_employee_id}
 
         verifier_token = keycloak.service_token(
@@ -354,6 +411,7 @@ def main() -> None:
             evidence["samples"].append(rec)
             return {"raw": snapshots, "record": rec}
 
+        evidence["stage"] = "baseline_probe"
         before = sample("before_dispatch")
         target_before = before["record"]["samples"][subject_ref]
         control_before = before["record"]["samples"][control_ref]
