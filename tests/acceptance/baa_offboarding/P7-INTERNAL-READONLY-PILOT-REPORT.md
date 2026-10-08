@@ -15,7 +15,8 @@
 ### 当前 readiness 证据
 
 - 主 Compose 项目 `aios` 保持 8 个 AIOS 组件运行，未修改。第一次独立栈启动成功，但 wrapper 重复拼接 observer 路径，Python 未启动、P7 请求为 0；仅停止/移除该项目容器和网络。第二次新项目正常启动并执行一次预检，随后按失败门停止/移除容器和网络。两次各保留 Odoo/runtime 合成 volume（未使用 `down -v`）；现在没有 P7 容器运行，绑定端口已空闲。Odoo/Keycloak/Postgres 镜像现已缓存本机。
-- 本地栈来自 `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`，另用独立 `p7-local-compose.yaml` overlay 和空 Keycloak realm（`users=[]`、`clients=[]`）。端口仅绑定 `127.0.0.1`；Runtime 周期 healthcheck 关闭且直出端口移除，避免代理之外访问和未计数 Runtime 读请求。预检数据文件与 SHA-256 sidecar 在仓库外受限目录，checksum 已核验。
+- 本地栈来自 `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`，另用独立 `p7-local-compose.yaml` overlay 和空 Keycloak realm（`users=[]`、`clients=[]`）；Keycloak 导入依据其官方 `--import-realm` 启动机制，[官方说明](https://www.keycloak.org/server/importExport)。端口仅绑定 `127.0.0.1`；Runtime 周期 healthcheck 关闭且直出端口移除，避免代理之外访问和未计数 Runtime 读请求。预检数据文件与 SHA-256 sidecar 在仓库外受限目录，checksum 已核验。
+- 候选一已准备为 P7 专用 Odoo addon `p7_root_health`：继承 Odoo 18 `Home.index`，只处理 `GET /`，`auth=none`、`save_session=False`、`readonly=True`，返回静态 200，不访问 ORM/session，也不是外部反向代理。路由采用 Odoo 官方 controller extension 机制（需继承并重新装饰方法，[Odoo 18 文档](https://www.odoo.com/documentation/18.0/developer/reference/backend/http.html)）；官方 18.0 `Home.index` 源码说明 stock root 会重定向至 `/odoo`，[源码](https://raw.githubusercontent.com/odoo/odoo/18.0/addons/web/controllers/home.py)。它只安装在新的空白 P7 staging 数据库；**该新栈和根路径尚未启动/预检**，因此还没有证据证明路由覆盖成功。该措施改变的是合成 staging 的根路由，不改变冻结契约，也不代表 stock Odoo 根路径行为。
 - AIOS 仓库根 `.env` 与 BAA 子目录 `.env` 均不存在；`.env.example` 只是模板。Windows Credential Manager 未发现 BAA/P7/Keycloak/Odoo 对应目标，进程中也没有 `BAA_REAL_*` / `BAA_P7_*` 值。`commerce-orchestrator` 另有 `dev` Odoo 配置与 API key，但属于不同项目，未读取或转用其 secret。
 - 现有 `real_e2e/run.py` 会创建合成员工并调用写接口，本任务明确未执行它。局部栈只用于 empty-realm、无 demo employee 的准备；P7 sampler 通过独立 GET-only relay 访问 Runtime，使用短时 bearer token 和 loopback 端点。
 - 用户批准已写入仓库外 activation；第二次预检实际发送四个 GET，结果已写入并通过 SHA-256 校验。由于 Odoo root 返回重定向，固定契约要求的无重定向 HTTP 200 不满足，故严格停止，未启动 observe、未尝试改用 `/web/login`、未放宽分类或阈值。旧 activation、失败预检记录和合成 volumes 保留，供独立复核。
@@ -47,7 +48,7 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 
 ### 验证结果
 
-- 定向 unittest：**13/13 通过**。包括模拟完整 240 轮/960 槽位、unknown 后两轮重新获取、超过 300 秒未恢复即停止、能力指纹漂移立即停止、人工 STOP、值守失联、成本超限、授权路径/loopback 与 HTTPS 检查、只读代理 GET/路径/token/delegation/expiry gate、空 realm 与 loopback Compose 边界、预检证据 hash 绑定、槽位/事件 hash chain 与 checkpoint 对账、错误详情脱敏，以及原 900 秒限制保持不变。
+- 定向 unittest：**13/13 通过**。包括模拟完整 240 轮/960 槽位、unknown 后两轮重新获取、超过 300 秒未恢复即停止、能力指纹漂移立即停止、人工 STOP、值守失联、成本超限、授权路径/loopback 与 HTTPS 检查、只读代理 GET/路径/token/delegation/expiry gate、Odoo 根控制器仅 GET/无 session/ORM 的静态约束、空 realm 与 loopback Compose 边界、预检证据 hash 绑定、槽位/事件 hash chain 与 checkpoint 对账、错误详情脱敏，以及原 900 秒限制保持不变。
 - Docker Compose overlay 静态合并检查通过：Runtime 无主机发布端口且禁用周期 healthcheck；Keycloak realm import 开启；只读代理仅绑定 loopback。检查使用 config-only dummy values，不启动服务、不创建容器。
 - 冻结契约静态检查通过；直接运行 observer 的 `--help` 入口通过。
 - 上述完整窗口测试使用模拟时钟和本地伪响应，**不是**四小时真实 staging 运行，也不证明远端服务可用或授权有效。
@@ -55,7 +56,7 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 
 ### 结果与后续门槛
 
-此次短时 `preflight` 已运行一次；固定资源 `odoo_root=/` 返回重定向。严格遵守契约：不跟随重定向、不改用 `/web/login`、不改阈值、不启动四小时 `observe`。后续尝试必须先有仍在批准范围内、且固定 `/` 根路径返回 `200` 的 Odoo staging；否则维持停止状态。
+此前短时 `preflight` 的 `odoo_root=/` 返回重定向，故未启动四小时 `observe`。候选一的 Odoo-only 根路由现已准备，但必须在新的空白项目与新 activation 下再做短预检；只有真实 `GET /` 返回 200 且其余来源合格，才继续。若覆盖未生效，立即停止，不跟随重定向或改路径。
 
 ## English
 
@@ -68,7 +69,8 @@ The short preflight made **four GET requests**, one per source. Runtime health, 
 ### Readiness evidence
 
 - The main local Compose project `aios` still reports `running(8)` and was not changed; it has no Keycloak/Odoo staging container. The first isolated-stack attempt started successfully, but the wrapper duplicated the observer path, so Python did not launch and no P7 request occurred; only that project's containers/network were stopped and removed. A second unique project started, ran one preflight, then stopped on the failed gate. Two synthetic Odoo/runtime volumes per attempt were retained (no `down -v`); no P7 containers are now running and the host ports are free. Odoo/Keycloak/Postgres images are now cached locally.
-- The synthetic source stack is `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`, with a separate `p7-local-compose.yaml` overlay and empty Keycloak realm (`users=[]`, `clients=[]`). Ports bind only to `127.0.0.1`; Runtime's periodic healthcheck and direct host port were disabled to prevent reads outside the meter. Preflight JSON and SHA-256 sidecar are stored outside the repository in a restricted directory; the checksum was verified.
+- The synthetic source stack is `tests/acceptance/baa_offboarding/real_e2e/compose.yaml`, with a separate `p7-local-compose.yaml` overlay and empty Keycloak realm (`users=[]`, `clients=[]`), imported with Keycloak's documented `--import-realm` startup option ([official docs](https://www.keycloak.org/server/importExport)). Ports bind only to `127.0.0.1`; Runtime's periodic healthcheck and direct host port were disabled to prevent reads outside the meter. Preflight JSON and SHA-256 sidecar are stored outside the repository in a restricted directory; the checksum was verified.
+- Candidate 1 is prepared as a P7-only Odoo addon, `p7_root_health`: it subclasses Odoo 18 `Home.index`, serves only `GET /`, uses `auth=none`, `save_session=False`, and `readonly=True`, and returns a static 200 without ORM/session access. This follows Odoo's documented controller-extension mechanism ([Odoo 18 docs](https://www.odoo.com/documentation/18.0/developer/reference/backend/http.html)); Odoo's official 18.0 `Home.index` source shows the stock root redirecting to `/odoo` ([source](https://raw.githubusercontent.com/odoo/odoo/18.0/addons/web/controllers/home.py)). The addon is installed only into a new empty P7 staging database; **that stack/root route has not yet been started or preflighted**, so successful override is not yet evidenced. This changes the synthetic staging root route, not the frozen contract, and does not claim stock Odoo root behavior.
 - The repository-root `.env` and BAA-subdirectory `.env` are absent; `.env.example` is only a template. Windows Credential Manager has no BAA/P7/Keycloak/Odoo target, and no `BAA_REAL_*` / `BAA_P7_*` variables were present. A separate `commerce-orchestrator` `.env` describes a `dev` Odoo configuration and an API key, but belongs to another project; its secret was not read or reused.
 - The existing `real_e2e/run.py` creates synthetic employee records and invokes write endpoints, so it was not run. The local overlay prepares only an empty-realm, no-demo-employee stack. The P7 sampler uses a separate GET-only Runtime relay, short-lived bearer credential, and loopback endpoints.
 - A private activation and evidence package were created. The first wrapper error is retained separately; the second preflight has four source records and a verified checksum. The Odoo root redirection fails the frozen gate, so observe was not invoked and observed slots remain **0/960**. The redirect was not followed, the path was not widened, and no retry was made after the preflight failure. Private activation and failure evidence remain for audit.
@@ -100,7 +102,7 @@ The first command must run within the approved short preflight window. The secon
 
 ### Verification
 
-- Focused unittest suite: **13/13 passed**. Coverage includes a simulated 240-round/960-slot window, unknown followed by two-round reacquisition, stopping after the 300-second reacquisition budget expires, immediate stop on capability drift, manual STOP, operator loss, cost overrun, activation path/loopback/HTTPS checks, read-only proxy method/path/token/delegation/expiry checks, empty realm and loopback Compose boundary, hash-bound preflight evidence, slot/event hash chains and checkpoint reconciliation, error-detail redaction, and preservation of the legacy 900-second limit.
+- Focused unittest suite: **13/13 passed**. Coverage includes a simulated 240-round/960-slot window, unknown followed by two-round reacquisition, stopping after the 300-second reacquisition budget expires, immediate stop on capability drift, manual STOP, operator loss, cost overrun, activation path/loopback/HTTPS checks, read-only proxy method/path/token/delegation/expiry checks, static Odoo root controller constraints (GET-only, no session/ORM), empty realm and loopback Compose boundary, hash-bound preflight evidence, slot/event hash chains and checkpoint reconciliation, error-detail redaction, and preservation of the legacy 900-second limit.
 - Docker Compose overlay merge validation passed: Runtime has no host-published port and no periodic healthcheck; Keycloak realm import is enabled; the read-only proxy binds only to loopback. This used config-only dummy values and did not start services or create containers.
 - The frozen-contract static checker passed; the observer's direct `--help` entry point passed.
 - The full-window test used a simulated clock and local fake responses. It is **not** a four-hour staging run and does not prove remote service availability or authorization.
@@ -108,4 +110,4 @@ The first command must run within the approved short preflight window. The secon
 
 ### Outcome and next gate
 
-The short `preflight` has run once, and the frozen `odoo_root=/` resource redirected. The contract was enforced: no redirect-follow, no substitution with `/web/login`, no threshold change, and no four-hour `observe`. A future attempt requires an in-scope approved Odoo staging instance whose fixed `/` root returns `200`; otherwise remain stopped.
+The earlier `preflight` found a redirect at frozen `odoo_root=/`; no four-hour `observe` was started. Candidate 1 is now prepared as an Odoo-only root controller in a fresh empty staging database. It still requires a new project/activation and a qualifying short preflight; if `GET /` does not return 200, stop without following the redirect or changing the path.

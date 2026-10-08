@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import io
 import json
@@ -262,12 +263,40 @@ class InternalReadonlyPilotTests(unittest.TestCase):
             )
         )
         compose_overlay = (fixture_root / "p7-local-compose.yaml").read_text(encoding="utf-8")
+        odoo_root = (
+            fixture_root
+            / "p7-local"
+            / "odoo-addons"
+            / "p7_root_health"
+            / "controllers"
+            / "main.py"
+        ).read_text(encoding="utf-8")
+        manifest_path = (
+            fixture_root
+            / "p7-local"
+            / "odoo-addons"
+            / "p7_root_health"
+            / "__manifest__.py"
+        )
+        manifest_tree = ast.parse(manifest_path.read_text(encoding="utf-8"))
+        manifest = ast.literal_eval(manifest_tree.body[0].value)
         self.assertEqual(realm["realm"], "baa-real-e2e")
         self.assertEqual(realm["users"], [])
         self.assertEqual(realm["clients"], [])
         self.assertIn("ports: !reset []", compose_overlay)
         self.assertIn("disable: true", compose_overlay)
         self.assertIn('127.0.0.1:${BAA_P7_RUNTIME_HOST_PORT', compose_overlay)
+        self.assertIn("hr,p7_root_health", compose_overlay)
+        self.assertIn("./p7-local/odoo-addons:/mnt/extra-addons:ro", compose_overlay)
+        self.assertIn('methods=["GET"]', odoo_root)
+        self.assertIn("save_session=False", odoo_root)
+        self.assertIn("readonly=True", odoo_root)
+        self.assertIn('"p7-local-odoo-root-ready\\n"', odoo_root)
+        self.assertNotIn("request.env", odoo_root)
+        self.assertNotIn("request.session", odoo_root)
+        self.assertEqual(manifest["depends"], ["web"])
+        self.assertFalse(manifest["application"])
+        self.assertTrue(manifest["installable"])
 
     def test_preflight_proof_is_hash_bound_to_activation_and_instrument(self) -> None:
         activation = make_activation()

@@ -4,6 +4,36 @@ services:
     volumes:
       - ./p7-local/realm:/opt/keycloak/data/import:ro
 
+  odoo-init:
+    volumes:
+      - ./p7-local/odoo-addons:/mnt/extra-addons:ro
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - -i
+      - hr,p7_root_health
+      - --without-demo=all
+      - --stop-after-init
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+      - --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+
+  odoo:
+    volumes:
+      - ./p7-local/odoo-addons:/mnt/extra-addons:ro
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - --db-filter=^baa_real_e2e$
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+      - --http-port=8069
+      - --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+
   world-runtime:
     healthcheck:
       disable: true
