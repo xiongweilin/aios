@@ -6,6 +6,12 @@ name: BAA P2 Isolated Read-Only Maintenance Model Replay v1
 on:
   workflow_dispatch:
     inputs:
+      run_mode:
+        description: "Default: qualify pinned source ZIP and local gateway WITHOUT model generation or token cost"
+        type: choice
+        required: true
+        default: "source_preflight_only"
+        options: ["source_preflight_only", "model_sample"]
       approve_finite_model_sampling:
         description: "Explicitly authorize bounded archived-evidence model sampling (up to 96 distinct model calls; no product network)"
         type: choice
@@ -26,7 +32,7 @@ jobs:
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 180
     env:
-      BAA_PROTOCOL_SHA: 82370d7991eea9c288126610594a208efff06baa
+      BAA_PROTOCOL_SHA: 3c9aec12cb261621cf79e4e693498af6f738647c
       BAA_MODEL_ID: gpt-6-luna
       BAA_GATEWAY_BASE: http://127.0.0.1:4101
       BAA_SOURCE_ARTIFACT_ID: "11526016609"
@@ -36,9 +42,16 @@ jobs:
         shell: pwsh
         env:
           APPROVAL: ${{ inputs.approve_finite_model_sampling }}
+          RUN_MODE: ${{ inputs.run_mode }}
         run: |
-          if ($env:APPROVAL -ne "yes") {
+          if ($env:RUN_MODE -notin @("source_preflight_only", "model_sample")) {
+            throw "Unknown P2 manual mode; never use implicit model generation."
+          }
+          if ($env:RUN_MODE -eq "model_sample" -and $env:APPROVAL -ne "yes") {
             throw "Model API use was not explicitly authorized for this workflow dispatch."
+          }
+          if ($env:RUN_MODE -eq "source_preflight_only" -and $env:APPROVAL -eq "yes") {
+            throw "Select model_sample to explicitly approve billable model generation."
           }
 
       - name: Checkout AIOS (provenance only)
@@ -50,7 +63,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: xiongweilin/BAA-Protocol
-          ref: 82370d7991eea9c288126610594a208efff06baa
+          ref: 3c9aec12cb261621cf79e4e693498af6f738647c
           path: baa-protocol
           persist-credentials: false
 
@@ -102,6 +115,13 @@ jobs:
             --qualify-source-only `
             --output "$env:BAA_SOURCE_QUALIFICATION"
           if ($LASTEXITCODE -ne 0) { throw "P2 archived source qualification failed" }
+          $source = Get-Content -LiteralPath $env:BAA_SOURCE_QUALIFICATION -Raw | ConvertFrom-Json -ErrorAction Stop
+          if ($source.qualified -ne $true -or
+              [int]$source.verified_p2_episodes -ne 5 -or
+              $source.source_zip_sha256 -ne $env:BAA_SOURCE_ARTIFACT_SHA256 -or
+              $source.observer_only_gap_indistinguishable_at_sensor_level -ne $true) {
+            throw "Standalone P2 source JSON sidecar failed strict qualification"
+          }
 
       - name: Require already available local model gateway
         shell: pwsh
@@ -128,6 +148,7 @@ jobs:
           } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 "$env:BAA_EVIDENCE_DIR/gateway-provenance.json"
 
       - name: Run finite real-model three-regime archived evidence replay
+        if: ${{ inputs.run_mode == 'model_sample' }}
         shell: pwsh
         run: |
           $env:PYTHONPATH = "$env:GITHUB_WORKSPACE\baa-protocol"
@@ -142,6 +163,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "P2 model evaluation incomplete; see result artifact if emitted." }
 
       - name: Qualify finite model result without inferring delegation causality
+        if: ${{ inputs.run_mode == 'model_sample' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -186,6 +208,7 @@ jobs:
             source_artifact_id = $env:BAA_SOURCE_ARTIFACT_ID
             source_archive_sha256 = $env:BAA_SOURCE_ARTIFACT_SHA256
             study_kind = "offline_archived_readonly_replay"
+            model_sampling_mode = "${{ inputs.run_mode }}"
             real_product_actions = 0
             preregistered_max_distinct_model_calls = 96
           } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 "$env:BAA_EVIDENCE_DIR/provenance.json"
