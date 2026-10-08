@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from p7_shadow_readonly import Observation, SOURCES
+from p7_shadow_readonly import SOURCES, Observation
 
 
 class TriageStatus(StrEnum):
