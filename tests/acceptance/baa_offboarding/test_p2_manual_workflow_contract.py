@@ -24,8 +24,14 @@ class P2ManualReadOnlyWorkflowTests(unittest.TestCase):
         self.assertNotIn("\n  push:", s)
         self.assertNotIn("\n  schedule:", s)
         self.assertIn("approve_finite_model_sampling:", s)
+        self.assertIn("run_mode:", s)
+        self.assertIn('default: "source_preflight_only"', s)
+        self.assertIn('options: ["source_preflight_only", "model_sample"]', s)
+        self.assertIn('if ($env:RUN_MODE -eq "model_sample" -and $env:APPROVAL -ne "yes")', s)
+        self.assertIn("if: ${{ inputs.run_mode == 'model_sample' }}", s)
+        self.assertEqual(s.count("if: ${{ inputs.run_mode == 'model_sample' }}"), 2)
         self.assertIn('default: "no"', s)
-        self.assertIn("if ($env:APPROVAL -ne \"yes\")", s)
+        self.assertIn('if ($env:RUN_MODE -eq "source_preflight_only" -and $env:APPROVAL -eq "yes")', s)
         self.assertIn("--max-calls 96", s)
         self.assertIn("timeout-minutes: 180", s)
         self.assertIn("cancel-in-progress: false", s)
@@ -33,7 +39,7 @@ class P2ManualReadOnlyWorkflowTests(unittest.TestCase):
     def test_pin_bytes_and_refuse_model_until_source_qualified(self):
         s = self.workflow
         self.assertIn(
-            "82370d7991eea9c288126610594a208efff06baa", s
+            "3c9aec12cb261621cf79e4e693498af6f738647c", s
         )
         self.assertIn("11526016609", s)
         self.assertIn(
@@ -42,6 +48,9 @@ class P2ManualReadOnlyWorkflowTests(unittest.TestCase):
         )
         self.assertIn("Get-FileHash -Algorithm SHA256", s)
         self.assertIn("--qualify-source-only", s)
+        self.assertIn("ConvertFrom-Json -ErrorAction Stop", s)
+        self.assertIn("[int]$source.verified_p2_episodes -ne 5", s)
+        self.assertIn("$source.source_zip_sha256 -ne $env:BAA_SOURCE_ARTIFACT_SHA256", s)
         self.assertIn("--source-zip", s)
         self.assertLess(
             s.index("Offline source projection and P2 tool qualification"),
