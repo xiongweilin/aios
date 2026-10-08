@@ -1,14 +1,14 @@
 # P7 Internal Read-Only Maintenance Pilot — Implementation and Readiness Report
 
 - Date: 2026-10-08
-- State: Candidate-1 Odoo staging preflight qualified twice; supervised observer start timed out twice for missing `ON-DUTY`; pilot remains **0/960** and not complete.
+- State: Candidate-1 Odoo staging preflight qualified twice; two starts stopped at the human gate. The user has now supplied `ON-DUTY` for a fresh window; no new observer has started yet and the pilot remains **0/960**.
 - Frozen contract: `p7_internal_readonly_pilot_v1.json`, unchanged (`design_frozen_not_authorized`).
 
 ## 中文
 
 ### 结论
 
-独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据、只读 loopback relay，以及离线故障测试已实现。stock Odoo 根路径预检曾因重定向未合格；候选一的空白 Odoo staging 两次预检均合格。但两次 `observe` 都在值守门因未收到 `ON-DUTY` 而停止，PilotRunner 未启动；四小时观测仍 **0/960**。这不是服务错误率或运营验收结论。
+独立的四小时 GET-only observer、预检门、值守停止/升级、成本记录、断点证据、只读 loopback relay，以及离线故障测试已实现。stock Odoo 根路径预检曾因重定向未合格；候选一的空白 Odoo staging 两次预检均合格。两次 `observe` 均在值守门因未收到 `ON-DUTY` 而停止；用户现已为新的 activation 提供 `ON-DUTY`，但尚未启动新观察器。四小时观测仍 **0/960**，不是服务错误率或运营验收结论。
 
 三轮真实预检共发送 **12 次 GET**（每源每轮一次）：stock Odoo 栈因 `/` 重定向未合格；候选一 Odoo 栈的两轮四源均 `ok`。两次 `observe` 均在值守确认期限内未收到人工输入，故 **0/960** 观测槽位。未调用模型、未访问真实员工数据、未执行员工/业务写入。
 
@@ -22,7 +22,7 @@
 - 候选一两次 activation 的四源预检均 `status=qualified`、4/4 `ok`，sidecar 校验通过。两次 `observe` 均在 60 秒内未收到 `ON-DUTY`，以 `on_duty_operator_confirmation_missing` 退出；第一次 TTY 输出未显示给用户，第二次已在聊天中提示但仍无命令。两份 partial journal 均为 0 observations / 0 operator events，无 manifest/SHA256SUMS；两份仓库外补充 gate 记录保留退出结果。
 - 证据 lineage：第一次候选一来源提交 `eec3caab996e9cfd97ad4c0b44095d813111c395`，activation SHA-256 `e5a64ba9a91eaa28acaeaf58adf486bb7857f03426c4c945e42a1919123c2243`，合格 preflight SHA-256 `1512b1235e3b4d363a362af668d5800d1c5298258b1c28bd955a1214d1d7abda`，gate 记录 SHA-256 `9c427d19284a601a678c09133c9f982b0d4e6664cb06a1d3b5fd5d3b1622add3`。第二次候选一来源提交 `b30c0d1999a17a98d10594ac76ef1689a9e8c756`，activation SHA-256 `4ad80acd7c45cd072f2db060af6e32869f127c3ffd0021a5fbfcfb3757a1dc20`，合格 preflight SHA-256 `77a03215d1936f80acb165f0cf966201b010a470f35c6463e8b5c1de0a293c6e`，gate 记录 SHA-256 `c69db8dc1a756d62c826bbf75c40d011e34a0e2002ed964d518f1c267c1e087d`。instrument SHA-256 `6d55adeb3a76e19b280c9fdba1c6011a532f6a7c4e8da9ba5222f80d61354ff7`；冻结契约 SHA-256 `0d17bcc59f93ec2e2a7eacb3f39a8b4193f5349dea195350d06a99ca1bd9050c`。所有列出的 sidecar 均匹配；stock Odoo 失败证据也另行保留。
 
-用户已确认第一次未看到终端提示并要求继续；第二次在聊天中提示后也未收到人工 `ON-DUTY`。冻结值守门两次阻止 PilotRunner；“0/960”表示未采样，不是服务健康结论。
+用户已确认第一次未看到终端提示；第二次聊天提示后未收到 `ON-DUTY`。用户现已发送 `ON-DUTY`，该信号只用于新的 activation，不追溯覆盖前两次超时；“0/960”仍表示未采样。
 
 ### 实现范围
 
@@ -56,13 +56,13 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 
 ### 结果与后续门槛
 
-候选一四源预检已通过；但值守确认门未收到 `ON-DUTY`，因此未开始采样。下一次 wrapper 将实时转发 TTY 输出；本 thread 作为 activation 已登记的私密联系路线。提示时仅在用户亲自发送精确 `ON-DUTY`/`ACK` 后，我才逐字转发该字符串到 TTY；不会自动生成确认，超时仍按规则停止。
+候选一四源预检已通过；前两次值守门超时，没有采样。用户现已给出 `ON-DUTY`，供新的 activation 使用；我将在新 TTY 提示出现时逐字转发该信号。本 thread 是 activation 中登记的私密联系路线，之后只转发用户实际输入的 `ACK`/`STOP` 等命令，不自动生成；超时仍按规则停止。
 
 ## English
 
 ### Outcome
 
-The independent four-hour GET-only observer, preflight gate, operator stop/escalation, cost accounting, resumable evidence checkpoints, read-only loopback relay, and offline fault tests are implemented. The stock-Odoo preflight was unqualified due to a root redirect; candidate 1's isolated Odoo preflight qualified, but the observer stopped before sampling because its human `ON-DUTY` gate timed out. This is neither a service error-rate finding nor operational acceptance.
+The independent four-hour GET-only observer, preflight gate, operator stop/escalation, cost accounting, resumable evidence checkpoints, read-only loopback relay, and offline fault tests are implemented. The stock-Odoo preflight was unqualified due to a root redirect; both candidate-1 preflights qualified, but both observer starts stopped at the human `ON-DUTY` gate. The user has now supplied `ON-DUTY` for a fresh window; that signal has not yet been relayed to a new observer. This is neither a service error-rate finding nor operational acceptance.
 
 Three actual preflight rounds made **12 GET requests** (four per round): the stock Odoo root redirected in round one; both candidate-1 rounds returned `ok` for all four sources. Two `observe` commands then received no `ON-DUTY` within their 60-second gates, so `PilotRunner` never started and the four-hour window remains **0/960**. No model was called, no real employee data was accessed, and no business write was performed.
 
@@ -76,7 +76,7 @@ Three actual preflight rounds made **12 GET requests** (four per round): the sto
 - Both candidate-1 activations and qualified preflights have valid SHA-256 sidecars. The first TTY prompt was not visible; the second prompt was relayed in chat, but neither received `ON-DUTY` within 60 seconds. Both partial journals have 0 observations and 0 operator events; neither produced a manifest or `SHA256SUMS`. Supplemental gate records preserve both exits.
 - Candidate 1 run 1: source revision `eec3caab996e9cfd97ad4c0b44095d813111c395`; activation SHA-256 `e5a64ba9a91eaa28acaeaf58adf486bb7857f03426c4c945e42a1919123c2243`; preflight SHA-256 `1512b1235e3b4d363a362af668d5800d1c5298258b1c28bd955a1214d1d7abda`; gate SHA-256 `9c427d19284a601a678c09133c9f982b0d4e6664cb06a1d3b5fd5d3b1622add3`. Candidate 1 run 2: source revision `b30c0d1999a17a98d10594ac76ef1689a9e8c756`; activation SHA-256 `4ad80acd7c45cd072f2db060af6e32869f127c3ffd0021a5fbfcfb3757a1dc20`; preflight SHA-256 `77a03215d1936f80acb165f0cf966201b010a470f35c6463e8b5c1de0a293c6e`; gate SHA-256 `c69db8dc1a756d62c826bbf75c40d011e34a0e2002ed964d518f1c267c1e087d`. The instrument SHA-256 is `6d55adeb3a76e19b280c9fdba1c6011a532f6a7c4e8da9ba5222f80d61354ff7`; frozen-contract SHA-256 is `0d17bcc59f93ec2e2a7eacb3f39a8b4193f5349dea195350d06a99ca1bd9050c`. All listed sidecars match; the earlier stock-root unqualified evidence is preserved separately.
 
-The user authorized candidate 1 and confirmed the first prompt was not visible. A second prompt was relayed in chat, but still no human `ON-DUTY` arrived; both runs stopped before sampling. “0/960” is an unobserved pilot denominator, not a 0% error rate or healthy-service result.
+The user authorized candidate 1, confirmed the first prompt was not visible, and has now supplied `ON-DUTY` for a fresh run. The prior two runs stopped before sampling; “0/960” remains an unobserved pilot denominator, not a 0% error rate or healthy-service result.
 
 ### Implementation
 
@@ -110,4 +110,4 @@ The first command must run within the approved short preflight window. The secon
 
 ### Outcome and next gate
 
-Candidate 1's preflight qualified, but its observer start timed out because no human `ON-DUTY` reached the TTY. The Codex terminal attachment remained queued and the wrapper buffered its output. The next wrapper will stream TTY output; the approved private thread will be the activation's contact route. Only exact human-entered `ON-DUTY`/`ACK` strings will be relayed to the TTY; no automatic confirmations will be sent. If no human input arrives by the deadline, stop again without sampling.
+Candidate 1's two preflights qualified, but both observer starts timed out because no human `ON-DUTY` reached the TTY. The user has now supplied `ON-DUTY` for a fresh activation; it has not yet been forwarded. The next wrapper will stream TTY output and use the approved private thread as its contact route. Only exact human-entered `ON-DUTY`/`ACK` strings will be relayed; no automatic confirmations will be sent. If no human input arrives by the deadline, stop without sampling.
