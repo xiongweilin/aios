@@ -50,6 +50,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: P6 instrumentation conformance (offline)
+        run: python -m unittest discover -s tests/acceptance/baa_offboarding/real_e2e -p "test_p6_quality.py" -v
+
       - name: Prepare ephemeral credentials
         shell: bash
         run: |
