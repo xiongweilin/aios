@@ -234,14 +234,17 @@ def main() -> None:
         parser.error("interval-seconds must be 1..60")
 
     token = os.environ["BAA_REAL_RUNTIME_TOKEN"]
-    probe = lambda source: read_only_probe(
-        source=source,
-        runtime_base=args.runtime_base,
-        keycloak_base=args.keycloak_base,
-        odoo_base=args.odoo_base,
-        runtime_token=token,
-        delegation_id="delegation:baa-real-products-administrative",
-    )
+
+    def probe(source: str) -> tuple[str, str | None, str | None]:
+        return read_only_probe(
+            source=source,
+            runtime_base=args.runtime_base,
+            keycloak_base=args.keycloak_base,
+            odoo_base=args.odoo_base,
+            runtime_token=token,
+            delegation_id="delegation:baa-real-products-administrative",
+        )
+
     monitor = ShadowMonitor(probe)
     start = time.monotonic()
     try:
