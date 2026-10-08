@@ -142,6 +142,9 @@ class AccessTimelineSampler:
         self._mono = monotonic_ns
         self._wall = wall_ns
         self._lock = threading.Lock()
+        # A foreground final sample and the background loop must not
+        # interleave; sequence numbers must reflect capture order.
+        self._capture_lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._records: list[ProbeRecord] = []
@@ -149,7 +152,11 @@ class AccessTimelineSampler:
         self._capacity_reached = False
 
     def capture_once(self, phase: str = "manual") -> tuple[ProbeRecord, ...]:
-        """Capture one complete round. Intended for tests and preflight."""
+        """Capture a serialized round (foreground and background cannot overlap)."""
+        with self._capture_lock:
+            return self._capture_round(phase)
+
+    def _capture_round(self, phase: str) -> tuple[ProbeRecord, ...]:
         with self._lock:
             if self._rounds >= self.max_rounds:
                 self._capacity_reached = True
