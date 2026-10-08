@@ -99,4 +99,8 @@ class ProtectedResource(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("0.0.0.0", 8095), ProtectedResource).serve_forever()
+    listener = (
+        os.environ.get("P3_LISTEN_HOST", "127.0.0.1"),
+        int(os.environ.get("P3_LISTEN_PORT", "8095")),
+    )
+    ThreadingHTTPServer(listener, ProtectedResource).serve_forever()
