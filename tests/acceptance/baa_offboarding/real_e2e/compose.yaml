@@ -108,6 +108,29 @@ services:
       timeout: 2s
       retries: 30
 
+  # Opt-in only; existing offboarding real_e2e scenarios do not start it.
+  p3-protected-resource:
+    profiles: ["p3-probe"]
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "-u", "/probe/p3_protected_resource.py"]
+    environment:
+      P3_KEYCLOAK_BASE: http://keycloak:8080
+      P3_KEYCLOAK_REALM: baa-real-e2e
+      P3_INTROSPECTION_CLIENT_ID: baa-verifier
+      P3_INTROSPECTION_CLIENT_SECRET: ${BAA_REAL_KEYCLOAK_VERIFIER_SECRET:?set BAA_REAL_KEYCLOAK_VERIFIER_SECRET}
+      P3_ALLOWED_BEARER_CLIENT_ID: baa-session-client
+    depends_on:
+      - keycloak
+    volumes:
+      - ./p3_protected_resource.py:/probe/p3_protected_resource.py:ro
+    ports:
+      - "127.0.0.1:${BAA_REAL_PROBE_HOST_PORT:-28187}:8095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8095/healthz', timeout=2).read()"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
 volumes:
   odoo-data:
   runtime-state:
