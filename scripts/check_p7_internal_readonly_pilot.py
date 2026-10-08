@@ -79,6 +79,12 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         errors.append("unbounded_environment")
     if domain.get("real_access_probe") is not False:
         errors.append("unapproved_access_probe")
+    if set(domain.get("fixed_security_contract", [])) != {
+        "administrative.iam.identity.disable.v1",
+        "administrative.iam.sessions.revoke.v1",
+        "administrative.hris.employee.deactivate.v1",
+    }:
+        errors.append("security_contract_scope_drift")
     sources = domain.get("allowed_sources", [])
     if not isinstance(sources, list) or [
         (s.get("id"), s.get("path")) for s in sources if isinstance(s, dict)
@@ -139,6 +145,28 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         or thresholds.get("measurement_kind") != "prospective_initial_pilot_acceptance_not_production_slo"
     ):
         errors.append("unsafe_thresholds")
+
+    expected_thresholds = {
+        "measurement_kind": "prospective_initial_pilot_acceptance_not_production_slo",
+        "planned_slots_accounted_exactly": 960,
+        "min_complete_rounds": 240,
+        "max_unclassified_slots": 0,
+        "max_missing_evidence_rounds": 0,
+        "max_unscheduled_sample_gap_seconds": 120,
+        "max_probe_p95_ms": 2000,
+        "max_round_p95_ms": 10000,
+        "max_non_ok_probe_fraction": 0.01,
+        "max_contract_drift_events": 0,
+        "max_unauthorized_or_effectful_calls": 0,
+        "max_terminal_unresolved": 0,
+        "max_principal_attention_minutes": 30,
+        "max_third_party_assurance_labor_minutes": 60,
+        "max_operator_acknowledgement_seconds": 900,
+        "max_observation_reacquisition_seconds": 300,
+        "expected_external_business_effect_count": 0,
+    }
+    if thresholds != expected_thresholds:
+        errors.append("frozen_threshold_drift")
 
     exit_rules = contract.get("escalation_and_exit", {})
     if not isinstance(exit_rules, dict):
