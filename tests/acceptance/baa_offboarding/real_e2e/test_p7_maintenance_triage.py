@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import p7_maintenance_experiment as experiment
 from p7_maintenance_triage import TriageStatus, assess_maintenance
-from p7_shadow_readonly import Observation, SOURCES
+from p7_shadow_readonly import SOURCES, Observation
 
 
 def rows(
