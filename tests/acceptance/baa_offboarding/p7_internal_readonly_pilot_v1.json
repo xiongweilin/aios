@@ -1,0 +1,203 @@
+{
+  "schema": "aios-p7-internal-readonly-pilot-contract-v1",
+  "version": 1,
+  "phase": "P6+P7",
+  "status": "design_frozen_not_authorized",
+  "activation": {
+    "default": "deny",
+    "approved": false,
+    "requires": [
+      "named_accountable_owner",
+      "named_on_duty_operator",
+      "written_scoped_staging_read_authorization",
+      "four_source_resource_inventory",
+      "read_only_credential_scope_proof",
+      "approved_start_end_time",
+      "independent_stop_access",
+      "private_contact_route",
+      "artifact_access_and_retention_review"
+    ],
+    "no_production_write": true,
+    "no_automatic_activation": true,
+    "no_cron": true
+  },
+  "domain": {
+    "intent": "supervised internal staging read-only maintenance observability pilot",
+    "environments": [
+      "approved_internal_staging_only"
+    ],
+    "prohibited": [
+      "production_staff_identifiers",
+      "production_mutations",
+      "employee_offboarding_execution",
+      "provider_execute",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "service_pause",
+      "service_restart",
+      "credential_rotation",
+      "automatic_repair",
+      "automatic_escalation_to_write",
+      "model_generation"
+    ],
+    "allowed_sources": [
+      {
+        "id": "runtime_health",
+        "method": "GET",
+        "path": "/healthz",
+        "authentication": "read_only_if_required"
+      },
+      {
+        "id": "runtime_capabilities",
+        "method": "GET",
+        "path": "/v1/capabilities",
+        "authentication": "scoped_read_only"
+      },
+      {
+        "id": "keycloak_realm",
+        "method": "GET",
+        "path": "/realms/{approved_realm}",
+        "authentication": "read_only_if_required"
+      },
+      {
+        "id": "odoo_root",
+        "method": "GET",
+        "path": "/",
+        "authentication": "read_only_if_required"
+      }
+    ],
+    "fixed_security_contract": [
+      "administrative.iam.identity.disable.v1",
+      "administrative.iam.sessions.revoke.v1",
+      "administrative.hris.employee.deactivate.v1"
+    ],
+    "permitted_outputs": [
+      "health_sample",
+      "capability_fingerprint",
+      "redacted_error_class",
+      "sampling_envelope",
+      "task_diagnosis",
+      "operator_attention_record",
+      "assurance_labor_record",
+      "termination_record"
+    ],
+    "real_access_probe": false
+  },
+  "horizon": {
+    "supervised_window_seconds": 14400,
+    "interval_seconds": 60,
+    "planned_rounds": 240,
+    "sources_per_round": 4,
+    "planned_slots": 960,
+    "per_request_timeout_seconds": 3,
+    "max_attempts_per_slot": 1,
+    "baseline_required": true,
+    "clean_reacquisition_rounds": 2,
+    "stop_after_window": true
+  },
+  "pilot_acceptance_thresholds": {
+    "measurement_kind": "prospective_initial_pilot_acceptance_not_production_slo",
+    "planned_slots_accounted_exactly": 960,
+    "min_complete_rounds": 240,
+    "max_unclassified_slots": 0,
+    "max_missing_evidence_rounds": 0,
+    "max_unscheduled_sample_gap_seconds": 120,
+    "max_probe_p95_ms": 2000,
+    "max_round_p95_ms": 10000,
+    "max_non_ok_probe_fraction": 0.01,
+    "max_contract_drift_events": 0,
+    "max_unauthorized_or_effectful_calls": 0,
+    "max_terminal_unresolved": 0,
+    "max_principal_attention_minutes": 30,
+    "max_third_party_assurance_labor_minutes": 60,
+    "max_operator_acknowledgement_seconds": 900,
+    "max_observation_reacquisition_seconds": 300,
+    "expected_external_business_effect_count": 0
+  },
+  "escalation_and_exit": {
+    "fail_closed_on": [
+      "auth_401_or_403",
+      "security_contract_invalid_or_weakened",
+      "security_contract_fingerprint_drift",
+      "resource_scope_change",
+      "probe_method_not_get",
+      "missing_on_duty_operator",
+      "missing_or_stale_approval",
+      "evidence_integrity_failure",
+      "cannot_stop_sampler",
+      "secret_leak_suspected",
+      "uncategorized_observation",
+      "time_budget_exceeded"
+    ],
+    "unknown_transport": "record_unknown_no_success_inference",
+    "allow_recovery_classification_only_after_full_clean_rounds": 2,
+    "contract_or_authority_discrepancy": "sticky_human_escalation_no_autoclear",
+    "observation_gap": "record_and_escalate_if_reacquisition_budget_exhausted",
+    "operator_unavailable": "stop_sampling_no_automatic_takeover",
+    "stop_action": "disable_pilot_sampler_and_revoke_pilot_specific_read_credentials",
+    "no_write_recovery": true,
+    "do_not_erase_unknown_at_timeout": true
+  },
+  "measurement": {
+    "all_assigned_windows_denominator": true,
+    "clock_kind": "host_monotonic_duration_with_wall_time_provenance",
+    "observed_fields": [
+      "sample_round",
+      "source",
+      "method",
+      "started_ns",
+      "completed_ns",
+      "classified_result",
+      "fingerprint_or_null",
+      "error_class_or_null"
+    ],
+    "require_evidence_sha256": true,
+    "require_exact_repo_and_instrument_commit": true,
+    "require_credential_scope_attestation": true,
+    "require_operator_approval_reference": true,
+    "require_operator_response_timestamps": true,
+    "require_principal_attention_intervals": true,
+    "require_assurance_labor_intervals": true,
+    "evidence_retention_days": 14,
+    "do_not_record": [
+      "raw_bearer_token",
+      "password",
+      "credential",
+      "employee_id",
+      "unredacted_http_body",
+      "full_internal_url",
+      "personally_identifying_ticket_text"
+    ],
+    "disjoint_cost_counters": [
+      "principal_attention",
+      "third_party_assurance_labor",
+      "automated_monitor_runtime",
+      "external_readback_count"
+    ],
+    "censoring_rule": "failed_start_before_baseline_is_unqualified_not_a_healthy_window; gaps_and_stops_stay_in_assigned_denominator",
+    "percentile_rule": "report_n_and_empirical_percentiles_only; no_production_tail_slo_claim"
+  },
+  "decisions": {
+    "no_agent_or_three_arm_comparison": true,
+    "go_requirements": [
+      "activation_evidence_verified_outside_repository",
+      "baseline_valid",
+      "all_horizon_slots_accounted",
+      "all_acceptance_thresholds_met",
+      "zero_protected_contract_incidents",
+      "independent_evidence_integrity",
+      "actual_operator_and_labor_costs_recorded"
+    ],
+    "reject_or_stop_if_any_requirement_unmet": true,
+    "stronger_claims_not_supported": [
+      "continuous_availability",
+      "long_term_unattended_safety",
+      "production_slo",
+      "delegation_leverage",
+      "real_joint_loss_Y",
+      "complete_execution_mediation"
+    ]
+  }
+}
