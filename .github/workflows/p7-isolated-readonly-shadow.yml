@@ -14,6 +14,9 @@ on:
       - ".github/workflows/p7-isolated-readonly-shadow.yml"
       - "tests/acceptance/baa_offboarding/real_e2e/p7_shadow_readonly.py"
       - "tests/acceptance/baa_offboarding/real_e2e/test_p7_shadow_readonly.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/p7_maintenance_triage.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/p7_maintenance_experiment.py"
+      - "tests/acceptance/baa_offboarding/real_e2e/test_p7_maintenance_triage.py"
 
 permissions:
   contents: read
@@ -38,7 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: P7 offline read-only contract checks
-        run: python -m unittest discover -s tests/acceptance/baa_offboarding/real_e2e -p "test_p7_shadow_readonly.py" -v
+        run: python -m unittest discover -s tests/acceptance/baa_offboarding/real_e2e -p "test_p7*.py" -v
 
       - name: Generate disposable test-only credentials
         shell: bash
@@ -126,6 +129,17 @@ jobs:
             --duration-seconds "$seconds" \
             --interval-seconds 5 \
             --evidence-path "$P7_EVIDENCE_DIR/observations.json"
+
+      - name: Qualify three frozen read-only maintenance triage cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$P7_EVIDENCE_DIR"
+          python tests/acceptance/baa_offboarding/real_e2e/p7_maintenance_experiment.py \
+            --runtime-base "http://127.0.0.1:$BAA_REAL_RUNTIME_HOST_PORT" \
+            --keycloak-base "http://127.0.0.1:$BAA_REAL_KEYCLOAK_HOST_PORT" \
+            --odoo-base "http://127.0.0.1:$BAA_REAL_ODOO_HOST_PORT" \
+            --evidence-path "$P7_EVIDENCE_DIR/maintenance-triage.json"
 
       - name: Record versioned provenance
         if: always()
