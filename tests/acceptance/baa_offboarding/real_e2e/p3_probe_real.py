@@ -284,6 +284,19 @@ def main() -> None:
                 grace_s=0,
             ),
         )
+        evidence["identity_mapping"] = {
+            "target": {
+                "odoo_subject": subject_ref,
+                "odoo_employee_id": employee_id,
+                "keycloak_user_id": user_id,
+            },
+            "test_only_control": {
+                "odoo_subject": control_ref,
+                "odoo_employee_id": control_employee_id,
+                "keycloak_user_id": control_user_id,
+                "binding_provenance": "explicit isolated-fixture pairing; not an organizational identity claim",
+            },
+        }
         evidence["policy"] = {
             "target_effective_at": policies[0].effective_at_s,
             "target_grace_s": 0,
@@ -319,6 +332,27 @@ def main() -> None:
             raise AssertionError("target failed baseline actual protected access")
         if control_before["point_violation"] is not False:
             raise AssertionError("compliant control failed baseline qualification")
+        # Explicit negative instrument control: a separate unreachable
+        # endpoint must be UNKNOWN, not an alleged revocation.
+        outage = ReadOnlyCollector(
+            sources=collector.sources,
+            read_hris_active=read_hris,
+            read_iam_state=read_iam,
+            probe_access=lambda subject: _protected_probe(
+                "http://127.0.0.1:1",
+                bearer_by_subject[subject],
+                identity_ids[subject],
+            ),
+        ).capture(
+            subject_id=subject_ref,
+            observed_at_s=int(time.time()),
+            sample_id="probe_network_outage",
+        )
+        evidence["outage_control"] = _snapshot_json(
+            outage, classify_point(outage, policy=policies[0])
+        )
+        if outage.projection.access_probe is not AccessProbe.UNKNOWN:
+            raise AssertionError("probe outage was incorrectly recorded as authorization denial")
         evidence["stage"] = "dispatch"
 
         store, case = _authorized_case(
@@ -406,7 +440,7 @@ def main() -> None:
     except Exception as exc:
         evidence["error"] = {
             "type": type(exc).__name__,
-            "message": str(exc)[:450],
+            "detail": "See bounded step logs; no exception text stored to avoid credential leakage",
         }
         raise
     finally:
