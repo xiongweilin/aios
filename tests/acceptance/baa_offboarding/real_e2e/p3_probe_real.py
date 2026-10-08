@@ -41,6 +41,31 @@ from run import (
 )
 
 
+def _configure_probe_audience(keycloak: Any) -> None:
+    """Qualify the Keycloak 26.8 resource-server introspection audience.
+
+    This changes ONLY the disposable realm's test client protocol mapper. It
+    neither grants a realm-management role nor weakens introspection checks.
+    """
+    client = keycloak._client_rep(KEYCLOAK_SESSION_CLIENT)
+    keycloak.request(
+        "POST",
+        f"/admin/realms/{KEYCLOAK_REALM}/clients/{client['id']}/protocol-mappers/models",
+        json_body={
+            "name": "p3-protected-resource-audience",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "consentRequired": False,
+            "config": {
+                "included.client.audience": KEYCLOAK_VERIFIER,
+                "access.token.claim": "true",
+                "id.token.claim": "false",
+            },
+        },
+        expected={201},
+    )
+
+
 def _password_token(keycloak: Any, username: str, password: str) -> str:
     response = keycloak.client.post(
         f"{keycloak.base_url}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token",
@@ -196,6 +221,13 @@ def main() -> None:
         control_user_id = _identity(keycloak, control_username)
         control_employee_id = _control_employee(odoo)
         control_ref = f"odoo:hr.employee:{control_employee_id}"
+
+        # Keycloak 26.8 requires the introspecting confidential resource
+        # client to be a token audience. The first qualification attempt
+        # (run 37709634277, artifact 11520849286) failed with active test
+        # sessions but baseline introspection denied: keep that failure as
+        # an instrument-qualification record, not a loss observation.
+        _configure_probe_audience(keycloak)
 
         # All tokens exist only in memory. The previously issued target token
         # is reused post-disable: a new login test alone would be insufficient.
