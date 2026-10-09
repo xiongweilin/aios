@@ -47,7 +47,7 @@ PLANNED_SLOTS = 960
 REQUEST_TIMEOUT_SECONDS = 3.0
 MAX_CAPABILITY_BODY_BYTES = 1_048_576
 INSTRUMENT_PATH = Path(__file__).resolve()
-MAX_PRESTART_ACK_SECONDS = 60
+MAX_PRESTART_ACK_SECONDS = 300
 TOKEN_ENV = {
     "runtime_capabilities": "BAA_P7_RUNTIME_TOKEN",
     "keycloak_realm": "BAA_P7_KEYCLOAK_BEARER_TOKEN",
@@ -696,7 +696,7 @@ class PilotRunner:
         reason = _safe_classification(reason) or "uncategorized_observation"
         self.pending_alerts.append(mono_ns)
         self._event("operator_alert", mono_ns, when, alert_class=reason)
-        print(f"P7 PILOT ALERT: {reason}. Follow the approved human stop/escalation procedure.", flush=True)
+        print(f"P7 试点警报：{reason}。请按已批准的人工停止/升级流程处理。", flush=True)
 
     def _operator_health(self) -> bool:
         self._handle_operator_events()
@@ -845,7 +845,7 @@ class PilotRunner:
                 (self.activation.pilot_start - now_utc).total_seconds() * 1_000_000_000
             )
         if now_utc < self.activation.pilot_start:
-            print("Waiting for the approved UTC pilot start; operator coverage remains required.", flush=True)
+            print("等待经批准的 UTC 试点开始时间；值守仍须保持。", flush=True)
             if not self._wait_until(pilot_start_mono):
                 self.stop_reason = self.stop_reason or "operator_unavailable"
 
@@ -1504,10 +1504,10 @@ def start_observation(activation: Activation, preflight: dict[str, Any], output_
     headers = credential_headers(activation)
     run_id = str(uuid.uuid4())
     journal = EvidenceJournal(output_dir / f"p7-pilot-{run_id}", run_id)
-    print("P7 pilot operator console: ON-DUTY, ACK, ATTENTION START/STOP, ASSURANCE START/STOP, STOP", flush=True)
-    print("Use ACK at least every 900 seconds. STOP halts sampling; use the separately approved stop/revoke route if this process cannot stop.", flush=True)
+    print("P7 试点值守输入：ON-DUTY、ACK、ATTENTION START/STOP、ASSURANCE START/STOP、STOP", flush=True)
+    print("每 900 秒内至少输入一次 ACK。STOP 停止采样；若本进程无法停止，请使用已批准的独立停止/撤权方式。", flush=True)
     operator = OperatorConsole(journal)
-    print("Type ON-DUTY to confirm the named operator is present.", flush=True)
+    print("请在 5 分钟内输入 ON-DUTY，确认指定值守人员在场。", flush=True)
     first = operator.next_event(MAX_PRESTART_ACK_SECONDS)
     if first is None or first[0] != "ON-DUTY":
         raise PilotError("on_duty_operator_confirmation_missing")
