@@ -1,0 +1,59 @@
+services:
+  keycloak:
+    command: ["start-dev", "--http-port=8080", "--import-realm"]
+    volumes:
+      - ./p7-local/realm:/opt/keycloak/data/import:ro
+
+  odoo-init:
+    volumes:
+      - ./p7-local/odoo-addons:/mnt/extra-addons:ro
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - -i
+      - hr,p7_root_health
+      - --without-demo=all
+      - --stop-after-init
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+      - --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+
+  odoo:
+    volumes:
+      - ./p7-local/odoo-addons:/mnt/extra-addons:ro
+    command:
+      - odoo
+      - -d
+      - baa_real_e2e
+      - --db-filter=^baa_real_e2e$
+      - --db_host=db
+      - --db_user=odoo
+      - --db_password=${BAA_REAL_ODOO_DB_PASSWORD:?set BAA_REAL_ODOO_DB_PASSWORD}
+      - --http-port=8069
+      - --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+
+  world-runtime:
+    healthcheck:
+      disable: true
+    ports: !reset []
+
+  p7-readonly-runtime-proxy:
+    image: ${AIOS_IMAGE:?set AIOS_IMAGE}
+    command: ["python", "-u", "/p7/p7_readonly_runtime_proxy.py"]
+    environment:
+      BAA_P7_RUNTIME_TOKEN: ${BAA_P7_RUNTIME_TOKEN:?set BAA_P7_RUNTIME_TOKEN}
+      BAA_P7_RUNTIME_DELEGATION_ID: ${BAA_P7_RUNTIME_DELEGATION_ID:?set BAA_P7_RUNTIME_DELEGATION_ID}
+      BAA_P7_RUNTIME_EXPIRES_AT: ${BAA_P7_RUNTIME_EXPIRES_AT:?set BAA_P7_RUNTIME_EXPIRES_AT}
+      BAA_P7_RUNTIME_UPSTREAM: http://world-runtime:8086
+      BAA_P7_RUNTIME_PROXY_PORT: "8087"
+      BAA_REAL_RUNTIME_TOKEN: ${BAA_REAL_RUNTIME_TOKEN:?set BAA_REAL_RUNTIME_TOKEN}
+      BAA_REAL_RUNTIME_DELEGATION_ID: delegation:baa-real-products-administrative
+    volumes:
+      - ./p7_readonly_runtime_proxy.py:/p7/p7_readonly_runtime_proxy.py:ro
+    ports:
+      - "127.0.0.1:${BAA_P7_RUNTIME_HOST_PORT:?set BAA_P7_RUNTIME_HOST_PORT}:8087"
+    depends_on:
+      world-runtime:
+        condition: service_started
