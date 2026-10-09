@@ -13,3 +13,9 @@ The `guide` repository maintains its minimal derivation and conceptual framework
 Migrated architecture notes are not evidence that every described feature is implemented. Actual contracts, source, and tests remain authoritative. Formalization lives in [distinction-self-reference-lean](https://github.com/xiongweilin/distinction-self-reference-lean).
 
 Original source snapshot: [guide 511c073](https://github.com/xiongweilin/guide/tree/511c073322c6b38ed2d36b32492836abf4d69b58/engineering).
+
+## BAA research integration (not an AIOS-wide guarantee)
+
+[BAA-Protocol](https://github.com/xiongweilin/BAA-Protocol) studies bounded admission, narrow capabilities, independent read-back, and recovery over **specified, version-pinned AIOS execution interfaces**. See the [pinned AIOS integration boundary](https://github.com/xiongweilin/BAA-Protocol/blob/main/integration/README.md) and [claim/evidence index](https://github.com/xiongweilin/BAA-Protocol/blob/main/experiments/claim-evidence-index.md).
+
+Its finite checks, isolated product acceptance, and mixed prospective delegation studies do **not** establish that all AIOS runtime operations pass through BAA, that production deployments are certified, that all external harm is measurable, or that total human review labor declines. For any concrete AIOS deployment, authorization and effect semantics remain governed by the current AIOS contracts, code, and independently applicable tests; a BAA guarantee requires a separately qualified interface, evidence bridge, assumptions, and version.
