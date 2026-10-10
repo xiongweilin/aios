@@ -143,21 +143,48 @@ def test_verified_but_unmodeled_observation_halts():
         )
 
 
-def test_unknown_effect_can_only_transition_to_precompiled_qualified_probe():
+def test_unknown_effect_requires_effect_readback_not_subject_eligibility():
+    # Qualifying an initial subject is not the same as reading back the
+    # durable effect. The required meaning remains external to this fixture.
     plan = {
         "kind": "effect", "name": "iam.disable",
         "next": {
-            "kind": "probe", "name": "read.subject",
-            "branches": {"eligible": {"kind": "done"}},
+            "kind": "probe", "name": "readback.effect",
+            "branches": {
+                "settled": {"kind": "done"},
+                "pending": {
+                    "kind": "effect", "name": "iam.reconcile",
+                    "next": {"kind": "done"},
+                },
+            },
         },
     }
-    item = cursor(plan=plan)
-    assert item.next_step(BIND).name == "iam.disable"
-    item.resolve_effect(
-        BIND, effect_name="iam.disable", result="unknown", independent_readback=False,
-    )
-    assert item.next_step(BIND).name == "read.subject"
-    item.observe_with_receipt(
-        BIND, probe_name="read.subject", receipt=probe_receipt(),
-    )
-    assert item.next_step(BIND).kind == "done"
+    identities = {
+        "iam.disable": "runtime-effect:immutable-42",
+        "iam.reconcile": "runtime-effect:reconcile-43",
+    }
+    for label in ("settled", "pending"):
+        item = cursor(
+            plan=plan, effect_identities=identities,
+            authorize_effect=lambda _b, name: name in identities,
+            qualify_probe=lambda _b, name: name == "readback.effect",
+        )
+        assert item.next_step(BIND).name == "iam.disable"
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="unknown",
+            independent_readback=False,
+        )
+        assert item.next_step(BIND).name == "readback.effect"
+        item.observe_with_receipt(
+            BIND, probe_name="readback.effect",
+            receipt=EvidenceReceipt(
+                binding=BIND, kind="probe", step_name="readback.effect",
+                disposition=label, evidence_ref="evidence:probe",
+                source_ref="independent:fixture",
+            ),
+        )
+        if label == "pending":
+            assert item.next_step(BIND).name == "iam.reconcile"
+            assert item.next_step(BIND).kind == "blocked"  # no blind repeat
+        else:
+            assert item.next_step(BIND).kind == "done"
