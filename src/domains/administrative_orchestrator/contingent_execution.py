@@ -7,6 +7,7 @@ identity, durable dispatch, independent readback and settlement remain mandatory
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -34,6 +35,61 @@ class ProposedStep:
     reason: str = ""
 
 
+def _validate_policy_shape(
+    root: Mapping[str, Any], *, max_depth: int = 32, max_nodes: int = 128,
+) -> None:
+    """Bounded structural preflight; world-relative soundness is *not* proven.
+
+    Refuse incomplete future branches before ANY proposed effect. This does
+    not replace BAA's world-model checker or live execution authorization.
+    """
+    seen_on_path: set[int] = set()
+    remaining_nodes = [max_nodes]
+
+    def walk(node: Mapping[str, Any], depth: int, effects: frozenset[str]) -> None:
+        remaining_nodes[0] -= 1
+        if remaining_nodes[0] < 0 or depth > max_depth:
+            raise ContingentPolicyViolation("policy exceeds finite size/depth bounds")
+        if not isinstance(node, Mapping):
+            raise ContingentPolicyViolation("policy continuation is not an object")
+        identity = id(node)
+        if identity in seen_on_path:
+            raise ContingentPolicyViolation("cyclic policy graph")
+        seen_on_path.add(identity)
+        try:
+            kind = node.get("kind")
+            next_node = node.get("next")
+            branches = node.get("branches")
+            if kind == "done":
+                if next_node is not None or branches:
+                    raise ContingentPolicyViolation("malformed terminal policy node")
+                return
+            name = node.get("name")
+            if not isinstance(name, str) or not name:
+                raise ContingentPolicyViolation("policy operation name must be nonempty")
+            if kind == "effect":
+                if name in effects or branches or not isinstance(next_node, Mapping):
+                    raise ContingentPolicyViolation(
+                        "missing effect continuation or replayed effect in policy"
+                    )
+                walk(next_node, depth + 1, effects | {name})
+            elif kind == "probe":
+                if (next_node is not None or not isinstance(branches, Mapping)
+                        or not branches or
+                        any(not isinstance(k, str) or not k for k in branches)):
+                    raise ContingentPolicyViolation(
+                        "missing or malformed observation branch"
+                    )
+                for child in branches.values():
+                    walk(child, depth + 1, effects)
+            else:
+                raise ContingentPolicyViolation("unrecognized policy node")
+        finally:
+            seen_on_path.remove(identity)
+
+    walk(root, 0, frozenset())
+
+
 class ContingentPolicyCursor:
     """Sequentially traverses a policy while enforcing real authority on every step.
 
@@ -50,7 +106,11 @@ class ContingentPolicyCursor:
         authorize_effect: Callable[[CaseBinding, str], bool],
         qualify_probe: Callable[[CaseBinding, str], bool],
     ) -> None:
-        self._node = dict(policy)
+        # Validate the *entire* future tree before staging the first step.
+        # Then own a snapshot so callers cannot mutate a later branch.
+        _validate_policy_shape(policy)
+        self._node = deepcopy(dict(policy))
+        _validate_policy_shape(self._node)
         self._binding = binding
         self._authorize = authorize_effect
         self._qualify = qualify_probe
