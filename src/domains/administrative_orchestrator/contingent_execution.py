@@ -69,6 +69,8 @@ class ContingentPolicyCursor:
         if self._blocked:
             return ProposedStep("blocked", reason="unresolved or invalidated policy")
         if self._pending is not None:
+            if self._pending.kind == "effect":
+                return ProposedStep("blocked", reason="effect attempted or in flight; await readback")
             return self._pending
         kind = self._node.get("kind")
         if kind == "done":
@@ -148,3 +150,54 @@ class ContingentPolicyCursor:
             raise ContingentPolicyViolation("effect continuation is malformed")
         self._node = continuation
         self._pending = None
+
+
+def compile_authorized_external_intents(
+    obligation_set: Any,
+    allowed_effects: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """Preflight the full effect batch *before* mutable domain fulfillment.
+
+    The immutable obligation set must agree with the current policy's exact
+    target/operation/authority class. A duplicate or rebound item is rejected
+    instead of being partly planned before the mismatch is detected.
+    """
+    from .obligations import ObligationFulfillmentKind
+
+    allowed: set[tuple[str, str, Any]] = {
+        (t.target_system, t.operation, t.authority_class) for t in allowed_effects
+    }
+    if len(allowed) != len(allowed_effects):
+        raise ContingentPolicyViolation("duplicate current-policy effect templates")
+    selected: list[Any] = []
+    seen_ids: set[Any] = set()
+    seen_intents: set[tuple[str, str, str]] = set()
+    for obligation in obligation_set.obligations:
+        if (obligation.case_id != obligation_set.case_id
+                or obligation.authority_epoch != obligation_set.authority_epoch
+                or obligation.governance_basis_id != obligation_set.governance_basis_id):
+            raise ContingentPolicyViolation("obligation escaped case/authority/governance binding")
+        if obligation.obligation_id in seen_ids:
+            raise ContingentPolicyViolation("duplicate frozen obligation identity")
+        seen_ids.add(obligation.obligation_id)
+        if obligation.fulfillment_kind is not ObligationFulfillmentKind.EXTERNAL_EFFECT_VERIFIED:
+            continue
+        exact = (obligation.target_system, obligation.required_operation,
+                 obligation.authority_class)
+        if exact not in allowed:
+            raise ContingentPolicyViolation("effect is outside currently allowed policy")
+        expected = obligation.expected_postcondition
+        if (expected.get("target_system") != obligation.target_system
+                or expected.get("operation") != obligation.required_operation
+                or expected.get("subject_ref") != obligation.subject_ref):
+            raise ContingentPolicyViolation("expected effect rebound from approved intent")
+        identity = (obligation.subject_ref, obligation.target_system, obligation.required_operation)
+        if identity in seen_intents:
+            raise ContingentPolicyViolation("duplicate external intent; replay risk")
+        seen_intents.add(identity)
+        selected.append(obligation)
+    # No silent omission of any current-policy required external effect.
+    if {(item.target_system, item.required_operation, item.authority_class)
+        for item in selected} != allowed:
+        raise ContingentPolicyViolation("frozen obligations do not cover allowed effects")
+    return tuple(selected)
