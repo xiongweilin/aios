@@ -1,0 +1,378 @@
+"""Model-relative policy cursor: no production dispatch, authority or readback forged."""
+from __future__ import annotations
+
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+from administrative_orchestrator.contingent_execution import (
+    CaseBinding,
+    ContingentPolicyCursor,
+    ContingentPolicyViolation,
+    ProposedStep,
+    compile_authorized_external_intents,
+)
+
+BIND = CaseBinding("case:1", 2, 4)
+PLAN = {
+    "kind": "probe", "name": "independent-subject-check",
+    "branches": {
+        "ok": {"kind": "effect", "name": "iam.disable",
+               "next": {"kind": "done"}},
+        "absent": {"kind": "done"},
+    },
+}
+
+
+def cursor(*, authorize=True, qualify=True, policy=PLAN):
+    return ContingentPolicyCursor(
+        policy, BIND,
+        authorize_effect=lambda current, effect: bool(authorize) and effect == "iam.disable",
+        qualify_probe=lambda current, source: bool(qualify)
+        and source == "independent-subject-check",
+    )
+
+
+def test_qualified_observation_then_separately_authorized_and_verified_effect():
+    item = cursor()
+    assert item.next_step(BIND) == ProposedStep("probe", "independent-subject-check")
+    item.observe(BIND, probe_name="independent-subject-check",
+                 observed_label="ok", independent_readback=True)
+    assert item.next_step(BIND) == ProposedStep("effect", "iam.disable")
+    item.resolve_effect(BIND, effect_name="iam.disable",
+                        result="verified", independent_readback=True)
+    assert item.next_step(BIND).kind == "done"
+    assert "independent domain completion" in item.next_step(BIND).reason
+
+
+def test_incomplete_policy_cannot_be_used_as_permission():
+    item = cursor(authorize=False)
+    item.next_step(BIND)
+    item.observe(BIND, probe_name="independent-subject-check",
+                 observed_label="ok", independent_readback=True)
+    with pytest.raises(ContingentPolicyViolation, match="not authorized"):
+        item.next_step(BIND)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_effect_unknown_stays_blocked_and_cannot_be_replayed():
+    item = cursor(policy={
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "done"},
+    })
+    assert item.next_step(BIND).kind == "effect"
+    with pytest.raises(ContingentPolicyViolation, match="reconciliation"):
+        item.resolve_effect(BIND, effect_name="iam.disable",
+                            result="unknown", independent_readback=False)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+
+def _reconciliation_policy():
+    return {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "settled": {"kind": "done"},
+                "pending": {
+                    "kind": "effect", "name": "iam.reconcile",
+                    "next": {"kind": "done"},
+                },
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize("label", ["settled", "pending"])
+def test_unknown_effect_only_allows_independent_readback_then_safe_recovery(label):
+    plan = _reconciliation_policy()
+    item = ContingentPolicyCursor(
+        plan, BIND,
+        authorize_effect=lambda _binding, name: name in {
+            "iam.disable", "iam.reconcile",
+        },
+        qualify_probe=lambda _binding, name: name == "independent-subject-check",
+    )
+    assert item.next_step(BIND).name == "iam.disable"
+    item.resolve_effect(
+        BIND, effect_name="iam.disable",
+        result="unknown", independent_readback=False,
+    )
+    assert item.next_step(BIND) == ProposedStep(
+        "probe", "independent-subject-check",
+    )
+    item.observe(
+        BIND, probe_name="independent-subject-check",
+        observed_label=label, independent_readback=True,
+    )
+    if label == "pending":
+        assert item.next_step(BIND).name == "iam.reconcile"
+        assert item.next_step(BIND).kind == "blocked"
+        item.resolve_effect(
+            BIND, effect_name="iam.reconcile",
+            result="verified", independent_readback=True,
+        )
+    assert item.next_step(BIND).kind == "done"
+
+
+def test_unknown_effect_unqualified_readback_never_proceeds():
+    item = ContingentPolicyCursor(
+        _reconciliation_policy(), BIND,
+        authorize_effect=lambda _binding, name: True,
+        qualify_probe=lambda _binding, name: False,
+    )
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="qualified reconciliation"):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable",
+            result="unknown", independent_readback=False,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_unknown_effect_cannot_skip_reconciliation_or_fake_verified_result():
+    item = cursor(policy={
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "effect", "name": "iam.reconcile",
+                 "next": {"kind": "done"}},
+    })
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="reconciliation"):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="unknown",
+            independent_readback=False,
+        )
+    with pytest.raises(ContingentPolicyViolation):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="verified",
+            independent_readback=True,
+        )
+
+
+def test_out_of_order_or_wrong_effect_rejected():
+    item = cursor(policy={
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "done"},
+    })
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="not independently admitted"):
+        item.resolve_effect(
+            BIND, effect_name="wrong.effect", result="verified",
+            independent_readback=True,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
+
+
+def test_entire_future_policy_preflight_prevents_partial_external_effect():
+    malicious = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "ok": {"kind": "done"},
+                "no": {"kind": "effect", "name": "iam.reconcile"},
+            },
+        },
+    }
+    with pytest.raises(ContingentPolicyViolation, match="continuation"):
+        cursor(policy=malicious)
+
+
+def test_policy_cycle_and_same_path_effect_replay_rejected_before_action():
+    loop = {"kind": "probe", "name": "independent-subject-check"}
+    loop["branches"] = {"again": loop}
+    with pytest.raises(ContingentPolicyViolation, match="cyclic"):
+        cursor(policy=loop)
+    replay = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "retry": {
+                    "kind": "effect", "name": "iam.disable",
+                    "next": {"kind": "done"},
+                },
+            },
+        },
+    }
+    with pytest.raises(ContingentPolicyViolation, match="replayed"):
+        cursor(policy=replay)
+
+
+def test_policy_is_defensively_copied_against_caller_mutation():
+    plan = {
+        "kind": "probe", "name": "independent-subject-check",
+        "branches": {"ok": {"kind": "done"}},
+    }
+    item = cursor(policy=plan)
+    plan["branches"]["ok"] = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "done"},
+    }
+    assert item.next_step(BIND).kind == "probe"
+    item.observe(
+        BIND, probe_name="independent-subject-check",
+        observed_label="ok", independent_readback=True,
+    )
+    assert item.next_step(BIND).kind == "done"
+
+
+def test_adversarial_policy_depth_and_node_limits():
+    plan = {"kind": "done"}
+    for _ in range(34):
+        plan = {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {"same": plan},
+        }
+    with pytest.raises(ContingentPolicyViolation, match="bounds"):
+        cursor(policy=plan)
+
+def test_stale_authority_epoch_invalidates_policy():
+    item = cursor()
+    with pytest.raises(ContingentPolicyViolation, match="recompile"):
+        item.next_step(CaseBinding("case:1", 3, 4))
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_missing_or_forged_branch_fails_closed():
+    item = cursor()
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="unmodeled observation"):
+        item.observe(BIND, probe_name="independent-subject-check",
+                     observed_label="unlisted", independent_readback=True)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_unqualified_readback_cannot_choose_a_branch():
+    item = cursor()
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="unqualified"):
+        item.observe(BIND, probe_name="independent-subject-check",
+                     observed_label="ok", independent_readback=False)
+    item = cursor(qualify=False)
+    with pytest.raises(ContingentPolicyViolation, match="untrusted"):
+        item.next_step(BIND)
+
+
+def test_bad_terminal_or_unsupported_step_does_not_create_effect():
+    item = cursor(policy={"kind": "done"})
+    assert item.next_step(BIND).kind == "done"  # never Administrative completion
+    with pytest.raises(ContingentPolicyViolation, match="unrecognized"):
+        cursor(policy={"kind": "invent-capability", "name": "iam.disable"})
+
+
+def test_direct_effect_without_independent_verification_stops():
+    item = cursor(policy={"kind": "effect", "name": "iam.disable",
+                          "next": {"kind": "done"}})
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="reconciliation"):
+        item.resolve_effect(BIND, effect_name="iam.disable",
+                            result="verified", independent_readback=False)
+
+
+
+def _batch():
+    from administrative_orchestrator.obligations import ObligationFulfillmentKind
+    case, basis, obligation_id = uuid4(), uuid4(), uuid4()
+    template = SimpleNamespace(
+        target_system="iam",
+        operation="identity.disable",
+        authority_class="privileged-access",
+    )
+    item = SimpleNamespace(
+        obligation_id=obligation_id,
+        case_id=case,
+        authority_epoch=5,
+        governance_basis_id=basis,
+        target_system="iam",
+        required_operation="identity.disable",
+        authority_class="privileged-access",
+        subject_ref="person:42",
+        fulfillment_kind=ObligationFulfillmentKind.EXTERNAL_EFFECT_VERIFIED,
+        expected_postcondition={
+            "target_system": "iam", "operation": "identity.disable",
+            "subject_ref": "person:42",
+        },
+    )
+    group = SimpleNamespace(
+        case_id=case,
+        authority_epoch=5,
+        governance_basis_id=basis,
+        obligations=(item,),
+    )
+    return group, template, item
+
+
+def _preflight(group, templates, *, case=None, governance_basis_id=None):
+    current = case or SimpleNamespace(
+        case_id=group.case_id,
+        authority_epoch=group.authority_epoch,
+        subject_ref="person:42",
+    )
+    return compile_authorized_external_intents(
+        group, templates,
+        case=current,
+        governance_basis_id=(
+            group.governance_basis_id
+            if governance_basis_id is None else governance_basis_id
+        ),
+    )
+
+
+def test_preflight_frozen_batch_exactly_matches_authorized_intent():
+    group, template, item = _batch()
+    assert _preflight(group, (template,)) == (item,)
+
+
+def test_preflight_rejects_duplicate_or_rebound_before_any_effect():
+    group, template, item = _batch()
+    group.obligations = (item, item)
+    with pytest.raises(ContingentPolicyViolation, match="duplicate"):
+        _preflight(group, (template,))
+    group.obligations = (item,)
+    item.expected_postcondition = {**item.expected_postcondition, "subject_ref": "another"}
+    with pytest.raises(ContingentPolicyViolation, match="rebound"):
+        _preflight(group, (template,))
+
+
+def test_preflight_fails_closed_on_stale_governance_or_missing_allowed_effect():
+    group, template, item = _batch()
+    item.authority_epoch += 1
+    with pytest.raises(ContingentPolicyViolation, match="binding"):
+        _preflight(group, (template,))
+    item.authority_epoch -= 1
+    with pytest.raises(ContingentPolicyViolation, match="outside"):
+        _preflight(group, ())
+
+
+def test_preflight_rejects_internally_consistent_but_wrong_case_or_subject():
+    group, template, item = _batch()
+    stale_case = SimpleNamespace(
+        case_id=uuid4(), authority_epoch=group.authority_epoch,
+        subject_ref="person:42",
+    )
+    with pytest.raises(ContingentPolicyViolation, match="current case"):
+        _preflight(group, (template,), case=stale_case)
+
+    wrong_subject_case = SimpleNamespace(
+        case_id=group.case_id, authority_epoch=group.authority_epoch,
+        subject_ref="person:99",
+    )
+    with pytest.raises(ContingentPolicyViolation, match="subject rebound"):
+        _preflight(group, (template,), case=wrong_subject_case)
+
+    # Previously passed: model-supplied obligation and expected payload both
+    # rebinding to the *same wrong person* while internal fields agree.
+    item.subject_ref = "person:99"
+    item.expected_postcondition["subject_ref"] = "person:99"
+    with pytest.raises(ContingentPolicyViolation, match="subject rebound"):
+        _preflight(group, (template,))
+
+
+def test_preflight_rejects_internally_consistent_stale_approval_basis():
+    group, template, _ = _batch()
+    with pytest.raises(ContingentPolicyViolation, match="governance"):
+        _preflight(group, (template,), governance_basis_id=uuid4())

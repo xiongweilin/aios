@@ -8,6 +8,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from .authority_lifecycle import AuthorityLifecycleRepository
 from .completion import assess_administrative_completion
+from .contingent_execution import compile_authorized_external_intents
 from .domain import (
     AdministrativeCase,
     CaseStatus,
@@ -153,16 +154,19 @@ class OffboardingExecutionEngine(OnboardingExecutionEngine):
                 transfer_requirements=transfers,
             )
             self.obligations.put(obligation_set)
+        # Validate the *whole* external-effect plan against the current policy
+        # before changing Administrative domain state or issuing any effect.
+        external_intents = compile_authorized_external_intents(
+            obligation_set,
+            evaluation.allowed_effects,
+            case=case,
+            governance_basis_id=basis.basis_id,
+        )
         self._fulfill_domain_state(
             case, obligation_set, transfers, transfer_phase=False
         )
 
-        for obligation in obligation_set.obligations:
-            if (
-                obligation.fulfillment_kind
-                is not ObligationFulfillmentKind.EXTERNAL_EFFECT_VERIFIED
-            ):
-                continue
+        for obligation in external_intents:
             authorization = mint_execution_authorization_from_approval(
                 case,
                 satisfaction,
