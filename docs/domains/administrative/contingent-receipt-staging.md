@@ -24,6 +24,12 @@ effects). Then use `observe_with_receipt` and `resolve_effect_with_receipt`.
   independence and the historical effect. The receipt fields do not prove this.
 - In this mode, the legacy `independent_readback=True` path cannot advance a
   probe or a verified effect without a qualified receipt.
+- Each independently accepted evidence locator can advance this in-memory cursor
+  at most once, even if reused under a different source name. Repeated
+  observations require genuinely fresh and independently verified evidence.
+  This replay guard is **not durable across process restarts** and requires a
+  protected evidence store and durable reconciliation before production use.
+- Strict mode refuses to stage an effect without a bound durable effect ID.
 - An effect-unknown report is **not** a verified outcome; it can only move to
   the precompiled qualified probe, not dispatch the same effect again.
 - Even a verified policy `done` never closes the Administrative case.
