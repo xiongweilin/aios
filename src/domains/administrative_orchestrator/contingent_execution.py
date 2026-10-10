@@ -144,6 +144,9 @@ class ContingentPolicyCursor:
         self._effect_identities = dict(effect_identities or {})
         self._pending: ProposedStep | None = None
         self._attempted: set[str] = set()
+        # A repeated named probe needs a FRESH independent observation.
+        # Reusing the same evidence locator cannot advance a later step.
+        self._consumed_receipts: set[tuple[str, str]] = set()
         self._blocked = False
 
     def _require_same_binding(self, binding: CaseBinding) -> None:
@@ -173,6 +176,9 @@ class ContingentPolicyCursor:
             if name in self._attempted:
                 self._blocked = True
                 raise ContingentPolicyViolation("effect identity already attempted")
+            if self._verify_receipt is not None and not self._effect_identities.get(name):
+                self._blocked = True
+                raise ContingentPolicyViolation("effect lacks durable identity in receipt-enforced mode")
             if not self._authorize(binding, name):
                 self._blocked = True
                 raise ContingentPolicyViolation("effect not authorized by live policy")
@@ -212,6 +218,9 @@ class ContingentPolicyCursor:
         elif receipt.effect_identity:
             self._blocked = True
             raise ContingentPolicyViolation("probe receipt carried effect identity")
+        if (receipt.source_ref, receipt.evidence_ref) in self._consumed_receipts:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent evidence receipt already consumed")
         # This callback must inspect independently protected evidence. The
         # receipt's fields alone cannot attest source, scope or freshness.
         try:
@@ -222,6 +231,9 @@ class ContingentPolicyCursor:
         if qualified is not True:
             self._blocked = True
             raise ContingentPolicyViolation("independent receipt qualification failed")
+        # Consume before moving the policy cursor. Even if the subsequent
+        # transition fails, this identity may not certify a different step.
+        self._consumed_receipts.add((receipt.source_ref, receipt.evidence_ref))
 
     def observe(
         self,
