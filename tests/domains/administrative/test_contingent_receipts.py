@@ -210,6 +210,22 @@ def test_repeated_probe_requires_fresh_protected_evidence_locator():
     assert other.next_step(BIND).kind == "done"
 
 
+    # Retagging one immutable evidence locator with another accepted source
+    # must not let it certify a second observation.
+    alias = cursor(
+        plan=plan, verify_receipt=lambda r: r.evidence_ref == "evidence:probe"
+        and r.source_ref in {"independent:fixture", "independent:alias"},
+    )
+    alias.next_step(BIND)
+    alias.observe_with_receipt(BIND, probe_name="read.subject", receipt=first)
+    alias.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="already consumed"):
+        alias.observe_with_receipt(
+            BIND, probe_name="read.subject",
+            receipt=replace(first, source_ref="independent:alias"),
+        )
+
+
 def test_unknown_effect_requires_effect_readback_not_subject_eligibility():
     # Qualifying an initial subject is not the same as reading back the
     # durable effect. The required meaning remains external to this fixture.
