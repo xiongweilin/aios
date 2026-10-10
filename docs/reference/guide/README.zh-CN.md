@@ -19,3 +19,5 @@
 [BAA-Protocol](https://github.com/xiongweilin/BAA-Protocol) 研究在**明确范围、固定版本的 AIOS 执行接口**上实施有界准入、窄权限、独立回读与恢复。见 [AIOS 集成边界](https://github.com/xiongweilin/BAA-Protocol/blob/main/integration/README.zh-CN.md)与[主张—证据索引](https://github.com/xiongweilin/BAA-Protocol/blob/main/experiments/claim-evidence-index.zh-CN.md)。
 
 有限结构检查、隔离真实产品验收和正负并存的前瞻委托实验，**不能**证明 AIOS 所有操作均经过 BAA、生产部署已获认证、全部外部损害可以测量或人工总复核成本已经下降。具体 AIOS 部署仍以现行契约、代码和相应测试为准；BAA 的现实保证还需要另行验证接口、证据桥接、假设和版本。
+
+[guide 影响路径](https://github.com/xiongweilin/guide/blob/main/use/studies/impact-pathway.zh-CN.md)梳理了从有界执行到总人工劳动与用户收益之间尚未测量的环节。它用于限定主张，不是 AIOS 产品保证。
