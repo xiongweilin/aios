@@ -1,0 +1,164 @@
+"""Adversarial evidence-receipt tests for the STAGING-only policy cursor.
+
+The independent verifier is a fixture, not a production evidence authority.
+No provider writes or operational acceptance are exercised here.
+"""
+from __future__ import annotations
+
+from dataclasses import replace
+
+import pytest
+
+from administrative_orchestrator.contingent_execution import (
+    CaseBinding,
+    ContingentPolicyCursor,
+    ContingentPolicyViolation,
+    EvidenceReceipt,
+)
+
+BIND = CaseBinding("case:fixture", 7, 12)
+PLAN = {
+    "kind": "probe", "name": "read.subject",
+    "branches": {
+        "eligible": {
+            "kind": "effect", "name": "iam.disable",
+            "next": {"kind": "done"},
+        },
+        "ineligible": {"kind": "done"},
+    },
+}
+KNOWN = {"evidence:probe", "evidence:effect"}
+
+
+def cursor(plan=PLAN, **changes):
+    options = dict(
+        authorize_effect=lambda _binding, name: name == "iam.disable",
+        qualify_probe=lambda _binding, name: name == "read.subject",
+        verify_receipt=lambda receipt: receipt.evidence_ref in KNOWN
+        and receipt.source_ref == "independent:fixture",
+        effect_identities={"iam.disable": "runtime-effect:immutable-42"},
+    )
+    options.update(changes)
+    return ContingentPolicyCursor(plan, BIND, **options)
+
+
+def probe_receipt(label="eligible"):
+    return EvidenceReceipt(
+        binding=BIND, kind="probe", step_name="read.subject",
+        disposition=label, evidence_ref="evidence:probe",
+        source_ref="independent:fixture",
+    )
+
+
+def effect_receipt():
+    return EvidenceReceipt(
+        binding=BIND, kind="effect", step_name="iam.disable",
+        disposition="verified", evidence_ref="evidence:effect",
+        source_ref="independent:fixture",
+        effect_identity="runtime-effect:immutable-42",
+    )
+
+
+def test_verified_receipts_advance_but_do_not_dispatch_or_close_domain():
+    item = cursor()
+    assert item.next_step(BIND).name == "read.subject"
+    item.observe_with_receipt(BIND, probe_name="read.subject", receipt=probe_receipt())
+    assert item.next_step(BIND).name == "iam.disable"
+    item.resolve_effect_with_receipt(
+        BIND, effect_name="iam.disable", receipt=effect_receipt(),
+    )
+    assert item.next_step(BIND).kind == "done"
+    assert "independent domain completion" in item.next_step(BIND).reason
+
+
+def test_true_boolean_cannot_bypass_strict_probe_receipt():
+    item = cursor()
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="receipt required"):
+        item.observe(BIND, probe_name="read.subject",
+                     observed_label="eligible", independent_readback=True)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_true_boolean_cannot_bypass_strict_effect_receipt():
+    item = cursor(plan={"kind": "effect", "name": "iam.disable", "next": {"kind": "done"}})
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="receipt required"):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="verified", independent_readback=True,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
+@pytest.mark.parametrize(
+    "bad_receipt",
+    [
+        replace(probe_receipt(), binding=CaseBinding("case:other", 7, 12)),
+        replace(probe_receipt(), binding=CaseBinding("case:fixture", 8, 12)),
+        replace(probe_receipt(), step_name="read.other"),
+        replace(probe_receipt(), evidence_ref="unverified:claimed"),
+        replace(probe_receipt(), source_ref="agent:self-asserted"),
+        replace(probe_receipt(), effect_identity="not-a-probe"),
+    ],
+)
+def test_stale_wrong_source_or_unbound_probe_evidence_fails_closed(bad_receipt):
+    item = cursor()
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation):
+        item.observe_with_receipt(BIND, probe_name="read.subject", receipt=bad_receipt)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+@pytest.mark.parametrize(
+    "bad_receipt",
+    [
+        replace(effect_receipt(), effect_identity="another-effect"),
+        replace(effect_receipt(), binding=CaseBinding("case:fixture", 7, 13)),
+        replace(effect_receipt(), disposition="pending"),
+        replace(effect_receipt(), evidence_ref="unverified:claimed"),
+    ],
+)
+def test_effect_rebound_or_unverified_disposition_fails_closed(bad_receipt):
+    item = cursor(plan={"kind": "effect", "name": "iam.disable", "next": {"kind": "done"}})
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation):
+        item.resolve_effect_with_receipt(
+            BIND, effect_name="iam.disable", receipt=bad_receipt,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_receipt_fields_without_independent_verifier_are_not_evidence():
+    item = cursor(verify_receipt=None)
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="independent receipt"):
+        item.observe_with_receipt(BIND, probe_name="read.subject", receipt=probe_receipt())
+
+
+def test_verified_but_unmodeled_observation_halts():
+    item = cursor()
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="unmodeled observation"):
+        item.observe_with_receipt(
+            BIND, probe_name="read.subject", receipt=probe_receipt("surprise"),
+        )
+
+
+def test_unknown_effect_can_only_transition_to_precompiled_qualified_probe():
+    plan = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "read.subject",
+            "branches": {"eligible": {"kind": "done"}},
+        },
+    }
+    item = cursor(plan=plan)
+    assert item.next_step(BIND).name == "iam.disable"
+    item.resolve_effect(
+        BIND, effect_name="iam.disable", result="unknown", independent_readback=False,
+    )
+    assert item.next_step(BIND).name == "read.subject"
+    item.observe_with_receipt(
+        BIND, probe_name="read.subject", receipt=probe_receipt(),
+    )
+    assert item.next_step(BIND).kind == "done"
