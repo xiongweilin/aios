@@ -160,6 +160,37 @@ def test_verified_but_unmodeled_observation_halts():
         )
 
 
+@pytest.mark.parametrize(
+    "gate",
+    [
+        lambda _binding, _name: "truthy-but-not-approved",
+        lambda _binding, _name: (_ for _ in ()).throw(OSError("auth unavailable")),
+    ],
+)
+def test_live_authorization_gate_requires_boolean_true(gate):
+    item = cursor(
+        plan={"kind": "effect", "name": "iam.disable", "next": {"kind": "done"}},
+        authorize_effect=gate,
+    )
+    with pytest.raises(ContingentPolicyViolation, match="not authorized"):
+        item.next_step(BIND)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+@pytest.mark.parametrize(
+    "gate",
+    [
+        lambda _binding, _name: "maybe",
+        lambda _binding, _name: (_ for _ in ()).throw(OSError("probe unavailable")),
+    ],
+)
+def test_probe_qualification_gate_requires_boolean_true(gate):
+    item = cursor(qualify_probe=gate)
+    with pytest.raises(ContingentPolicyViolation, match="untrusted"):
+        item.next_step(BIND)
+    assert item.next_step(BIND).kind == "blocked"
+
+
 def test_strict_mode_will_not_stage_an_effect_with_no_durable_identity():
     item = cursor(
         plan={"kind": "effect", "name": "iam.disable", "next": {"kind": "done"}},
