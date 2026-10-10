@@ -81,7 +81,7 @@ jobs:
           tests/kernel/world_runtime/test_postgres_ledger.py
 
 
-  baa-network-preflight:
+  baa-network-preflight-versions:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -155,3 +155,11 @@ jobs:
         run: |
           docker compose -f tests/acceptance/baa_offboarding/compose.network.yaml down -v --remove-orphans || true
           docker image rm -f "$AIOS_IMAGE" 2>/dev/null || true
+
+  # Keep the stable branch-protection context, covering both pinned and moving BAA.
+  baa-network-preflight:
+    needs: baa-network-preflight-versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Both BAA contract baselines passed
+        run: echo "Pinned and current-BAA network preflights succeeded"
