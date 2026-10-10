@@ -156,6 +156,9 @@ class ContingentPolicyCursor:
 def compile_authorized_external_intents(
     obligation_set: Any,
     allowed_effects: tuple[Any, ...],
+    *,
+    case: Any,
+    governance_basis_id: Any,
 ) -> tuple[Any, ...]:
     """Preflight the full effect batch *before* mutable domain fulfillment.
 
@@ -164,6 +167,16 @@ def compile_authorized_external_intents(
     instead of being partly planned before the mismatch is detected.
     """
     from .obligations import ObligationFulfillmentKind
+
+    # A batch can be internally consistent yet belong to a *different*
+    # case, subject, or past approval. Compare it to live governed inputs.
+    if (obligation_set.case_id != case.case_id
+            or obligation_set.authority_epoch != case.authority_epoch
+            or obligation_set.governance_basis_id != governance_basis_id
+            or not case.subject_ref):
+        raise ContingentPolicyViolation(
+            "frozen batch does not match current case/authority/governance"
+        )
 
     allowed: set[tuple[str, str, Any]] = {
         (t.target_system, t.operation, t.authority_class) for t in allowed_effects
@@ -183,6 +196,10 @@ def compile_authorized_external_intents(
         seen_ids.add(obligation.obligation_id)
         if obligation.fulfillment_kind is not ObligationFulfillmentKind.EXTERNAL_EFFECT_VERIFIED:
             continue
+        if obligation.subject_ref != case.subject_ref:
+            raise ContingentPolicyViolation(
+                "effect subject rebound from current governed case"
+            )
         exact = (obligation.target_system, obligation.required_operation,
                  obligation.authority_class)
         if exact not in allowed:
