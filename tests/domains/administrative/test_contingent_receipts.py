@@ -160,6 +160,56 @@ def test_verified_but_unmodeled_observation_halts():
         )
 
 
+def test_strict_mode_will_not_stage_an_effect_with_no_durable_identity():
+    item = cursor(
+        plan={"kind": "effect", "name": "iam.disable", "next": {"kind": "done"}},
+        effect_identities={},
+    )
+    with pytest.raises(ContingentPolicyViolation, match="durable identity"):
+        item.next_step(BIND)
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_repeated_probe_requires_fresh_protected_evidence_locator():
+    # Two reads of the same named probe cannot reuse one evidence reference
+    # merely because the case/version and observation label still match.
+    plan = {
+        "kind": "probe", "name": "read.subject",
+        "branches": {
+            "eligible": {
+                "kind": "probe", "name": "read.subject",
+                "branches": {
+                    "eligible": {"kind": "done"},
+                    "ineligible": {"kind": "done"},
+                },
+            },
+            "ineligible": {"kind": "done"},
+        },
+    }
+    first = probe_receipt("eligible")
+    item = cursor(plan=plan)
+    assert item.next_step(BIND).name == "read.subject"
+    item.observe_with_receipt(BIND, probe_name="read.subject", receipt=first)
+    assert item.next_step(BIND).name == "read.subject"
+    with pytest.raises(ContingentPolicyViolation, match="already consumed"):
+        item.observe_with_receipt(BIND, probe_name="read.subject", receipt=first)
+    assert item.next_step(BIND).kind == "blocked"
+
+    # A second *independently qualified* locator advances, but the mocked
+    # verifier is not evidence of production readback independence.
+    fresh = replace(first, evidence_ref="evidence:fresh")
+    other = cursor(
+        plan=plan, verify_receipt=lambda r: r.evidence_ref in {
+            "evidence:probe", "evidence:fresh",
+        } and r.source_ref == "independent:fixture",
+    )
+    other.next_step(BIND)
+    other.observe_with_receipt(BIND, probe_name="read.subject", receipt=first)
+    other.next_step(BIND)
+    other.observe_with_receipt(BIND, probe_name="read.subject", receipt=fresh)
+    assert other.next_step(BIND).kind == "done"
+
+
 def test_unknown_effect_requires_effect_readback_not_subject_eligibility():
     # Qualifying an initial subject is not the same as reading back the
     # durable effect. The required meaning remains external to this fixture.
