@@ -67,6 +67,103 @@ def test_effect_unknown_stays_blocked_and_cannot_be_replayed():
     assert item.next_step(BIND).kind == "blocked"
 
 
+
+def _reconciliation_policy():
+    return {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "settled": {"kind": "done"},
+                "pending": {
+                    "kind": "effect", "name": "iam.reconcile",
+                    "next": {"kind": "done"},
+                },
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize("label", ["settled", "pending"])
+def test_unknown_effect_only_allows_independent_readback_then_safe_recovery(label):
+    plan = _reconciliation_policy()
+    item = ContingentPolicyCursor(
+        plan, BIND,
+        authorize_effect=lambda _binding, name: name in {
+            "iam.disable", "iam.reconcile",
+        },
+        qualify_probe=lambda _binding, name: name == "independent-subject-check",
+    )
+    assert item.next_step(BIND).name == "iam.disable"
+    item.resolve_effect(
+        BIND, effect_name="iam.disable",
+        result="unknown", independent_readback=False,
+    )
+    assert item.next_step(BIND) == ProposedStep(
+        "probe", "independent-subject-check",
+    )
+    item.observe(
+        BIND, probe_name="independent-subject-check",
+        observed_label=label, independent_readback=True,
+    )
+    if label == "pending":
+        assert item.next_step(BIND).name == "iam.reconcile"
+        assert item.next_step(BIND).kind == "blocked"
+        item.resolve_effect(
+            BIND, effect_name="iam.reconcile",
+            result="verified", independent_readback=True,
+        )
+    assert item.next_step(BIND).kind == "done"
+
+
+def test_unknown_effect_unqualified_readback_never_proceeds():
+    item = ContingentPolicyCursor(
+        _reconciliation_policy(), BIND,
+        authorize_effect=lambda _binding, name: True,
+        qualify_probe=lambda _binding, name: False,
+    )
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="qualified reconciliation"):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable",
+            result="unknown", independent_readback=False,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
+def test_unknown_effect_cannot_skip_reconciliation_or_fake_verified_result():
+    item = cursor(policy={
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "effect", "name": "iam.disable",
+                 "next": {"kind": "done"}},
+    })
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="reconciliation"):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="unknown",
+            independent_readback=False,
+        )
+    with pytest.raises(ContingentPolicyViolation):
+        item.resolve_effect(
+            BIND, effect_name="iam.disable", result="verified",
+            independent_readback=True,
+        )
+
+
+def test_out_of_order_or_wrong_effect_rejected():
+    item = cursor(policy={
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "done"},
+    })
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="not independently admitted"):
+        item.resolve_effect(
+            BIND, effect_name="wrong.effect", result="verified",
+            independent_readback=True,
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
 def test_stale_authority_epoch_invalidates_policy():
     item = cursor()
     with pytest.raises(ContingentPolicyViolation, match="recompile"):
