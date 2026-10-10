@@ -134,7 +134,7 @@ def test_unknown_effect_unqualified_readback_never_proceeds():
 def test_unknown_effect_cannot_skip_reconciliation_or_fake_verified_result():
     item = cursor(policy={
         "kind": "effect", "name": "iam.disable",
-        "next": {"kind": "effect", "name": "iam.disable",
+        "next": {"kind": "effect", "name": "iam.reconcile",
                  "next": {"kind": "done"}},
     })
     item.next_step(BIND)
@@ -163,6 +163,72 @@ def test_out_of_order_or_wrong_effect_rejected():
         )
     assert item.next_step(BIND).kind == "blocked"
 
+
+
+
+def test_entire_future_policy_preflight_prevents_partial_external_effect():
+    malicious = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "ok": {"kind": "done"},
+                "no": {"kind": "effect", "name": "iam.reconcile"},
+            },
+        },
+    }
+    with pytest.raises(ContingentPolicyViolation, match="continuation"):
+        cursor(policy=malicious)
+
+
+def test_policy_cycle_and_same_path_effect_replay_rejected_before_action():
+    loop = {"kind": "probe", "name": "independent-subject-check"}
+    loop["branches"] = {"again": loop}
+    with pytest.raises(ContingentPolicyViolation, match="cyclic"):
+        cursor(policy=loop)
+    replay = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {
+                "retry": {
+                    "kind": "effect", "name": "iam.disable",
+                    "next": {"kind": "done"},
+                },
+            },
+        },
+    }
+    with pytest.raises(ContingentPolicyViolation, match="replayed"):
+        cursor(policy=replay)
+
+
+def test_policy_is_defensively_copied_against_caller_mutation():
+    plan = {
+        "kind": "probe", "name": "independent-subject-check",
+        "branches": {"ok": {"kind": "done"}},
+    }
+    item = cursor(policy=plan)
+    plan["branches"]["ok"] = {
+        "kind": "effect", "name": "iam.disable",
+        "next": {"kind": "done"},
+    }
+    assert item.next_step(BIND).kind == "probe"
+    item.observe(
+        BIND, probe_name="independent-subject-check",
+        observed_label="ok", independent_readback=True,
+    )
+    assert item.next_step(BIND).kind == "done"
+
+
+def test_adversarial_policy_depth_and_node_limits():
+    plan = {"kind": "done"}
+    for _ in range(34):
+        plan = {
+            "kind": "probe", "name": "independent-subject-check",
+            "branches": {"same": plan},
+        }
+    with pytest.raises(ContingentPolicyViolation, match="bounds"):
+        cursor(policy=plan)
 
 def test_stale_authority_epoch_invalidates_policy():
     item = cursor()
@@ -194,9 +260,8 @@ def test_unqualified_readback_cannot_choose_a_branch():
 def test_bad_terminal_or_unsupported_step_does_not_create_effect():
     item = cursor(policy={"kind": "done"})
     assert item.next_step(BIND).kind == "done"  # never Administrative completion
-    item = cursor(policy={"kind": "invent-capability", "name": "iam.disable"})
     with pytest.raises(ContingentPolicyViolation, match="unrecognized"):
-        item.next_step(BIND)
+        cursor(policy={"kind": "invent-capability", "name": "iam.disable"})
 
 
 def test_direct_effect_without_independent_verification_stops():
