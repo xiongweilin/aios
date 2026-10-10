@@ -139,16 +139,32 @@ class ContingentPolicyCursor:
         if self._blocked or self._pending != ProposedStep("effect", effect_name):
             self._blocked = True
             raise ContingentPolicyViolation("effect was not independently admitted")
+        # An effect-unknown response must never be treated as success or
+        # license to dispatch another effect. A *precompiled, qualified*
+        # read-only probe is the sole allowed next step for reconciliation.
         self._attempted.add(effect_name)
+        continuation = self._node["next"]
+        if not isinstance(continuation, dict):
+            self._blocked = True
+            raise ContingentPolicyViolation("effect continuation is malformed")
+        if result == "unknown":
+            probe_name = continuation.get("name")
+            if (continuation.get("kind") != "probe"
+                    or not isinstance(probe_name, str)
+                    or not probe_name
+                    or not self._qualify(binding, probe_name)):
+                self._blocked = True
+                raise ContingentPolicyViolation(
+                    "effect unknown without qualified reconciliation probe"
+                )
+            self._node = continuation
+            self._pending = None
+            return
         if result != "verified" or not independent_readback:
             self._blocked = True
             raise ContingentPolicyViolation(
                 "effect is not independently verified; reconciliation required"
             )
-        continuation = self._node["next"]
-        if not isinstance(continuation, dict):
-            self._blocked = True
-            raise ContingentPolicyViolation("effect continuation is malformed")
         self._node = continuation
         self._pending = None
 
