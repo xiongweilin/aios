@@ -145,8 +145,8 @@ class ContingentPolicyCursor:
         self._pending: ProposedStep | None = None
         self._attempted: set[str] = set()
         # A repeated named probe needs a FRESH independent observation.
-        # Reusing the same evidence locator cannot advance a later step.
-        self._consumed_receipts: set[tuple[str, str]] = set()
+        # Reusing a locator (even with a rebound source name) cannot advance a later step.
+        self._consumed_receipts: set[str] = set()
         self._blocked = False
 
     def _require_same_binding(self, binding: CaseBinding) -> None:
@@ -218,7 +218,7 @@ class ContingentPolicyCursor:
         elif receipt.effect_identity:
             self._blocked = True
             raise ContingentPolicyViolation("probe receipt carried effect identity")
-        if (receipt.source_ref, receipt.evidence_ref) in self._consumed_receipts:
+        if receipt.evidence_ref in self._consumed_receipts:
             self._blocked = True
             raise ContingentPolicyViolation("independent evidence receipt already consumed")
         # This callback must inspect independently protected evidence. The
@@ -233,7 +233,7 @@ class ContingentPolicyCursor:
             raise ContingentPolicyViolation("independent receipt qualification failed")
         # Consume before moving the policy cursor. Even if the subsequent
         # transition fails, this identity may not certify a different step.
-        self._consumed_receipts.add((receipt.source_ref, receipt.evidence_ref))
+        self._consumed_receipts.add(receipt.evidence_ref)
 
     def observe(
         self,
