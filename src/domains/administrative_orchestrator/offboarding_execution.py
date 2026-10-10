@@ -157,7 +157,10 @@ class OffboardingExecutionEngine(OnboardingExecutionEngine):
         # Validate the *whole* external-effect plan against the current policy
         # before changing Administrative domain state or issuing any effect.
         external_intents = compile_authorized_external_intents(
-            obligation_set, evaluation.allowed_effects
+            obligation_set,
+            evaluation.allowed_effects,
+            case=case,
+            governance_basis_id=basis.basis_id,
         )
         self._fulfill_domain_state(
             case, obligation_set, transfers, transfer_phase=False
