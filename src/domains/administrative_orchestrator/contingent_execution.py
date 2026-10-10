@@ -156,6 +156,21 @@ class ContingentPolicyCursor:
                 "case, authority epoch or state version changed; recompile"
             )
 
+    def _require_gate(
+        self, callback: Callable[[CaseBinding, str], bool],
+        binding: CaseBinding, name: str, denial: str,
+    ) -> None:
+        # Live authorization/probe qualification is not a stringly-typed
+        # attestation. Errors and truthy non-bools always fail closed.
+        try:
+            allowed = callback(binding, name)
+        except Exception as exc:
+            self._blocked = True
+            raise ContingentPolicyViolation(denial + " (callback unavailable)") from exc
+        if allowed is not True:
+            self._blocked = True
+            raise ContingentPolicyViolation(denial)
+
     def next_step(self, binding: CaseBinding) -> ProposedStep:
         self._require_same_binding(binding)
         if self._blocked:
@@ -179,16 +194,16 @@ class ContingentPolicyCursor:
             if self._verify_receipt is not None and not self._effect_identities.get(name):
                 self._blocked = True
                 raise ContingentPolicyViolation("effect lacks durable identity in receipt-enforced mode")
-            if not self._authorize(binding, name):
-                self._blocked = True
-                raise ContingentPolicyViolation("effect not authorized by live policy")
+            self._require_gate(
+                self._authorize, binding, name, "effect not authorized by live policy",
+            )
             if not isinstance(self._node.get("next"), dict):
                 self._blocked = True
                 raise ContingentPolicyViolation("effect continuation missing")
         elif kind == "probe":
-            if not self._qualify(binding, name):
-                self._blocked = True
-                raise ContingentPolicyViolation("untrusted or unavailable readback source")
+            self._require_gate(
+                self._qualify, binding, name, "untrusted or unavailable readback source",
+            )
             branches = self._node.get("branches")
             if not isinstance(branches, dict) or not branches:
                 self._blocked = True
@@ -268,10 +283,12 @@ class ContingentPolicyCursor:
     ) -> None:
         self._require_same_binding(binding)
         if (self._blocked or self._pending != ProposedStep("probe", probe_name)
-                or not independent_readback
-                or not self._qualify(binding, probe_name)):
+                or not independent_readback):
             self._blocked = True
             raise ContingentPolicyViolation("observation is unqualified or unrequested")
+        self._require_gate(
+            self._qualify, binding, probe_name, "observation is unqualified or unrequested",
+        )
         branches = self._node["branches"]
         continuation = branches.get(observed_label)
         if not isinstance(continuation, dict):
@@ -329,12 +346,15 @@ class ContingentPolicyCursor:
             probe_name = continuation.get("name")
             if (continuation.get("kind") != "probe"
                     or not isinstance(probe_name, str)
-                    or not probe_name
-                    or not self._qualify(binding, probe_name)):
+                    or not probe_name):
                 self._blocked = True
                 raise ContingentPolicyViolation(
                     "effect unknown without qualified reconciliation probe"
                 )
+            self._require_gate(
+                self._qualify, binding, probe_name,
+                "effect unknown without qualified reconciliation probe",
+            )
             self._node = continuation
             self._pending = None
             return
