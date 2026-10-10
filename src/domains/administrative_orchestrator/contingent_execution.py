@@ -214,7 +214,12 @@ class ContingentPolicyCursor:
             raise ContingentPolicyViolation("probe receipt carried effect identity")
         # This callback must inspect independently protected evidence. The
         # receipt's fields alone cannot attest source, scope or freshness.
-        if not self._verify_receipt(receipt):
+        try:
+            qualified = self._verify_receipt(receipt)
+        except Exception as exc:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent receipt verifier unavailable") from exc
+        if qualified is not True:
             self._blocked = True
             raise ContingentPolicyViolation("independent receipt qualification failed")
 
