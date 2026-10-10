@@ -144,27 +144,73 @@ def _batch():
     return group, template, item
 
 
+def _preflight(group, templates, *, case=None, governance_basis_id=None):
+    current = case or SimpleNamespace(
+        case_id=group.case_id,
+        authority_epoch=group.authority_epoch,
+        subject_ref="person:42",
+    )
+    return compile_authorized_external_intents(
+        group, templates,
+        case=current,
+        governance_basis_id=(
+            group.governance_basis_id
+            if governance_basis_id is None else governance_basis_id
+        ),
+    )
+
+
 def test_preflight_frozen_batch_exactly_matches_authorized_intent():
     group, template, item = _batch()
-    assert compile_authorized_external_intents(group, (template,)) == (item,)
+    assert _preflight(group, (template,)) == (item,)
 
 
 def test_preflight_rejects_duplicate_or_rebound_before_any_effect():
     group, template, item = _batch()
     group.obligations = (item, item)
     with pytest.raises(ContingentPolicyViolation, match="duplicate"):
-        compile_authorized_external_intents(group, (template,))
+        _preflight(group, (template,))
     group.obligations = (item,)
     item.expected_postcondition = {**item.expected_postcondition, "subject_ref": "another"}
     with pytest.raises(ContingentPolicyViolation, match="rebound"):
-        compile_authorized_external_intents(group, (template,))
+        _preflight(group, (template,))
 
 
 def test_preflight_fails_closed_on_stale_governance_or_missing_allowed_effect():
     group, template, item = _batch()
     item.authority_epoch += 1
     with pytest.raises(ContingentPolicyViolation, match="binding"):
-        compile_authorized_external_intents(group, (template,))
+        _preflight(group, (template,))
     item.authority_epoch -= 1
     with pytest.raises(ContingentPolicyViolation, match="outside"):
-        compile_authorized_external_intents(group, ())
+        _preflight(group, ())
+
+
+def test_preflight_rejects_internally_consistent_but_wrong_case_or_subject():
+    group, template, item = _batch()
+    stale_case = SimpleNamespace(
+        case_id=uuid4(), authority_epoch=group.authority_epoch,
+        subject_ref="person:42",
+    )
+    with pytest.raises(ContingentPolicyViolation, match="current case"):
+        _preflight(group, (template,), case=stale_case)
+
+    wrong_subject_case = SimpleNamespace(
+        case_id=group.case_id, authority_epoch=group.authority_epoch,
+        subject_ref="person:99",
+    )
+    with pytest.raises(ContingentPolicyViolation, match="subject rebound"):
+        _preflight(group, (template,), case=wrong_subject_case)
+
+    # Previously passed: model-supplied obligation and expected payload both
+    # rebinding to the *same wrong person* while internal fields agree.
+    item.subject_ref = "person:99"
+    item.expected_postcondition["subject_ref"] = "person:99"
+    with pytest.raises(ContingentPolicyViolation, match="subject rebound"):
+        _preflight(group, (template,))
+
+
+def test_preflight_rejects_internally_consistent_stale_approval_basis():
+    group, template, _ = _batch()
+    with pytest.raises(ContingentPolicyViolation, match="governance"):
+        _preflight(group, (template,), governance_basis_id=uuid4())
