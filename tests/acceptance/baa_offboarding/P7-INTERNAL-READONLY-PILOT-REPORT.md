@@ -58,7 +58,7 @@ python tests/acceptance/baa_offboarding/real_e2e/p7_internal_readonly_pilot.py o
 
 ### 结果与后续门槛
 
-候选一三轮四源预检均通过；三次值守门都超时，没有采样。第三次用户在 TTY 提示前发送了 `ON-DUTY`，但未在 60 秒窗口内转入 TTY，不能追溯算作确认。当前没有有效的值守确认；下一次 activation 需要在新提示出现时收到一条新鲜的人工 `ON-DUTY`，之后仅逐字转发用户实际输入的 `ACK`/`STOP` 等命令，不自动生成。
+候选一四轮四源预检均通过；四次值守门都超时，没有采样。第三次用户在 TTY 提示前发送了 `ON-DUTY`，但未在 60 秒窗口内转入 TTY，不能追溯算作确认。当前没有有效的值守确认；下一次 activation 需要在新提示出现时收到一条新鲜的人工 `ON-DUTY`，之后仅逐字转发用户实际输入的 `ACK`/`STOP` 等命令，不自动生成。
 
 ## English
 
@@ -114,4 +114,4 @@ The first command must run within the approved short preflight window. The secon
 
 ### Outcome and next gate
 
-All three candidate-1 preflights qualified, but all three observer starts timed out because no `ON-DUTY` reached the TTY in time. The third user-supplied token arrived before the TTY prompt and was not relayed within the 60-second window; it does not count. A future activation requires a fresh human `ON-DUTY` at its prompt. The wrapper will stream TTY output and use the approved private thread as the contact route; only exact user-entered `ON-DUTY`/`ACK` strings will be relayed, never generated automatically. If no timely input arrives, stop without sampling.
+All four candidate-1 preflights qualified, but all four observer starts timed out because no `ON-DUTY` reached the TTY in time. The third user-supplied token arrived before the TTY prompt and was not relayed within the 60-second window; it does not count. A future activation requires a fresh human `ON-DUTY` at its prompt. The wrapper will stream TTY output and use the approved private thread as the contact route; only exact user-entered `ON-DUTY`/`ACK` strings will be relayed, never generated automatically. If no timely input arrives, stop without sampling.

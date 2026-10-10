@@ -32,7 +32,7 @@ Production uses:
 ```text
 ADMIN_WORLD_RUNTIME_MODE=cutover
 ADMIN_WORLD_RUNTIME_BASE_URL=http://world-runtime:8020
-WORLD_RUNTIME_FACTORY=scripts.production_world_runtime_stack:build
+WORLD_RUNTIME_FACTORY=scripts.domains.administrative.production_world_runtime_stack:build
 WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH=/var/lib/world-runtime/world-runtime.db
 ```
 
@@ -46,7 +46,7 @@ Use the root `.env.example` as the configuration inventory and inject deployment
 Run:
 
 ```bash
-uv run python scripts/production_preflight.py
+uv run python scripts/domains/administrative/production_preflight.py
 ```
 
 Production preflight requires:
@@ -65,12 +65,12 @@ The Administrative readiness endpoint also checks the running Runtime
 
 ## Starting World Runtime
 
-The production image is built from `Dockerfile.runtime`.
+The production image is built from the root `Dockerfile` (built with `--build-arg AIOS_APP_ROOT=/app`).
 
 The configured app is:
 
 ```bash
-WORLD_RUNTIME_FACTORY=scripts.production_world_runtime_stack:build \
+WORLD_RUNTIME_FACTORY=scripts.domains.administrative.production_world_runtime_stack:build \
 WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH=/var/lib/world-runtime/world-runtime.db \
 python -m uvicorn world_runtime.service:create_configured_app \
   --factory --host 0.0.0.0 --port 8020
@@ -147,7 +147,7 @@ If Runtime has a started durable attempt without a committed result, it forbids 
 Create an online SQLite backup:
 
 ```bash
-uv run python scripts/world_runtime_state_backup.py backup \
+uv run python scripts/domains/administrative/world_runtime_state_backup.py backup \
   "$WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH" \
   /secure-backups/world-runtime-$(date -u +%Y%m%dT%H%M%SZ).db
 ```
@@ -155,7 +155,7 @@ uv run python scripts/world_runtime_state_backup.py backup \
 Verify:
 
 ```bash
-uv run python scripts/world_runtime_state_backup.py verify \
+uv run python scripts/domains/administrative/world_runtime_state_backup.py verify \
   /secure-backups/world-runtime-20260920T090000Z.db
 ```
 
@@ -173,7 +173,7 @@ Do not restore into a live Runtime writer.
 Restore:
 
 ```bash
-uv run python scripts/world_runtime_state_backup.py restore \
+uv run python scripts/domains/administrative/world_runtime_state_backup.py restore \
   /secure-backups/world-runtime-approved.db \
   "$WORLD_RUNTIME_ADMIN_PRODUCTION_STATE_PATH" \
   --force
