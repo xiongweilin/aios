@@ -134,6 +134,23 @@ def test_receipt_fields_without_independent_verifier_are_not_evidence():
         item.observe_with_receipt(BIND, probe_name="read.subject", receipt=probe_receipt())
 
 
+@pytest.mark.parametrize(
+    "verifier",
+    [
+        lambda _receipt: "truthy-but-not-attested",
+        lambda _receipt: (_ for _ in ()).throw(OSError("protected evidence unavailable")),
+    ],
+)
+def test_malformed_or_unavailable_receipt_verifier_fails_closed(verifier):
+    item = cursor(verify_receipt=verifier)
+    item.next_step(BIND)
+    with pytest.raises(ContingentPolicyViolation, match="receipt"):
+        item.observe_with_receipt(
+            BIND, probe_name="read.subject", receipt=probe_receipt(),
+        )
+    assert item.next_step(BIND).kind == "blocked"
+
+
 def test_verified_but_unmodeled_observation_halts():
     item = cursor()
     item.next_step(BIND)
