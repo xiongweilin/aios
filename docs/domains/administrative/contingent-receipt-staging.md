@@ -19,6 +19,9 @@ effects). Then use `observe_with_receipt` and `resolve_effect_with_receipt`.
   kind, disposition and nonempty evidence/source references.
 - For a verified effect, the receipt must carry the independently bound durable
   effect identity. Names alone cannot identify a reality-changing attempt.
+- Real authorization and probe-qualification callbacks must return exactly
+  Boolean `True`. Truthy strings/objects, false values and callback failures
+  block the cursor; they cannot be interpreted as approval.
 - The verifier callback **must** independently resolve protected evidence and
   validate subject/operation, provenance, observation freshness, readback
   independence and the historical effect. The receipt fields do not prove this.
