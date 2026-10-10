@@ -35,6 +35,30 @@ class ProposedStep:
     reason: str = ""
 
 
+@dataclass(frozen=True)
+class EvidenceReceipt:
+    """An *untrusted* locator until an independent, bound receipt verifier accepts it.
+
+    The verifier must check the authoritative evidence store, correct subject,
+    source independence, effect identity and freshness; these are NOT inferred
+    from the fields or the receipt's Python type.
+    """
+    binding: CaseBinding
+    kind: Literal["probe", "effect"]
+    step_name: str
+    disposition: str
+    evidence_ref: str
+    source_ref: str
+    effect_identity: str = ""
+
+    def __post_init__(self) -> None:
+        if (not self.step_name or not self.disposition
+                or not self.evidence_ref or not self.source_ref):
+            raise ValueError("receipt requires step, disposition and evidence provenance")
+        if self.kind not in {"probe", "effect"}:
+            raise ValueError("receipt kind must be probe or effect")
+
+
 def _validate_policy_shape(
     root: Mapping[str, Any], *, max_depth: int = 32, max_nodes: int = 128,
 ) -> None:
@@ -105,6 +129,8 @@ class ContingentPolicyCursor:
         *,
         authorize_effect: Callable[[CaseBinding, str], bool],
         qualify_probe: Callable[[CaseBinding, str], bool],
+        verify_receipt: Callable[[EvidenceReceipt], bool] | None = None,
+        effect_identities: Mapping[str, str] | None = None,
     ) -> None:
         # Validate the *entire* future tree before staging the first step.
         # Then own a snapshot so callers cannot mutate a later branch.
@@ -114,6 +140,8 @@ class ContingentPolicyCursor:
         self._binding = binding
         self._authorize = authorize_effect
         self._qualify = qualify_probe
+        self._verify_receipt = verify_receipt
+        self._effect_identities = dict(effect_identities or {})
         self._pending: ProposedStep | None = None
         self._attempted: set[str] = set()
         self._blocked = False
@@ -165,6 +193,31 @@ class ContingentPolicyCursor:
         self._pending = ProposedStep(kind, name)
         return self._pending
 
+    def _check_receipt(
+        self, binding: CaseBinding, receipt: EvidenceReceipt,
+        *, kind: Literal["probe", "effect"], step_name: str,
+    ) -> None:
+        self._require_same_binding(binding)
+        if (not isinstance(receipt, EvidenceReceipt)
+                or receipt.binding != binding or receipt.kind != kind
+                or receipt.step_name != step_name
+                or self._verify_receipt is None):
+            self._blocked = True
+            raise ContingentPolicyViolation("missing or rebound independent receipt")
+        if kind == "effect":
+            expected = self._effect_identities.get(step_name)
+            if not expected or receipt.effect_identity != expected:
+                self._blocked = True
+                raise ContingentPolicyViolation("effect receipt identity is not bound")
+        elif receipt.effect_identity:
+            self._blocked = True
+            raise ContingentPolicyViolation("probe receipt carried effect identity")
+        # This callback must inspect independently protected evidence. The
+        # receipt's fields alone cannot attest source, scope or freshness.
+        if not self._verify_receipt(receipt):
+            self._blocked = True
+            raise ContingentPolicyViolation("independent receipt qualification failed")
+
     def observe(
         self,
         binding: CaseBinding,
@@ -172,6 +225,29 @@ class ContingentPolicyCursor:
         probe_name: str,
         observed_label: str,
         independent_readback: bool,
+    ) -> None:
+        # Compatibility API for simulation only. In receipt-enforced mode a
+        # caller-controlled True must NEVER bypass independent evidence.
+        if self._verify_receipt is not None:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent evidence receipt required")
+        self._advance_observation(
+            binding, probe_name=probe_name, observed_label=observed_label,
+            independent_readback=independent_readback,
+        )
+
+    def observe_with_receipt(
+        self, binding: CaseBinding, *, probe_name: str, receipt: EvidenceReceipt,
+    ) -> None:
+        self._check_receipt(binding, receipt, kind="probe", step_name=probe_name)
+        self._advance_observation(
+            binding, probe_name=probe_name,
+            observed_label=receipt.disposition, independent_readback=True,
+        )
+
+    def _advance_observation(
+        self, binding: CaseBinding, *, probe_name: str,
+        observed_label: str, independent_readback: bool,
     ) -> None:
         self._require_same_binding(binding)
         if (self._blocked or self._pending != ProposedStep("probe", probe_name)
@@ -192,6 +268,31 @@ class ContingentPolicyCursor:
         binding: CaseBinding,
         *,
         effect_name: str,
+        result: Literal["verified", "unknown", "failed"],
+        independent_readback: bool,
+    ) -> None:
+        if self._verify_receipt is not None and result == "verified":
+            self._blocked = True
+            raise ContingentPolicyViolation("independent effect receipt required")
+        self._advance_effect(
+            binding, effect_name=effect_name, result=result,
+            independent_readback=independent_readback,
+        )
+
+    def resolve_effect_with_receipt(
+        self, binding: CaseBinding, *, effect_name: str, receipt: EvidenceReceipt,
+    ) -> None:
+        self._check_receipt(binding, receipt, kind="effect", step_name=effect_name)
+        if receipt.disposition != "verified":
+            self._blocked = True
+            raise ContingentPolicyViolation("effect receipt does not verify completion")
+        self._advance_effect(
+            binding, effect_name=effect_name, result="verified",
+            independent_readback=True,
+        )
+
+    def _advance_effect(
+        self, binding: CaseBinding, *, effect_name: str,
         result: Literal["verified", "unknown", "failed"],
         independent_readback: bool,
     ) -> None:
