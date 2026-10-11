@@ -35,6 +35,30 @@ class ProposedStep:
     reason: str = ""
 
 
+@dataclass(frozen=True)
+class EvidenceReceipt:
+    """An *untrusted* locator until an independent, bound receipt verifier accepts it.
+
+    The verifier must check the authoritative evidence store, correct subject,
+    source independence, effect identity and freshness; these are NOT inferred
+    from the fields or the receipt's Python type.
+    """
+    binding: CaseBinding
+    kind: Literal["probe", "effect"]
+    step_name: str
+    disposition: str
+    evidence_ref: str
+    source_ref: str
+    effect_identity: str = ""
+
+    def __post_init__(self) -> None:
+        if (not self.step_name or not self.disposition
+                or not self.evidence_ref or not self.source_ref):
+            raise ValueError("receipt requires step, disposition and evidence provenance")
+        if self.kind not in {"probe", "effect"}:
+            raise ValueError("receipt kind must be probe or effect")
+
+
 def _validate_policy_shape(
     root: Mapping[str, Any], *, max_depth: int = 32, max_nodes: int = 128,
 ) -> None:
@@ -105,6 +129,8 @@ class ContingentPolicyCursor:
         *,
         authorize_effect: Callable[[CaseBinding, str], bool],
         qualify_probe: Callable[[CaseBinding, str], bool],
+        verify_receipt: Callable[[EvidenceReceipt], bool] | None = None,
+        effect_identities: Mapping[str, str] | None = None,
     ) -> None:
         # Validate the *entire* future tree before staging the first step.
         # Then own a snapshot so callers cannot mutate a later branch.
@@ -114,8 +140,13 @@ class ContingentPolicyCursor:
         self._binding = binding
         self._authorize = authorize_effect
         self._qualify = qualify_probe
+        self._verify_receipt = verify_receipt
+        self._effect_identities = dict(effect_identities or {})
         self._pending: ProposedStep | None = None
         self._attempted: set[str] = set()
+        # A repeated named probe needs a FRESH independent observation.
+        # Reusing a locator (even with a rebound source name) cannot advance a later step.
+        self._consumed_receipts: set[str] = set()
         self._blocked = False
 
     def _require_same_binding(self, binding: CaseBinding) -> None:
@@ -124,6 +155,21 @@ class ContingentPolicyCursor:
             raise ContingentPolicyViolation(
                 "case, authority epoch or state version changed; recompile"
             )
+
+    def _require_gate(
+        self, callback: Callable[[CaseBinding, str], bool],
+        binding: CaseBinding, name: str, denial: str,
+    ) -> None:
+        # Live authorization/probe qualification is not a stringly-typed
+        # attestation. Errors and truthy non-bools always fail closed.
+        try:
+            allowed = callback(binding, name)
+        except Exception as exc:
+            self._blocked = True
+            raise ContingentPolicyViolation(denial + " (callback unavailable)") from exc
+        if allowed is not True:
+            self._blocked = True
+            raise ContingentPolicyViolation(denial)
 
     def next_step(self, binding: CaseBinding) -> ProposedStep:
         self._require_same_binding(binding)
@@ -145,16 +191,19 @@ class ContingentPolicyCursor:
             if name in self._attempted:
                 self._blocked = True
                 raise ContingentPolicyViolation("effect identity already attempted")
-            if not self._authorize(binding, name):
+            if self._verify_receipt is not None and not self._effect_identities.get(name):
                 self._blocked = True
-                raise ContingentPolicyViolation("effect not authorized by live policy")
+                raise ContingentPolicyViolation("effect lacks durable identity in receipt-enforced mode")
+            self._require_gate(
+                self._authorize, binding, name, "effect not authorized by live policy",
+            )
             if not isinstance(self._node.get("next"), dict):
                 self._blocked = True
                 raise ContingentPolicyViolation("effect continuation missing")
         elif kind == "probe":
-            if not self._qualify(binding, name):
-                self._blocked = True
-                raise ContingentPolicyViolation("untrusted or unavailable readback source")
+            self._require_gate(
+                self._qualify, binding, name, "untrusted or unavailable readback source",
+            )
             branches = self._node.get("branches")
             if not isinstance(branches, dict) or not branches:
                 self._blocked = True
@@ -165,6 +214,42 @@ class ContingentPolicyCursor:
         self._pending = ProposedStep(kind, name)
         return self._pending
 
+    def _check_receipt(
+        self, binding: CaseBinding, receipt: EvidenceReceipt,
+        *, kind: Literal["probe", "effect"], step_name: str,
+    ) -> None:
+        self._require_same_binding(binding)
+        if (not isinstance(receipt, EvidenceReceipt)
+                or receipt.binding != binding or receipt.kind != kind
+                or receipt.step_name != step_name
+                or self._verify_receipt is None):
+            self._blocked = True
+            raise ContingentPolicyViolation("missing or rebound independent receipt")
+        if kind == "effect":
+            expected = self._effect_identities.get(step_name)
+            if not expected or receipt.effect_identity != expected:
+                self._blocked = True
+                raise ContingentPolicyViolation("effect receipt identity is not bound")
+        elif receipt.effect_identity:
+            self._blocked = True
+            raise ContingentPolicyViolation("probe receipt carried effect identity")
+        if receipt.evidence_ref in self._consumed_receipts:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent evidence receipt already consumed")
+        # This callback must inspect independently protected evidence. The
+        # receipt's fields alone cannot attest source, scope or freshness.
+        try:
+            qualified = self._verify_receipt(receipt)
+        except Exception as exc:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent receipt verifier unavailable") from exc
+        if qualified is not True:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent receipt qualification failed")
+        # Consume before moving the policy cursor. Even if the subsequent
+        # transition fails, this identity may not certify a different step.
+        self._consumed_receipts.add(receipt.evidence_ref)
+
     def observe(
         self,
         binding: CaseBinding,
@@ -173,12 +258,37 @@ class ContingentPolicyCursor:
         observed_label: str,
         independent_readback: bool,
     ) -> None:
+        # Compatibility API for simulation only. In receipt-enforced mode a
+        # caller-controlled True must NEVER bypass independent evidence.
+        if self._verify_receipt is not None:
+            self._blocked = True
+            raise ContingentPolicyViolation("independent evidence receipt required")
+        self._advance_observation(
+            binding, probe_name=probe_name, observed_label=observed_label,
+            independent_readback=independent_readback,
+        )
+
+    def observe_with_receipt(
+        self, binding: CaseBinding, *, probe_name: str, receipt: EvidenceReceipt,
+    ) -> None:
+        self._check_receipt(binding, receipt, kind="probe", step_name=probe_name)
+        self._advance_observation(
+            binding, probe_name=probe_name,
+            observed_label=receipt.disposition, independent_readback=True,
+        )
+
+    def _advance_observation(
+        self, binding: CaseBinding, *, probe_name: str,
+        observed_label: str, independent_readback: bool,
+    ) -> None:
         self._require_same_binding(binding)
         if (self._blocked or self._pending != ProposedStep("probe", probe_name)
-                or not independent_readback
-                or not self._qualify(binding, probe_name)):
+                or not independent_readback):
             self._blocked = True
             raise ContingentPolicyViolation("observation is unqualified or unrequested")
+        self._require_gate(
+            self._qualify, binding, probe_name, "observation is unqualified or unrequested",
+        )
         branches = self._node["branches"]
         continuation = branches.get(observed_label)
         if not isinstance(continuation, dict):
@@ -192,6 +302,31 @@ class ContingentPolicyCursor:
         binding: CaseBinding,
         *,
         effect_name: str,
+        result: Literal["verified", "unknown", "failed"],
+        independent_readback: bool,
+    ) -> None:
+        if self._verify_receipt is not None and result == "verified":
+            self._blocked = True
+            raise ContingentPolicyViolation("independent effect receipt required")
+        self._advance_effect(
+            binding, effect_name=effect_name, result=result,
+            independent_readback=independent_readback,
+        )
+
+    def resolve_effect_with_receipt(
+        self, binding: CaseBinding, *, effect_name: str, receipt: EvidenceReceipt,
+    ) -> None:
+        self._check_receipt(binding, receipt, kind="effect", step_name=effect_name)
+        if receipt.disposition != "verified":
+            self._blocked = True
+            raise ContingentPolicyViolation("effect receipt does not verify completion")
+        self._advance_effect(
+            binding, effect_name=effect_name, result="verified",
+            independent_readback=True,
+        )
+
+    def _advance_effect(
+        self, binding: CaseBinding, *, effect_name: str,
         result: Literal["verified", "unknown", "failed"],
         independent_readback: bool,
     ) -> None:
@@ -211,12 +346,15 @@ class ContingentPolicyCursor:
             probe_name = continuation.get("name")
             if (continuation.get("kind") != "probe"
                     or not isinstance(probe_name, str)
-                    or not probe_name
-                    or not self._qualify(binding, probe_name)):
+                    or not probe_name):
                 self._blocked = True
                 raise ContingentPolicyViolation(
                     "effect unknown without qualified reconciliation probe"
                 )
+            self._require_gate(
+                self._qualify, binding, probe_name,
+                "effect unknown without qualified reconciliation probe",
+            )
             self._node = continuation
             self._pending = None
             return
