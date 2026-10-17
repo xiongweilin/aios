@@ -4,9 +4,9 @@
 
 [English](./precise-semantics.md) | [简体中文](./precise-semantics.zh-CN.md)
 
-> Role: translate "reality — purposeful finite actor — six-dimensional boundary — sufficiency — exploration/decision — action chain" into implementable, verifiable engineering semantics that resist silent substitution.
+> Role: apply guide’s key distinctions, relevant systems analysis, and proportionate checks to bounded AIOS actions. This is engineering analysis, not a universal ontology or mandatory pipeline.
 
-The engineering goal is not six fields, six tables, or six services, and not a universal `sufficient=true`. The dimensions describe the current boundary; epistemic status cuts across representations; sufficiency gates concrete transitions; exploration and decision are activities; the action chain connects decision to reality and returns feedback.
+The engineering goal is not to turn analytical topics into six fields, tables, or services or to create a universal `sufficient=true`. The nine key distinctions clarify claims; six system perspectives examine relevant structures and levels. Formation of distinctions and five topics serve problem-specific analysis. Sufficiency is scoped to a purpose and proposed transition; inquiry need not anticipate a decision, and the action chain distinguishes choice, authority, execution and outcome.
 
 A semantic distinction does not automatically require an independent class, durable entity, table, or service. Split implementation objects only when independent identity, lifecycle, authority, concurrency, provenance, recovery, or retention materially matters.
 
@@ -15,8 +15,8 @@ A semantic distinction does not automatically require an independent class, dura
 ```text
 reality-side input / trigger
 → distinction and current boundary
-→ sufficiency check
-→ exploration or decision
+→ grounds for proposed transition (where needed)
+→ inquiry if relevant / reasoned decision
 → governance basis / authorization
 → execution
 → real-world effect
@@ -54,9 +54,9 @@ boundary context
 
 A fixed, already-sufficient machine contract may avoid repeatedly persisting the full context, but not bypass a materially changed semantic boundary.
 
-## 2. Minimum engineering responsibility of the six dimensions
+## 2. Problem-dependent engineering semantic checks
 
-| Dimension | Preserve at least |
+| Analysis topic (as needed) | Preserve when relevant |
 | --- | --- |
 | Distinction | objects, fields, categories, scope, problem framing, versions |
 | Relation | dependencies, roles, authority, ownership, composition, network, participants |
@@ -558,7 +558,7 @@ These need not each be independent durable entities.
 16. Critical dependency changes trigger review / revalidation.
 17. Revalidation does not automatically renew authority; reopening does not authorize action.
 18. Completion does not automatically discharge long-term responsibility.
-19. Six dimensions need not map one-to-one to fields, services, or layers.
+19. Analytical topics need not map to fields, services, or layers and do not replace the six system perspectives.
 20. Role separation does not automatically create failure independence.
 21. Local sufficiency does not automatically establish composition-level sufficiency.
 22. A competing framing need not translate into current vocabulary before it can challenge the framework.
@@ -627,4 +627,4 @@ Conditional conformance checks:
 - Do not silently change the baseline, horizon, evaluation population, or loss function when comparing forecast versions.
 - Observed outcomes alone do not identify causal effects or modify the authorization chain.
 
-See the [judgment and prediction validation protocol](https://github.com/xiongweilin/guide/blob/main/framework/judgment-validation.md) and [ten multi-actor cases](https://github.com/xiongweilin/guide/blob/main/framework/examples/judgment-prediction-cases.md) for methods and finite regression fixtures.
+See the [evaluation methods](https://github.com/xiongweilin/guide/blob/main/framework/methods/evaluation.md), [prediction cases](https://github.com/xiongweilin/guide/blob/main/applications/cases/prediction.md), and [interaction cases](https://github.com/xiongweilin/guide/blob/main/applications/cases/interaction.md) for methods and finite regression fixtures.

@@ -4,9 +4,9 @@
 
 [English](./precise-semantics.md) | [简体中文](./precise-semantics.zh-CN.md)
 
-> 定位：把“现实—目的性有限行动者—当前边界—充分性—探索/决策—现实反馈”转成可实现、可验证且不允许静默替代的工程语义。
+> 定位：把 guide 的关键区分、相关系统观察与相称检验用于 AIOS 有界行动；这是工程分析，不是通用本体或必经流程。
 
-工程目标不是把六维实现成六个字段、六张表、六个服务，也不是建立一个总控式 `sufficient=true`。六维描述当前边界；认识状态横切当前表示；充分性控制具体转换；探索和决策是活动；行动链负责把决定连接到现实并回流反馈。
+工程目标不是把分析专题固定成六个字段、表或服务，也不是建立通用的 `sufficient=true`。九组关键区分用于澄清主张，六个系统观察维度按需检查结构与层次；区分形成和五个专题供具体问题深入分析。充分性适用于指定目的和下一转换，探索不必预设决策，行动链则分别处理决定、授权、执行与结果。
 
 一个语义区分也不自动要求独立 class、durable entity、表或 service。只有独立 identity、lifecycle、authority、concurrency、provenance、recovery 或 retention 真正重要时才拆分实现对象。
 
@@ -15,8 +15,8 @@
 ```text
 现实侧输入 / 触发
 → 区分与当前边界
-→ 充分性检查
-→ 探索或决策
+→ 针对拟议转换检查依据（需要时）
+→ 按需探索 / 形成决定
 → 治理依据 / 授权
 → 执行
 → 现实效果
@@ -54,9 +54,9 @@
 
 固定且已经充分验证的机器契约可以避免重复持久化完整上下文，但不能跳过真正改变语义边界的检查。
 
-## 2. 六维在工程中的最小责任
+## 2. 按需调用的工程语义检查
 
-| 维度 | 工程上至少保存 |
+| 分析主题（按需） | 工程上相关时保存 |
 | --- | --- |
 | 区分 | 对象、字段、类别、范围、问题框定及其版本 |
 | 关系 | 依赖、角色、权限、所有、组成、网络与参与者关系 |
@@ -533,7 +533,7 @@ audit_record
 16. 关键依赖变化进入复核 / 重新验证。
 17. 重新验证不自动续权；重新打开不自动授权。
 18. 完成不自动等于长期责任解除。
-19. 六维不要求一一对应字段、服务或层。
+19. 分析专题不要求一一对应字段、服务或层，也不是六个系统观察维度的替代品。
 20. 角色分离不自动产生故障独立。
 21. 局部充分不自动建立组合整体充分。
 22. 竞争框定不需要先翻译成当前框架才有挑战资格。
@@ -602,4 +602,4 @@ audit_record
 - 预测版本之间的改进比较不能事后改换基线、时间窗口、样本总体或损失函数而不披露；
 - 已观察结果不自动证明干预因果效应，也不改变现有授权链。
 
-具体方法与有限回归案例见[判断与预测验证协议](https://github.com/xiongweilin/guide/blob/main/framework/judgment-validation.zh-CN.md)和[十个多行动者案例](https://github.com/xiongweilin/guide/blob/main/framework/examples/judgment-prediction-cases.zh-CN.md)。
+具体方法与有限回归案例见[评估方法](https://github.com/xiongweilin/guide/blob/main/framework/methods/evaluation.zh-CN.md)、[预测案例](https://github.com/xiongweilin/guide/blob/main/applications/cases/prediction.zh-CN.md)和[互动案例](https://github.com/xiongweilin/guide/blob/main/applications/cases/interaction.zh-CN.md)。

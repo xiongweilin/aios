@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-`guide` 维护最小推导与概念框架。对照 AIOS 现有文档后，原 `guide/engineering/` 的三组中英文文档已迁入此处，**保留原有实质内容**，避免删除尚未集中收录的工程分析。这些文件是**非权威设计参考**，不是与 AIOS 现行契约并列的实施规范。
+`guide` 维护九组关键区分、六个系统观察维度、四条原则、按需方法和专门有界行动研究。对照 AIOS 现有文档后，原 `guide/engineering/` 的三组中英文文档已迁入此处，**保留原有实质内容**，避免删除尚未集中收录的工程分析。这些文件是**非权威设计参考**，不是与 AIOS 现行契约并列的实施规范。
 
 | 迁入文档 | AIOS 现行相关文档 |
 | --- | --- |
@@ -20,4 +20,4 @@
 
 有限结构检查、隔离真实产品验收和正负并存的前瞻委托实验，**不能**证明 AIOS 所有操作均经过 BAA、生产部署已获认证、全部外部损害可以测量或人工总复核成本已经下降。具体 AIOS 部署仍以现行契约、代码和相应测试为准；BAA 的现实保证还需要另行验证接口、证据桥接、假设和版本。
 
-[guide 影响路径](https://github.com/xiongweilin/guide/blob/main/use/studies/impact-pathway.zh-CN.md)梳理了从有界执行到总人工劳动与用户收益之间尚未测量的环节。它用于限定主张，不是 AIOS 产品保证。
+[guide 影响路径](https://github.com/xiongweilin/guide/blob/main/research/studies/impact-pathway.zh-CN.md)梳理了从有界执行到总人工劳动与用户收益之间尚未测量的环节。它用于限定主张，不是 AIOS 产品保证。
