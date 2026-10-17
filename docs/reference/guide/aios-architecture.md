@@ -505,11 +505,10 @@ New capability does not automatically require new runtime semantics. A stronger 
 
 ```text
 guide
-  reality / purposeful finite actor
-  six-dimensional boundary
-  sufficiency
-  exploration / decision
-  action chain
+  nine key distinctions / four operating principles
+  six system perspectives (where relevant)
+  scoped topics and conditional methods
+  bounded-action analysis (for AIOS)
        │
        ▼
 aios/semantic-language
