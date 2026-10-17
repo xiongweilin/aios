@@ -4,7 +4,7 @@
 
 [English](./aios-architecture.md) | [简体中文](./aios-architecture.zh-CN.md)
 
-> Role: realize "reality — purposeful finite actor — six-dimensional boundary — sufficiency — exploration/decision — action chain" in a long-running autonomous AI system. AIOS is an application of the framework, not its source.
+> Role: apply guide’s problem-anchored distinctions, relevant systems analysis and proportionate judgment to a long-running AIOS. AIOS is a bounded-action application, not the source of general theory.
 
 ## 1. From framework to runtime
 
@@ -12,13 +12,13 @@ AIOS is itself a purposeful finite actor. It does not implement "reality" as a t
 
 The runtime needs to preserve:
 
-- **current boundary**: distinction, relation, causality, temporality, possibility, value;
+- **current boundary**: problem objects, significant unknowns and default categories; analyze relations, causality, time, possibility and value as needed;
 - **epistemic status**: provenance, evidence, unknowns, disputes, versions, freshness;
 - **sufficiency basis**: why the current transition is sufficient now;
-- **exploration / decision state**: reopen when insufficient, choose when sufficient;
+- **exploration / decision state**: investigate gaps where relevant and decide when grounds match the proposed commitment;
 - **action chain**: decision, authorization, execution, real-world effect, observation, verification, outcome, recovery, reopening.
 
-The six dimensions do not map to six services. They are semantic requirements that can be carried by different domain objects.
+These analytical topics are not guide’s six system perspectives or six mandatory engineering owners. Current domain contracts define the operative semantic obligations.
 
 ## 2. Long-running loop
 
@@ -113,7 +113,7 @@ A container is a deployment boundary, not a durable semantic owner. Internal Age
 
 | Component | Ownership |
 | --- | --- |
-| guide | Minimal derivation, conceptual framework, six working lenses, sufficiency, exploration and decision |
+| guide | Nine key distinctions, six system perspectives, four principles, scoped methods and specialized bounded-action research |
 | aios | AIOS source monorepo |
 | semantic-language | stable cross-domain role vocabulary, references, normalization, non-substitution |
 | personal-world | durable personal facts, preferences, relations, resource refs, provenance, revision, freshness, privacy, purpose-limited context |

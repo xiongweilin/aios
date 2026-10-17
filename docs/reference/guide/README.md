@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-The `guide` repository maintains its minimal derivation and conceptual framework. The engineering analysis formerly in `guide/engineering/` has been moved here after comparing existing AIOS documentation. The substantive content of all six files is preserved to avoid losing material not assembled into a single AIOS document. These are **non-normative design references**—not parallel implementation contracts.
+The `guide` repository maintains nine key distinctions, six system perspectives, four operating principles, scoped methods and specialized bounded-action research. The engineering analysis formerly in `guide/engineering/` has been moved here after comparing existing AIOS documentation. The substantive content of all six files is preserved to avoid losing material not assembled into a single AIOS document. These are **non-normative design references**—not parallel implementation contracts.
 
 | Migrated reference | Maintained AIOS documentation |
 | --- | --- |
@@ -20,4 +20,4 @@ Original source snapshot: [guide 511c073](https://github.com/xiongweilin/guide/t
 
 Its finite checks, isolated product acceptance, and mixed prospective delegation studies do **not** establish that all AIOS runtime operations pass through BAA, that production deployments are certified, that all external harm is measurable, or that total human review labor declines. For any concrete AIOS deployment, authorization and effect semantics remain governed by the current AIOS contracts, code, and independently applicable tests; a BAA guarantee requires a separately qualified interface, evidence bridge, assumptions, and version.
 
-The [guide impact pathway](https://github.com/xiongweilin/guide/blob/main/use/studies/impact-pathway.md) maps the unmeasured steps from bounded execution to total human labor and user benefit. It is a claim-boundary note, not an AIOS product guarantee.
+The [guide impact pathway](https://github.com/xiongweilin/guide/blob/main/research/studies/impact-pathway.md) maps the unmeasured steps from bounded execution to total human labor and user benefit. It is a claim-boundary note, not an AIOS product guarantee.
